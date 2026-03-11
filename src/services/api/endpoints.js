@@ -1,0 +1,57 @@
+const BASE_URL = import.meta.env.VITE_API_URL;
+
+export const ENDPOINTS = {
+  AUTH: {
+    GOOGLE_ADMIN_LOGIN: `${BASE_URL}/auth/google-admin-login`,
+    REFRESH: `${BASE_URL}/auth/refresh`,
+    LOGOUT: `${BASE_URL}/auth/logout`,
+    ME: `${BASE_URL}/auth/me`
+  },
+  
+  PERSONAL: {
+    LIST: `${BASE_URL}/admin/personal`,
+    GET: (id) => `${BASE_URL}/admin/personal/${id}`,           
+    CREATE: `${BASE_URL}/admin/personal`,
+    UPDATE: (id) => `${BASE_URL}/admin/personal/${id}`,
+    PATCH: (id) => `${BASE_URL}/admin/personal/${id}`,
+    DELETE: (id) => `${BASE_URL}/admin/personal/${id}`,
+    TOGGLE_ACTIVO: (id) => `${BASE_URL}/admin/personal/${id}/activar`,
+    RESTAURAR: (id) => `${BASE_URL}/admin/personal/${id}/restaurar`
+  },
+
+  UNIDADES: {
+    LIST: `${BASE_URL}/admin/unidades`,
+    GET: (id) => `${BASE_URL}/admin/unidades/${id}`,          
+    CREATE: `${BASE_URL}/admin/unidades`,
+    UPDATE: (id) => `${BASE_URL}/admin/unidades/${id}`,
+    DELETE: (id) => `${BASE_URL}/admin/unidades/${id}`,
+    RESTAURAR: (id) => `${BASE_URL}/admin/unidades/${id}/restaurar`,
+    ASIGNAR: (id) => `${BASE_URL}/admin/unidades/${id}/asignar`,
+    REMOVER: (id) => `${BASE_URL}/admin/unidades/${id}/remover`,
+    PERSONAL_DISPONIBLE: (id) => `${BASE_URL}/admin/unidades/${id}/disponibles`,
+    TOGGLE_ACTIVA: (id) => `${BASE_URL}/admin/unidades/${id}/toggle-activa`
+  },
+
+  ALERTAS: {
+    EXPIRADAS: `${BASE_URL}/admin/alertas/expiradas`,
+    CERRADAS_MANUAL: `${BASE_URL}/admin/alertas/cerradas-manual`,
+    ESTADISTICAS: `${BASE_URL}/admin/alertas/estadisticas-no-atendidas`,
+     // Acciones
+    CERRAR_INDIVIDUAL: (id) => `${BASE_URL}/admin/alertas/${id}/cerrar-manual`,
+    CERRAR_MASIVO: `${BASE_URL}/admin/alertas/cerrar-masivo`,
+    FORZAR_EXPIRACION: `${BASE_URL}/admin/alertas/forzar-expiracion`
+  },
+
+  REASIGNACIONES: {
+    PENDIENTES: `${BASE_URL}/admin/reasignaciones/pendientes`,
+    UNIDADES_DISPONIBLES: (alertaId) => `${BASE_URL}/admin/reasignaciones/${alertaId}/disponibles`,
+    REASIGNAR: (alertaId) => `${BASE_URL}/admin/reasignaciones/${alertaId}`
+
+  },
+
+  RECUPERACIONES: {
+    PENDIENTES: `${BASE_URL}/admin/recuperaciones/pendientes`,
+    APROBAR: (id) => `${BASE_URL}/admin/recuperaciones/${id}/aprobar`,
+    RECHAZAR: (id) => `${BASE_URL}/admin/recuperaciones/${id}/rechazar`
+  }
+};

@@ -1,0 +1,80 @@
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { GoogleOAuthProvider } from '@react-oauth/google';
+import Home from '../pages/Home';
+import Login from '../pages/auth/Login';
+import AdminLayout from '../components/layout/AdminLayout';
+import Dashboard from '../pages/admin/Dashboard';
+import PersonalList from '../pages/admin/personal/PersonalList';
+import PersonalForm from '../pages/admin/personal/PersonalForm';
+import PersonalDetail from '../pages/admin/personal/PersonalDetail';
+import AlertasExpiradas from '../pages/admin/alertas/AlertasExpiradas'; 
+import PrivateRoute from './PrivateRoute';
+import AlertasCerradasManual from '../pages/admin/alertas/AlertasCerradasManual';
+import RecuperacionesPendientes from '../pages/admin/recuperaciones/RecuperacionesPendientes';
+import UnidadesList from '../pages/admin/unidades/UnidadesList';
+import UnidadForm from '../pages/admin/unidades/UnidadForm';
+import UnidadDetail from '../pages/admin/unidades/UnidadDetail';
+import AlertaDetail from '../pages/admin/alertas/AlertaDetail';
+import ReasignacionesPendientes from '../pages/admin/reasignaciones/ReasignacionesPendientes';
+import ReportesMenu from '../pages/admin/reportes/ReportesMenu';
+import GeneradorReporte from '../pages/admin/reportes/GeneradorReporte';
+import Perfil from '../pages/admin/Perfil';
+
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+const AppRouter = () => {
+  return (
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+      <BrowserRouter>
+        <Routes>
+          {/*  pantalla principal de web */}
+          <Route path="/" element={<Home />} />
+
+          {/*  ruta del login */}
+          <Route path="/login" element={<Login />} />
+
+          {/* rutas protegias del rol admin*/}
+          <Route path="/admin" element={
+            <PrivateRoute allowedRoles={['admin', 'superadmin']}>
+              <AdminLayout />
+            </PrivateRoute>
+          }>
+            <Route path="dashboard" element={<Dashboard />} />
+            <Route path="perfil" element={<Perfil />} />
+            <Route path="personal" element={<PersonalList />} />
+            <Route path="personal/crear" element={<PersonalForm />} />
+            <Route path="personal/editar/:id" element={<PersonalForm />} />
+            <Route path="personal/:id" element={<PersonalDetail />} />
+            <Route path="alertas/expiradas" element={<AlertasExpiradas />} /> 
+            <Route path="alertas/cerradas-manual" element={<AlertasCerradasManual />} />
+            <Route path="recuperaciones/pendientes" element={<RecuperacionesPendientes />} />
+            <Route path="unidades" element={<UnidadesList />} />
+            <Route path="unidades/crear" element={<UnidadForm />} />
+            <Route path="unidades/editar/:id" element={<UnidadForm />} />
+            <Route path="unidades/:id" element={<UnidadDetail />} />
+            <Route path="alertas/:id" element={<AlertaDetail />} />
+            <Route path="reasignaciones/pendientes" element={<ReasignacionesPendientes />} />
+            <Route path="reportes" element={<ReportesMenu />} />
+            <Route path="reportes/:tipo" element={<GeneradorReporte />} />
+            <Route index element={<Navigate to="/admin/dashboard" />} />
+          </Route>
+
+          {/* rutas protegidas del superadmin-NOSOTROS-(PASARELAS DE PAGOS, ALTA DE MUNICIPIOS) */}
+          <Route path="/superadmin" element={
+            <PrivateRoute allowedRoles={['superadmin']}>
+              <AdminLayout />
+            </PrivateRoute>
+          }>
+            <Route path="dashboard" element={<Dashboard />} />
+            <Route index element={<Navigate to="/superadmin/dashboard" />} />
+          </Route>
+
+          {/* retorno a pantalla principal si no encuntra la ruta */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </GoogleOAuthProvider>
+  );
+};
+
+export default AppRouter;
