@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  AlertTriangle, Clock, MapPin, User, Calendar, Shield,
-  ChevronLeft, ChevronRight, Filter, Search, Download,
-  CheckCircle, XCircle, Activity
+  ChevronLeft, ChevronRight, Filter, Search, Calendar, User, MapPin,
+  Shield, XCircle, Clock
 } from 'lucide-react';
 import alertasService from '../../../services/admin/alertas.service';
 import useAuthStore from '../../../store/authStore';
@@ -13,11 +12,19 @@ const AlertasCerradasManual = () => {
   const { user } = useAuthStore();
   const [alertas, setAlertas] = useState([]);
   const [cargando, setCargando] = useState(true);
+  
   const [filtros, setFiltros] = useState({
     limite: 10,
     pagina: 1,
-    admin_id: ''
+    admin_id: '',
+    desde: '',
+    hasta: '',
+    search: ''
   });
+
+  const [searchInput, setSearchInput] = useState('');
+  const [searchTimeout, setSearchTimeout] = useState(null);
+
   const [paginacion, setPaginacion] = useState({
     total: 0,
     pagina: 1,
@@ -27,7 +34,20 @@ const AlertasCerradasManual = () => {
 
   useEffect(() => {
     cargarAlertas();
-  }, [filtros.pagina]);
+  }, [filtros.pagina, filtros.desde, filtros.hasta, filtros.admin_id]);
+
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    setSearchInput(value);
+
+    if (searchTimeout) clearTimeout(searchTimeout);
+
+    const timeout = setTimeout(() => {
+      setFiltros(prev => ({ ...prev, search: value, pagina: 1 }));
+    }, 500);
+
+    setSearchTimeout(timeout);
+  };
 
   const cargarAlertas = async () => {
     setCargando(true);
@@ -47,165 +67,254 @@ const AlertasCerradasManual = () => {
     }
   };
 
-  // Función para manejar clic en fila
+  const aplicarFiltros = () => {
+    setFiltros(prev => ({ ...prev, pagina: 1 }));
+  };
+
+  const limpiarFiltros = () => {
+    setSearchInput('');
+    setFiltros({
+      limite: 10,
+      pagina: 1,
+      admin_id: '',
+      desde: '',
+      hasta: '',
+      search: ''
+    });
+  };
+
   const handleRowClick = (alertaId) => {
     navigate(`/admin/alertas/${alertaId}`);
   };
 
+  const formatearFecha = (fecha) => {
+    return new Date(fecha).toLocaleString('es-MX', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
   return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">Alertas Cerradas Manualmente</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Alertas que fueron cerradas por administradores
-          </p>
-        </div>
-        <button
-          onClick={() => navigate('/admin/dashboard')}
-          className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-        >
-          <ChevronLeft size={18} />
-          Volver al Dashboard
-        </button>
-      </div>
-
-      {/* Filtros */}
-      <div className="bg-white rounded-xl shadow p-4 mb-6">
-        <div className="flex items-center gap-4">
-          <div className="flex-1 relative">
-            <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Buscar alertas..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+    <div className="p-6 bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-6">
+          <div className="flex items-center gap-3">
+            <div className="bg-white p-2 rounded-xl shadow-lg shadow-slate-200/50">
+              <XCircle size={24} className="text-purple-600" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-slate-800">Alertas Cerradas Manualmente</h1>
+              <p className="text-xs text-slate-500">Historial de alertas cerradas por administradores</p>
+            </div>
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50">
-            <Filter size={18} className="text-gray-500" />
-            Filtrar
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50">
-            <Download size={18} className="text-gray-500" />
-            Exportar
+          
+          <button
+            onClick={() => navigate('/admin/dashboard')}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl shadow-sm hover:bg-purple-50 hover:border-purple-200 hover:text-purple-700 transition-all text-slate-600 text-sm font-medium"
+          >
+            <ChevronLeft size={16} />
+            Dashboard
           </button>
         </div>
-      </div>
 
-      {/* Tabla de Alertas */}
-      <div className="bg-white rounded-xl shadow overflow-hidden">
-        {cargando ? (
-          <div className="p-8 text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-2 text-gray-500">Cargando alertas...</p>
+        {/* Panel de filtros */}
+        <div className="bg-white rounded-2xl shadow-lg shadow-slate-200/50 p-5 mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Filter size={16} className="text-purple-500" />
+            <span className="text-sm font-medium text-slate-700">Filtros</span>
+            <span className="text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full ml-2">
+              Tiempo real
+            </span>
           </div>
-        ) : alertas.length === 0 ? (
-          <div className="p-12 text-center">
-            <CheckCircle size={48} className="text-green-500 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-800 mb-2">No hay alertas cerradas manualmente</h3>
-            <p className="text-sm text-gray-500">Todas las alertas han sido cerradas automáticamente</p>
-          </div>
-        ) : (
-          <>
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ciudadano</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cerrado por</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Motivo</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ubicación</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {alertas.map((alerta) => (
-                  <tr 
-                    key={alerta.id} 
-                    className="hover:bg-gray-50 cursor-pointer transition-colors"
-                    onClick={() => handleRowClick(alerta.id)}
-                  >
-                    <td className="px-6 py-4 text-sm text-gray-600">#{alerta.id}</td>
-                    <td className="px-6 py-4">
-                      <span className={`text-xs px-2 py-1 rounded-full ${
-                        alerta.tipo === 'panico' 
-                          ? 'bg-red-100 text-red-700' 
-                          : 'bg-yellow-100 text-yellow-700'
-                      }`}>
-                        {alerta.tipo}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <User size={14} className="text-gray-400" />
-                        <span className="text-sm text-gray-600">
-                          {alerta.ciudadano?.nombre || 'Desconocido'}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <Shield size={14} className="text-gray-400" />
-                        <span className="text-sm text-gray-600">
-                          {alerta.cerrador?.nombre || 'Admin'}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-gray-600 max-w-xs truncate">
-                        {alerta.motivo_cierre_manual || 'Sin motivo'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <Calendar size={14} className="text-gray-400" />
-                        <span className="text-sm text-gray-600">
-                          {new Date(alerta.fecha_cierre).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      {alerta.lat && alerta.lng ? (
-                        <span className="text-xs text-gray-500">
-                          {alerta.lat.toFixed(4)}, {alerta.lng.toFixed(4)}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-gray-400">Sin ubicación</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            {/* Paginación */}
-            <div className="px-6 py-4 border-t flex items-center justify-between">
-              <p className="text-sm text-gray-500">
-                Mostrando {((paginacion.pagina - 1) * paginacion.limite) + 1} a{' '}
-                {Math.min(paginacion.pagina * paginacion.limite, paginacion.total)} de{' '}
-                {paginacion.total} alertas
-              </p>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setFiltros(prev => ({ ...prev, pagina: prev.pagina - 1 }))}
-                  disabled={paginacion.pagina === 1}
-                  className="px-3 py-1 border rounded-lg hover:bg-gray-50 disabled:opacity-50"
-                >
-                  Anterior
-                </button>
-                <button
-                  onClick={() => setFiltros(prev => ({ ...prev, pagina: prev.pagina + 1 }))}
-                  disabled={paginacion.pagina === paginacion.total_paginas}
-                  className="px-3 py-1 border rounded-lg hover:bg-gray-50 disabled:opacity-50"
-                >
-                  Siguiente
-                </button>
+          
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+            <div className="md:col-span-2">
+              <label className="block text-xs text-slate-500 mb-1">Buscar</label>
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="ID, ciudadano o motivo..."
+                  value={searchInput}
+                  onChange={handleSearchChange}
+                  className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-sm"
+                />
               </div>
             </div>
-          </>
-        )}
+
+            <div>
+              <label className="block text-xs text-slate-500 mb-1">Desde</label>
+              <div className="relative">
+                <Calendar size={14} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
+                <input
+                  type="date"
+                  value={filtros.desde}
+                  onChange={(e) => setFiltros({...filtros, desde: e.target.value, pagina: 1})}
+                  className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-sm"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs text-slate-500 mb-1">Hasta</label>
+              <div className="relative">
+                <Calendar size={14} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
+                <input
+                  type="date"
+                  value={filtros.hasta}
+                  onChange={(e) => setFiltros({...filtros, hasta: e.target.value, pagina: 1})}
+                  className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-end gap-2">
+              <button
+                onClick={aplicarFiltros}
+                className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-xl shadow-sm shadow-purple-200 hover:bg-purple-700 hover:shadow-md transition-all text-sm font-medium"
+              >
+                Aplicar
+              </button>
+              <button
+                onClick={limpiarFiltros}
+                className="px-4 py-2 border border-slate-200 bg-white rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all text-sm font-medium text-slate-600"
+              >
+                Limpiar
+              </button>
+            </div>
+          </div>
+
+          {(filtros.desde || filtros.hasta || filtros.search) && (
+            <div className="mt-3 flex items-center gap-2 text-xs">
+              <span className="w-1.5 h-1.5 bg-purple-500 rounded-full"></span>
+              <span className="text-purple-600">Filtros aplicados</span>
+            </div>
+          )}
+        </div>
+
+        {/* Tabla */}
+        <div className="bg-white rounded-2xl shadow-lg shadow-slate-200/50 overflow-hidden">
+          {cargando ? (
+            <div className="p-12 text-center">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-purple-200 border-t-purple-600"></div>
+              <p className="mt-3 text-sm text-slate-500">Cargando alertas...</p>
+            </div>
+          ) : alertas.length === 0 ? (
+            <div className="p-16 text-center">
+              <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <XCircle size={28} className="text-slate-400" />
+              </div>
+              <h3 className="text-base font-medium text-slate-700 mb-1">No hay alertas cerradas</h3>
+              <p className="text-xs text-slate-400">Las alertas cerradas manualmente aparecerán aquí</p>
+            </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200">
+                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">ID</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Tipo</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Ciudadano</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Cerrado por</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Motivo</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Fecha</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Ubicación</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {alertas.map((alerta) => (
+                      <tr 
+                        key={alerta.id} 
+                        onClick={() => handleRowClick(alerta.id)}
+                        className="hover:bg-purple-50/50 cursor-pointer transition-colors"
+                      >
+                        <td className="px-6 py-3 text-sm text-slate-600">#{alerta.id}</td>
+                        <td className="px-6 py-3">
+                          <span className={`text-xs px-2 py-1 rounded-full ${
+                            alerta.tipo === 'panico' 
+                              ? 'bg-rose-50 text-rose-600' 
+                              : 'bg-amber-50 text-amber-600'
+                          }`}>
+                            {alerta.tipo === 'panico' ? 'Pánico' : 'Médica'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-3">
+                          <div className="flex items-center gap-2">
+                            <User size={14} className="text-slate-400" />
+                            <span className="text-sm text-slate-600">
+                              {alerta.ciudadano?.nombre || 'Desconocido'}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-3">
+                          <div className="flex items-center gap-2">
+                            <Shield size={14} className="text-slate-400" />
+                            <span className="text-sm text-slate-600">
+                              {alerta.cerrador?.nombre || 'Admin'}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-3">
+                          <span className="text-sm text-slate-600 max-w-[200px] truncate block" title={alerta.motivo_cierre_manual}>
+                            {alerta.motivo_cierre_manual || '—'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-3">
+                          <div className="flex items-center gap-2">
+                            <Clock size={14} className="text-slate-400" />
+                            <span className="text-sm text-slate-600">
+                              {formatearFecha(alerta.fecha_cierre)}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-3">
+                          {alerta.lat && alerta.lng ? (
+                            <div className="flex items-center gap-1">
+                              <MapPin size={14} className="text-slate-400" />
+                              <span className="text-xs text-slate-500">
+                                {alerta.lat.toFixed(4)}, {alerta.lng.toFixed(4)}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-slate-400">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Paginación con color */}
+              <div className="px-6 py-3 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                <p className="text-xs text-slate-500">
+                  {((paginacion.pagina - 1) * paginacion.limite) + 1} - {Math.min(paginacion.pagina * paginacion.limite, paginacion.total)} de {paginacion.total}
+                </p>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => setFiltros(prev => ({ ...prev, pagina: prev.pagina - 1 }))}
+                    disabled={paginacion.pagina === 1}
+                    className="p-1.5 bg-white border border-slate-200 rounded-lg hover:bg-purple-50 hover:border-purple-200 hover:text-purple-600 disabled:opacity-50 transition-all"
+                  >
+                    <ChevronLeft size={16} className="text-slate-600" />
+                  </button>
+                  <button
+                    onClick={() => setFiltros(prev => ({ ...prev, pagina: prev.pagina + 1 }))}
+                    disabled={paginacion.pagina === paginacion.total_paginas}
+                    className="p-1.5 bg-white border border-slate-200 rounded-lg hover:bg-purple-50 hover:border-purple-200 hover:text-purple-600 disabled:opacity-50 transition-all"
+                  >
+                    <ChevronRight size={16} className="text-slate-600" />
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

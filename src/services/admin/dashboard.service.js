@@ -2,6 +2,7 @@ import axiosInstance from '../api/axiosConfig';
 import personalService from './personal.service';
 import unidadService from './unidad.service';
 import alertasService from './alertas.service';
+import alertasPanelService from './alertasPanel.service';
 
 class DashboardService {
   
@@ -10,17 +11,25 @@ class DashboardService {
     try {
       console.log("📊 Cargando estadísticas del dashboard...");
       
-      // Obtener datos en paralelo
+      // Obtener datos en paralelo (incluyendo los nuevos endpoints)
       const [
         personalRes,
         unidadesRes,
         alertasExpiradasRes,
+        alertasCerradasManualRes,
+        // NUEVOS ENDPOINTS
+        alertasActivasRes,
+        alertasEnProcesoRes,
         alertasCerradasRes
       ] = await Promise.allSettled([
         personalService.listarPersonal({ limite: 1000 }),
         unidadService.listarUnidades({ limite: 1000 }),
         alertasService.obtenerExpiradas({ limite: 1000 }),
-        alertasService.obtenerCerradasManual({ limite: 1000 })
+        alertasService.obtenerCerradasManual({ limite: 1000 }),
+        // NUEVAS LLAMADAS
+        alertasPanelService.obtenerActivas({ limite: 1000 }),
+        alertasPanelService.obtenerEnProceso({ limite: 1000 }),
+        alertasPanelService.obtenerCerradas({ limite: 1000 })
       ]);
 
       // Procesar personal
@@ -33,6 +42,16 @@ class DashboardService {
       const alertasExpiradas = alertasExpiradasRes.status === 'fulfilled' ? alertasExpiradasRes.value.data || [] : [];
       
       // Procesar alertas cerradas manualmente
+      const alertasCerradasManual = alertasCerradasManualRes.status === 'fulfilled' ? alertasCerradasManualRes.value.data || [] : [];
+
+      // ===== NUEVOS DATOS =====
+      // Procesar alertas activas
+      const alertasActivas = alertasActivasRes.status === 'fulfilled' ? alertasActivasRes.value.data || [] : [];
+      
+      // Procesar alertas en proceso
+      const alertasEnProceso = alertasEnProcesoRes.status === 'fulfilled' ? alertasEnProcesoRes.value.data || [] : [];
+      
+      // Procesar alertas cerradas (totales)
       const alertasCerradas = alertasCerradasRes.status === 'fulfilled' ? alertasCerradasRes.value.data || [] : [];
 
       // Calcular estadísticas de personal
@@ -63,29 +82,78 @@ class DashboardService {
         }
       };
 
-      // Calcular estadísticas de alertas
+      // Calcular estadísticas de alertas (MEJORADO)
       const alertasStats = {
         expiradas: alertasExpiradas.length,
-        cerradasManual: alertasCerradas.length,
-        totalAlertas: alertasExpiradas.length + alertasCerradas.length
+        cerradasManual: alertasCerradasManual.length,
+        totalAlertas: alertasExpiradas.length + alertasCerradasManual.length,
+        // NUEVOS CAMPOS
+        activas: alertasActivas.length,
+        enProceso: alertasEnProceso.length,
+        cerradasTotales: alertasCerradas.length
       };
 
-      // Calcular KPIs con variación (simulada por ahora)
+      // ===== CÁLCULO DE KPIs CON DATOS REALES =====
+      
+      // Obtener datos del período anterior (para calcular variación)
+      const mesActual = new Date().getMonth();
+      const mesAnterior = mesActual === 0 ? 11 : mesActual - 1;
+      
+      // Filtrar alertas del mes actual y anterior
+      const alertasMesActual = alertasCerradas.filter(a => {
+        const fecha = new Date(a.fecha_cierre || a.fecha_creacion);
+        return fecha.getMonth() === mesActual;
+      }).length;
+      
+      const alertasMesAnterior = alertasCerradas.filter(a => {
+        const fecha = new Date(a.fecha_cierre || a.fecha_creacion);
+        return fecha.getMonth() === mesAnterior;
+      }).length;
+
+      // Calcular variación para alertas
+      let alertasVariacion = '0%';
+      let alertasTendencia = 'stable';
+      
+      if (alertasMesAnterior > 0) {
+        const diff = ((alertasMesActual - alertasMesAnterior) / alertasMesAnterior) * 100;
+        alertasVariacion = `${diff > 0 ? '+' : ''}${diff.toFixed(1)}%`;
+        alertasTendencia = diff > 0 ? 'up' : diff < 0 ? 'down' : 'stable';
+      }
+
+      // Variación para personal (comparando con mes anterior)
+      const personalNuevos = personalData.filter(p => {
+        const fecha = new Date(p.creado_en);
+        return fecha.getMonth() === mesActual;
+      }).length;
+      
+      const personalVariacion = personalNuevos > 0 ? `+${personalNuevos}` : '0';
+      const personalTendencia = personalNuevos > 0 ? 'up' : 'stable';
+
+      // Variación para unidades
+      const unidadesNuevas = unidadesData.filter(u => {
+        const fecha = new Date(u.creado_en);
+        return fecha.getMonth() === mesActual;
+      }).length;
+      
+      const unidadesVariacion = unidadesNuevas > 0 ? `+${unidadesNuevas}` : '0';
+      const unidadesTendencia = unidadesNuevas > 0 ? 'up' : 'stable';
+
+      // Calcular KPIs con datos reales
       const kpis = {
         personal: {
           total: personalStats.total,
-          variacion: '+5%',
-          tendencia: 'up'
+          variacion: personalVariacion,
+          tendencia: personalTendencia
         },
         unidades: {
           total: unidadesStats.total,
-          variacion: '+2%',
-          tendencia: 'up'
+          variacion: unidadesVariacion,
+          tendencia: unidadesTendencia
         },
         alertas: {
           total: alertasStats.totalAlertas,
-          variacion: '-3%',
-          tendencia: 'down'
+          variacion: alertasVariacion,
+          tendencia: alertasTendencia
         }
       };
 
@@ -106,10 +174,9 @@ class DashboardService {
     }
   }
 
-//obtener alertas estancadas durante 24 horas
+  // Obtener alertas por hora (sin cambios)
   async obtenerAlertasPorHora() {
     try {
-      // Obtener alertas expiradas y cerradas
       const [expiradasRes, cerradasRes] = await Promise.allSettled([
         alertasService.obtenerExpiradas({ limite: 500 }),
         alertasService.obtenerCerradasManual({ limite: 500 })
@@ -118,10 +185,8 @@ class DashboardService {
       const expiradas = expiradasRes.status === 'fulfilled' ? expiradasRes.value.data || [] : [];
       const cerradas = cerradasRes.status === 'fulfilled' ? cerradasRes.value.data || [] : [];
       
-      // Combinar todas las alertas
       const todasAlertas = [...expiradas, ...cerradas];
       
-      // Crear array para 24 horas
       const horas = Array.from({ length: 24 }, (_, i) => ({
         hora: i,
         expiradas: 0,
@@ -129,7 +194,6 @@ class DashboardService {
         total: 0
       }));
 
-      // Agrupar por hora
       todasAlertas.forEach(alerta => {
         const fecha = new Date(alerta.fecha_creacion || alerta.fecha_cierre);
         const hora = fecha.getHours();
@@ -150,25 +214,25 @@ class DashboardService {
     }
   }
 
-  // =====================================================
-  // OBTENER ACTIVIDAD RECIENTE
-  
+  // Obtener actividad reciente (MEJORADO)
   async obtenerActividadReciente() {
     try {
-      const [personalRes, unidadesRes, alertasRes] = await Promise.allSettled([
+      const [personalRes, unidadesRes, alertasActivasRes, alertasProcesoRes] = await Promise.allSettled([
         personalService.listarPersonal({ limite: 5, orden: 'DESC', ordenarPor: 'creado_en' }),
         unidadService.listarUnidades({ limite: 5, orden: 'DESC', ordenarPor: 'creado_en' }),
-        alertasService.obtenerExpiradas({ limite: 5 })
+        alertasPanelService.obtenerActivas({ limite: 3 }),
+        alertasPanelService.obtenerEnProceso({ limite: 3 })
       ]);
 
       const personalReciente = personalRes.status === 'fulfilled' ? personalRes.value.data || [] : [];
       const unidadesRecientes = unidadesRes.status === 'fulfilled' ? unidadesRes.value.data || [] : [];
-      const alertasRecientes = alertasRes.status === 'fulfilled' ? alertasRes.value.data || [] : [];
+      const alertasActivas = alertasActivasRes.status === 'fulfilled' ? alertasActivasRes.value.data || [] : [];
+      const alertasProceso = alertasProcesoRes.status === 'fulfilled' ? alertasProcesoRes.value.data || [] : [];
 
       return {
         personal: personalReciente,
         unidades: unidadesRecientes,
-        alertas: alertasRecientes
+        alertas: [...alertasActivas, ...alertasProceso].slice(0, 5)
       };
 
     } catch (error) {

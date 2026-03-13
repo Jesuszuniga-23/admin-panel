@@ -67,7 +67,7 @@ const Sidebar = () => {
       </div>
 
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-        
+
         {/* ========== DASHBOARD ========== */}
         <NavLink
           to="/admin/dashboard"
@@ -117,11 +117,55 @@ const Sidebar = () => {
                 className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-400 cursor-not-allowed hover:bg-gray-50 rounded-lg transition-all"
                 disabled
               >
-                
-                
+
+
               </button>
 
-              {/* Alertas Expiradas */}
+             
+
+            
+              {/* Alertas Activas (NUEVO) */}
+              <NavLink
+                to="/admin/alertas/activas"
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-4 py-2 text-sm rounded-lg transition-all ${isActive
+                    ? 'bg-blue-50 text-blue-600 font-semibold'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
+                  }`
+                }
+              >
+                <Bell size={16} />
+                <span>Activas</span>
+              </NavLink>
+
+              {/* Alertas en Proceso (NUEVO) */}
+              <NavLink
+                to="/admin/alertas/en-proceso"
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-4 py-2 text-sm rounded-lg transition-all ${isActive
+                    ? 'bg-blue-50 text-blue-600 font-semibold'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
+                  }`
+                }
+              >
+                <Activity size={16} />
+                <span>En Proceso</span>
+              </NavLink>
+
+              {/* Alertas Cerradas (NUEVO) */}
+              <NavLink
+                to="/admin/alertas/cerradas"
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-4 py-2 text-sm rounded-lg transition-all ${isActive
+                    ? 'bg-blue-50 text-blue-600 font-semibold'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
+                  }`
+                }
+              >
+                <CheckCircle size={16} />
+                <span>Cerradas</span>
+              </NavLink>
+               {/* Alertas Expiradas */}
               <NavLink
                 to="/admin/alertas/expiradas"
                 className={({ isActive }) =>
@@ -134,8 +178,7 @@ const Sidebar = () => {
                 <Clock size={16} />
                 <span>Expiradas</span>
               </NavLink>
-
-              {/* Alertas Cerradas Manualmente */}
+               {/* Alertas Cerradas Manualmente */}
               <NavLink
                 to="/admin/alertas/cerradas-manual"
                 className={({ isActive }) =>
@@ -232,7 +275,7 @@ const Sidebar = () => {
           className="w-full flex items-center gap-3 px-4 py-3 text-gray-400 cursor-not-allowed hover:bg-gray-50 rounded-lg transition-all"
           disabled
         >
-          
+
         </button>
 
         {/* ========== CENTRO DE REPORTES ========== */}
@@ -261,7 +304,7 @@ const Sidebar = () => {
             <p className="text-xs text-gray-500 truncate capitalize">{user.rol}</p>
           </div>
         </div>
-        
+
         <button
           onClick={handleLogout}
           className="w-full flex items-center gap-3 px-4 py-3 text-red-600 hover:bg-red-50 rounded-lg transition-all font-medium"

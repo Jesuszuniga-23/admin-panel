@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Users, Plus, Search, Filter, ChevronLeft, ChevronRight,
-  Eye, Edit, Trash2, Power, RotateCcw, Shield, Ambulance,
+  Eye, Edit, Trash2, Power, Shield, Ambulance,
   User, Mail, Phone, MoreVertical, Download
 } from 'lucide-react';
 import personalService from '../../../services/admin/personal.service';
@@ -15,23 +15,29 @@ const PersonalList = () => {
   const [personal, setPersonal] = useState([]);
   const [loading, setLoading] = useState(true);
   const [mostrarReporte, setMostrarReporte] = useState(false);
+  
+  // FILTROS - Eliminado 'mostrarEliminados'
   const [filtros, setFiltros] = useState({
     rol: '',
     activo: '',
     disponible: '',
     search: '',
     pagina: 1,
-    limite: 10,
-    mostrarEliminados: false
+    limite: 10
   });
+  
   const [paginacion, setPaginacion] = useState({
     total: 0,
     pagina: 1,
     limite: 10,
     total_paginas: 0
   });
+  
   const searchTerm = useDebounce(filtros.search, 500);
 
+  // =====================================================
+  // EFECTO EN TIEMPO REAL - Reacciona a TODOS los filtros
+  // =====================================================
   useEffect(() => {
     console.log("🔄 Cargando datos con filtros:", filtros);
     cargarPersonal();
@@ -41,8 +47,7 @@ const PersonalList = () => {
     filtros.rol,
     filtros.activo,
     filtros.disponible,
-    searchTerm,
-    filtros.mostrarEliminados
+    searchTerm  // ← Búsqueda en tiempo real con debounce
   ]);
 
   const cargarPersonal = async () => {
@@ -50,6 +55,7 @@ const PersonalList = () => {
     try {
       const filtrosActivos = {};
 
+      // Solo agregar filtros que tengan valor
       if (filtros.rol && filtros.rol !== '') {
         filtrosActivos.rol = filtros.rol;
       }
@@ -63,10 +69,7 @@ const PersonalList = () => {
         filtrosActivos.search = filtros.search;
       }
 
-      if (filtros.mostrarEliminados) {
-        filtrosActivos.incluirEliminados = true;
-      }
-
+      // Siempre incluir paginación
       filtrosActivos.pagina = filtros.pagina;
       filtrosActivos.limite = filtros.limite;
 
@@ -89,6 +92,7 @@ const PersonalList = () => {
     }
   };
 
+  // Manejador de búsqueda (tiempo real con debounce)
   const handleSearch = (value) => {
     setFiltros(prev => ({ ...prev, search: value, pagina: 1 }));
   };
@@ -97,6 +101,7 @@ const PersonalList = () => {
     setFiltros(prev => ({ ...prev, pagina: nuevaPagina }));
   };
 
+  // Los botones "Aplicar" y "Limpiar" se mantienen como respaldo
   const aplicarFiltros = () => {
     setFiltros(prev => ({ ...prev, pagina: 1 }));
   };
@@ -108,8 +113,7 @@ const PersonalList = () => {
       disponible: '',
       search: '',
       pagina: 1,
-      limite: 10,
-      mostrarEliminados: false
+      limite: 10
     });
   };
 
@@ -158,25 +162,6 @@ const PersonalList = () => {
     }
   };
 
-  const handleRestaurar = async (id, nombre) => {
-    if (!window.confirm(`¿Estás seguro de restaurar a ${nombre}?`)) {
-      return;
-    }
-
-    setLoading(true);
-    try {
-      console.log("♻️ Restaurando personal ID:", id);
-      await personalService.restaurarPersonal(id);
-      toast.success(`Personal "${nombre}" restaurado correctamente`);
-      await cargarPersonal();
-    } catch (error) {
-      console.error("Error restaurando:", error);
-      toast.error(error.error || 'Error al restaurar personal');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="p-6">
       {/* Header */}
@@ -196,19 +181,18 @@ const PersonalList = () => {
         </button>
       </div>
 
-      {/* Filtros */}
+      {/* Filtros en tiempo real */}
       <div className="bg-white rounded-xl shadow p-4 mb-6">
-        <div className="flex flex-col md:flex-row gap-4">
-          <label className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
-            <input
-              type="checkbox"
-              checked={filtros.mostrarEliminados}
-              onChange={(e) => setFiltros(prev => ({ ...prev, mostrarEliminados: e.target.checked, pagina: 1 }))}
-              className="rounded text-blue-600 focus:ring-blue-500"
-            />
-            <span className="text-sm text-gray-700">Mostrar eliminados</span>
-          </label>
+        <div className="flex items-center gap-2 mb-3">
+          <Filter size={16} className="text-blue-500" />
+          <span className="text-sm font-medium text-gray-700">Filtros</span>
+          <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full ml-2">
+            Búsqueda instantánea
+          </span>
+        </div>
 
+        <div className="flex flex-col md:flex-row gap-4">
+          {/* Buscador en tiempo real */}
           <div className="flex-1 relative">
             <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <input
@@ -220,6 +204,7 @@ const PersonalList = () => {
             />
           </div>
 
+          {/* Filtros por select (también en tiempo real) */}
           <select
             value={filtros.rol}
             onChange={(e) => setFiltros(prev => ({ ...prev, rol: e.target.value, pagina: 1 }))}
@@ -252,6 +237,7 @@ const PersonalList = () => {
             <option value="false">No disponible</option>
           </select>
 
+          {/* Botones de respaldo */}
           <button
             onClick={aplicarFiltros}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -272,6 +258,14 @@ const PersonalList = () => {
             Exportar
           </button>
         </div>
+
+        {/* Indicador de filtros activos */}
+        {(filtros.rol || filtros.activo || filtros.disponible || filtros.search) && (
+          <div className="mt-3 flex items-center gap-2 text-xs">
+            <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></span>
+            <span className="text-blue-600">Filtros aplicados en tiempo real</span>
+          </div>
+        )}
       </div>
 
       {/* Tabla */}
@@ -336,11 +330,12 @@ const PersonalList = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${persona.rol === 'admin' ? 'bg-purple-100 text-purple-700' :
+                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
+                        persona.rol === 'admin' ? 'bg-purple-100 text-purple-700' :
                         persona.rol === 'superadmin' ? 'bg-red-100 text-red-700' :
-                          persona.rol === 'policia' ? 'bg-blue-100 text-blue-700' :
-                            'bg-green-100 text-green-700'
-                        }`}>
+                        persona.rol === 'policia' ? 'bg-blue-100 text-blue-700' :
+                        'bg-green-100 text-green-700'
+                      }`}>
                         {persona.rol === 'policia' && <Shield size={12} />}
                         {persona.rol === 'ambulancia' && <Ambulance size={12} />}
                         {persona.rol}
@@ -348,72 +343,63 @@ const PersonalList = () => {
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">{persona.placa}</td>
                     <td className="px-6 py-4">
-                      <span className={`px-2 py-1 rounded-full text-xs ${persona.activo
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-red-100 text-red-700'
-                        }`}>
+                      <span className={`px-2 py-1 rounded-full text-xs ${
+                        persona.activo
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-red-100 text-red-700'
+                      }`}>
                         {persona.activo ? 'Activo' : 'Inactivo'}
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`px-2 py-1 rounded-full text-xs ${persona.disponible
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-yellow-100 text-yellow-700'
-                        }`}>
+                      <span className={`px-2 py-1 rounded-full text-xs ${
+                        persona.disponible
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-yellow-100 text-yellow-700'
+                      }`}>
                         {persona.disponible ? 'Disponible' : 'Ocupado'}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        {persona.fecha_eliminacion ? (
-                          <button
-                            onClick={() => handleRestaurar(persona.id, persona.nombre)}
-                            className="p-1 hover:bg-green-50 rounded-lg transition-colors"
-                            title="Restaurar"
-                          >
-                            <RotateCcw size={18} className="text-green-600" />
-                          </button>
-                        ) : (
-                          <>
-                            <button
-                              onClick={() => handleToggleActivo(persona.id, persona.nombre, persona.activo)}
-                              className={`p-1 rounded-lg transition-colors ${persona.activo
-                                ? 'hover:bg-yellow-50 text-yellow-600'
-                                : 'hover:bg-green-50 text-green-600'
-                                }`}
-                              title={persona.activo ? 'Desactivar' : 'Activar'}
-                            >
-                              <Power size={18} />
-                            </button>
-                            <button
-                              onClick={() => navigate(`/admin/personal/${persona.id}`)}
-                              className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
-                              title="Ver detalles"
-                            >
-                              <Eye size={18} className="text-gray-500" />
-                            </button>
-                            <button
-                              onClick={() => navigate(`/admin/personal/editar/${persona.id}`)}
-                              className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
-                              title="Editar"
-                            >
-                              <Edit size={18} className="text-gray-500" />
-                            </button>
-                            <button
-                              onClick={() => handleEliminar(persona.id, persona.nombre)}
-                              className="p-1 hover:bg-red-50 rounded-lg transition-colors"
-                              title="Eliminar"
-                            >
-                              <Trash2 size={18} className="text-red-500" />
-                            </button>
-                            <button
-                              className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
-                              title="Más opciones"
-                            >
-                              <MoreVertical size={18} className="text-gray-500" />
-                            </button>
-                          </>
-                        )}
+                        <button
+                          onClick={() => handleToggleActivo(persona.id, persona.nombre, persona.activo)}
+                          className={`p-1 rounded-lg transition-colors ${
+                            persona.activo
+                              ? 'hover:bg-yellow-50 text-yellow-600'
+                              : 'hover:bg-green-50 text-green-600'
+                          }`}
+                          title={persona.activo ? 'Desactivar' : 'Activar'}
+                        >
+                          <Power size={18} />
+                        </button>
+                        <button
+                          onClick={() => navigate(`/admin/personal/${persona.id}`)}
+                          className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+                          title="Ver detalles"
+                        >
+                          <Eye size={18} className="text-gray-500" />
+                        </button>
+                        <button
+                          onClick={() => navigate(`/admin/personal/editar/${persona.id}`)}
+                          className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+                          title="Editar"
+                        >
+                          <Edit size={18} className="text-gray-500" />
+                        </button>
+                        <button
+                          onClick={() => handleEliminar(persona.id, persona.nombre)}
+                          className="p-1 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Eliminar"
+                        >
+                          <Trash2 size={18} className="text-red-500" />
+                        </button>
+                        <button
+                          className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+                          title="Más opciones"
+                        >
+                          <MoreVertical size={18} className="text-gray-500" />
+                        </button>
                       </div>
                     </td>
                   </tr>

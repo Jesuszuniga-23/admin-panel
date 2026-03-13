@@ -7,7 +7,7 @@ import Dashboard from '../pages/admin/Dashboard';
 import PersonalList from '../pages/admin/personal/PersonalList';
 import PersonalForm from '../pages/admin/personal/PersonalForm';
 import PersonalDetail from '../pages/admin/personal/PersonalDetail';
-import AlertasExpiradas from '../pages/admin/alertas/AlertasExpiradas'; 
+import AlertasExpiradas from '../pages/admin/alertas/AlertasExpiradas';
 import PrivateRoute from './PrivateRoute';
 import AlertasCerradasManual from '../pages/admin/alertas/AlertasCerradasManual';
 import RecuperacionesPendientes from '../pages/admin/recuperaciones/RecuperacionesPendientes';
@@ -19,7 +19,10 @@ import ReasignacionesPendientes from '../pages/admin/reasignaciones/Reasignacion
 import ReportesMenu from '../pages/admin/reportes/ReportesMenu';
 import GeneradorReporte from '../pages/admin/reportes/GeneradorReporte';
 import Perfil from '../pages/admin/Perfil';
-
+import AlertasActivas from '../pages/admin/alertas/AlertasActivas';
+import AlertasEnProceso from '../pages/admin/alertas/AlertasEnProceso';
+import AlertasCerradas from '../pages/admin/alertas/AlertasCerradas';
+import AlertaPanelDetail from '../pages/admin/alertas/AlertaPanelDetail';
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 const AppRouter = () => {
@@ -45,7 +48,11 @@ const AppRouter = () => {
             <Route path="personal/crear" element={<PersonalForm />} />
             <Route path="personal/editar/:id" element={<PersonalForm />} />
             <Route path="personal/:id" element={<PersonalDetail />} />
-            <Route path="alertas/expiradas" element={<AlertasExpiradas />} /> 
+            <Route path="alertas/activas" element={<AlertasActivas />} />
+            <Route path="alertas/en-proceso" element={<AlertasEnProceso />} />
+            <Route path="alertas/cerradas" element={<AlertasCerradas />} />
+            <Route path="alertas/:id" element={<AlertaPanelDetail />} />
+            <Route path="alertas/expiradas" element={<AlertasExpiradas />} />
             <Route path="alertas/cerradas-manual" element={<AlertasCerradasManual />} />
             <Route path="recuperaciones/pendientes" element={<RecuperacionesPendientes />} />
             <Route path="unidades" element={<UnidadesList />} />
@@ -56,6 +63,7 @@ const AppRouter = () => {
             <Route path="reasignaciones/pendientes" element={<ReasignacionesPendientes />} />
             <Route path="reportes" element={<ReportesMenu />} />
             <Route path="reportes/:tipo" element={<GeneradorReporte />} />
+            
             <Route index element={<Navigate to="/admin/dashboard" />} />
           </Route>
 

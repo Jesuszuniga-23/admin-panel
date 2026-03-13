@@ -72,18 +72,69 @@ const PersonalForm = () => {
 
     console.log(`📝 Cambio en ${name}:`, type === 'checkbox' ? checked : value);
 
+    // =====================================================
+    // VALIDACIONES EN TIEMPO REAL
+    // =====================================================
+    
+    // Validar teléfono (solo números y longitud)
+    if (name === 'telefono') {
+      // Limpiar caracteres no permitidos
+      const valorLimpio = value.replace(/[^0-9+\-\s]/g, '');
+      
+      // Validar longitud máxima
+      if (valorLimpio.length > 15) {
+        toast.error('El teléfono no puede tener más de 15 caracteres', {
+          id: 'telefono-toast', // Evita duplicados
+          duration: 2000
+        });
+        return; // No actualizar el estado
+      }
+      
+      setFormData(prev => ({
+        ...prev,
+        telefono: valorLimpio
+      }));
+      return;
+    }
+
+    // Validar nombre (solo letras y espacios)
+    if (name === 'nombre') {
+      const valorLimpio = value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '');
+      setFormData(prev => ({
+        ...prev,
+        nombre: valorLimpio
+      }));
+      return;
+    }
+
+    // Validar placa (solo alfanumérico y guiones)
+    if (name === 'placa') {
+      const valorLimpio = value.replace(/[^a-zA-Z0-9\-]/g, '');
+      setFormData(prev => ({
+        ...prev,
+        placa: valorLimpio
+      }));
+      return;
+    }
+
     // Si se está desmarcando "activo"
     if (name === 'activo' && !checked) {
-      // Desmarcar también "disponible"
+      toast('Usuario marcado como inactivo. Se deshabilitará su disponibilidad.', {
+        icon: 'ℹ️',
+        duration: 3000
+      });
       setFormData(prev => ({
         ...prev,
         activo: false,
-        disponible: false  // 👈 Se desmarca automáticamente
+        disponible: false
       }));
     }
     // Si se está marcando "activo"
     else if (name === 'activo' && checked) {
-      // Activar solo activo, disponible se queda como estaba
+      toast('Usuario activado. Ahora puede marcarse como disponible.', {
+        icon: '✅',
+        duration: 2000
+      });
       setFormData(prev => ({
         ...prev,
         activo: true
@@ -103,38 +154,74 @@ const PersonalForm = () => {
     setLoading(true);
 
     try {
+      // =====================================================
+      // VALIDACIONES ANTES DE ENVIAR
+      // =====================================================
+      
+      // Validar nombre (no vacío)
+      if (!formData.nombre.trim()) {
+        toast.error('El nombre es obligatorio');
+        setCampoError('nombre');
+        nombreRef.current?.focus();
+        setTimeout(() => setCampoError(''), 3000);
+        setLoading(false);
+        return;
+      }
+
+      // Validar email (formato básico)
+      if (!formData.email.includes('@') || !formData.email.includes('.')) {
+        toast.error('El correo electrónico no es válido');
+        setCampoError('email');
+        emailRef.current?.focus();
+        setTimeout(() => setCampoError(''), 3000);
+        setLoading(false);
+        return;
+      }
+
+      // Validar teléfono (mínimo 10 dígitos)
+      const numerosTelefono = formData.telefono.replace(/\D/g, '');
+      if (formData.telefono && numerosTelefono.length < 10) {
+        toast.error('El teléfono debe tener al menos 10 dígitos');
+        setCampoError('telefono');
+        telefonoRef.current?.focus();
+        setTimeout(() => setCampoError(''), 3000);
+        setLoading(false);
+        return;
+      }
+
+      // Validar placa
+      if (!formData.placa.trim()) {
+        toast.error('La placa es obligatoria');
+        setCampoError('placa');
+        placaRef.current?.focus();
+        setTimeout(() => setCampoError(''), 3000);
+        setLoading(false);
+        return;
+      }
+
       const datosAEnviar = {
         nombre: formData.nombre,
         email: formData.email,
         telefono: formData.telefono,
         placa: formData.placa,
         rol: formData.rol,
-        activo: formData.activo, // Tomar directamente del estado
-        disponible: formData.disponible // Tomar directamente del estado
+        activo: formData.activo,
+        disponible: formData.disponible
       };
+      
       console.log("=".repeat(50));
       console.log("📤 DATOS A ENVIAR AL BACKEND:");
-      console.log("📤 activo (valor):", datosAEnviar.activo);
-      console.log("📤 activo (tipo):", typeof datosAEnviar.activo);
-      console.log("📤 disponible:", datosAEnviar.disponible);
       console.log("📤 objeto completo:", datosAEnviar);
       console.log("=".repeat(50));
 
-      console.log("📡 Enviando datos:", datosAEnviar);
-      console.log("📡 Checkbox activo value:", formData.activo);
       if (isEditing) {
         await personalService.actualizarPersonal(id, datosAEnviar);
-        toast.success('Personal actualizado correctamente');
+        toast.success('✅ Personal actualizado correctamente');
       } else {
         await personalService.crearPersonal(datosAEnviar);
-        toast.success('Personal creado correctamente');
+        toast.success('✅ Personal creado correctamente');
       }
-      console.log("✅ Valores enviados:", {
-        activo: formData.activo,
-        disponible: formData.disponible,
-        tipoActivo: typeof formData.activo,
-        tipoDisponible: typeof formData.disponible
-      });
+      
       navigate('/admin/personal');
     } catch (error) {
       console.error('Error guardando personal:', error);
@@ -143,13 +230,12 @@ const PersonalForm = () => {
       const mensajeError = error.error || error.message || '';
 
       // Mostrar el error
-      toast.error(mensajeError);
+      toast.error(`❌ ${mensajeError}`);
 
       // 👇 ENFOCAR SEGÚN EL TIPO DE ERROR
       if (mensajeError.includes('Dominio') ||
         mensajeError.includes('email') ||
         mensajeError.includes('correo')) {
-        // Enfocar el campo de email
         setCampoError('email');
         emailRef.current?.focus();
         setTimeout(() => setCampoError(''), 3000);
@@ -159,7 +245,10 @@ const PersonalForm = () => {
         nombreRef.current?.focus();
         setTimeout(() => setCampoError(''), 3000);
       }
-      else if (mensajeError.includes('teléfono') || mensajeError.includes('telefono')) {
+      else if (mensajeError.includes('teléfono') || 
+               mensajeError.includes('telefono') || 
+               mensajeError.includes('phone') ||
+               mensajeError.includes('formato')) {
         setCampoError('telefono');
         telefonoRef.current?.focus();
         setTimeout(() => setCampoError(''), 3000);
@@ -231,10 +320,17 @@ const PersonalForm = () => {
                 value={formData.nombre}
                 onChange={handleChange}
                 required
-                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${campoError === 'nombre'
+                  ? 'border-red-500 bg-red-50 focus:ring-red-500'
+                  : 'border-gray-200 focus:ring-blue-500'
+                }`}
                 placeholder="Ej: Juan Pérez"
+                maxLength={100}
               />
             </div>
+            {formData.nombre && formData.nombre.length < 3 && (
+              <p className="text-xs text-amber-600 mt-1">El nombre debe tener al menos 3 caracteres</p>
+            )}
           </div>
 
           {/* Email */}
@@ -245,7 +341,6 @@ const PersonalForm = () => {
             <div className="relative">
               <Mail size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
               <input
-
                 ref={emailRef}
                 type="email"
                 name="email"
@@ -266,7 +361,6 @@ const PersonalForm = () => {
           </div>
 
           {/* Teléfono */}
-          {/* Teléfono */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Teléfono
@@ -278,30 +372,34 @@ const PersonalForm = () => {
                 type="tel"
                 name="telefono"
                 value={formData.telefono}
-                onChange={(e) => {
-                  // 👇 SOLO PERMITIR NÚMEROS, ESPACIOS, GUIONES Y SÍMBOLO +
-                  const valorLimpio = e.target.value.replace(/[^0-9+\-\s]/g, '');
-
-                  // Actualizar el formData con el valor limpio
-                  setFormData(prev => ({
-                    ...prev,
-                    telefono: valorLimpio
-                  }));
-                }}
+                onChange={handleChange}
                 className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${campoError === 'telefono'
                   ? 'border-red-500 bg-red-50 focus:ring-red-500'
                   : 'border-gray-200 focus:ring-blue-500'
                   }`}
                 placeholder="Ej: 238 458 7196"
-                pattern="[0-9+\-\s]+"
-                title="Solo se permiten números, espacios, guiones y el símbolo +"
+                maxLength={15}
               />
             </div>
-            {/* Mostrar ayuda si se intenta ingresar texto */}
-            {formData.telefono && !/^[0-9+\-\s]+$/.test(formData.telefono) && (
-              <p className="text-xs text-red-500 mt-1">
-                Solo se permiten números, espacios y guiones
-              </p>
+            {/* Mostrar validaciones */}
+            {formData.telefono && (
+              <>
+                {!/^[0-9+\-\s]+$/.test(formData.telefono) && (
+                  <p className="text-xs text-red-500 mt-1">
+                    Solo se permiten números, espacios y guiones
+                  </p>
+                )}
+                {formData.telefono.replace(/\D/g, '').length < 10 && formData.telefono.length > 0 && (
+                  <p className="text-xs text-amber-600 mt-1">
+                    El teléfono debe tener al menos 10 dígitos
+                  </p>
+                )}
+                {formData.telefono.replace(/\D/g, '').length >= 10 && (
+                  <p className="text-xs text-green-600 mt-1">
+                    ✓ Formato válido
+                  </p>
+                )}
+              </>
             )}
           </div>
 
@@ -319,10 +417,17 @@ const PersonalForm = () => {
                 value={formData.placa}
                 onChange={handleChange}
                 required
-                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${campoError === 'placa'
+                  ? 'border-red-500 bg-red-50 focus:ring-red-500'
+                  : 'border-gray-200 focus:ring-blue-500'
+                }`}
                 placeholder="Ej: P-001"
+                maxLength={20}
               />
             </div>
+            {formData.placa && formData.placa.length < 3 && (
+              <p className="text-xs text-amber-600 mt-1">La placa debe tener al menos 3 caracteres</p>
+            )}
           </div>
 
           {/* Rol */}
@@ -338,7 +443,10 @@ const PersonalForm = () => {
                 value={formData.rol}
                 onChange={handleChange}
                 required
-                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none bg-white"
+                className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${campoError === 'rol'
+                  ? 'border-red-500 bg-red-50 focus:ring-red-500'
+                  : 'border-gray-200 focus:ring-blue-500'
+                } appearance-none bg-white`}
               >
                 <option value="policia">Policía</option>
                 <option value="ambulancia">Ambulancia</option>
@@ -374,11 +482,15 @@ const PersonalForm = () => {
               <span className="text-sm text-gray-700">Disponible</span>
             </label>
           </div>
+          
           {/* Mensaje informativo */}
           {!formData.activo && (
-            <p className="text-xs text-gray-400 text-center">
-              * Un usuario inactivo no puede estar disponible
-            </p>
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <p className="text-xs text-amber-700 flex items-center gap-1">
+                <AlertCircle size={14} />
+                Usuario inactivo: No puede estar disponible ni recibir alertas
+              </p>
+            </div>
           )}
 
           {/* Botones */}

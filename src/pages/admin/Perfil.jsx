@@ -2,20 +2,16 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   User, Mail, Shield, Hash, Phone, Smartphone,
-  Calendar, LogOut, Edit2, Save, X, ChevronLeft,
+  Calendar, LogOut, ChevronLeft,
   Loader, Clock, CheckCircle, Truck, Users,
-  Activity, Lock
+  Activity
 } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
-import authService from '../../services/auth.service';
 import toast from 'react-hot-toast';
 
 const Perfil = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
-  const [editandoTelefono, setEditandoTelefono] = useState(false);
-  const [telefono, setTelefono] = useState(user?.telefono || '');
-  const [guardando, setGuardando] = useState(false);
 
   // Datos de ejemplo (luego del backend)
   const stats = [
@@ -29,26 +25,6 @@ const Perfil = () => {
     { tipo: 'Web', nombre: 'Chrome - Windows', ultimoAcceso: 'Hace 5 min', activo: true },
     { tipo: 'Android', nombre: 'Samsung Galaxy', ultimoAcceso: 'Hace 2 horas', activo: false }
   ];
-
-  const handleActualizarTelefono = async () => {
-    if (!telefono.trim()) {
-      toast.error('El teléfono no puede estar vacío');
-      return;
-    }
-
-    setGuardando(true);
-    try {
-      // TODO: Llamar al endpoint real
-      await new Promise(resolve => setTimeout(resolve, 800));
-      toast.success('Teléfono actualizado');
-      setEditandoTelefono(false);
-      user.telefono = telefono;
-    } catch {
-      toast.error('Error al actualizar');
-    } finally {
-      setGuardando(false);
-    }
-  };
 
   if (!user) {
     return (
@@ -108,7 +84,7 @@ const Perfil = () => {
               })}
             </div>
 
-            {/* Contacto */}
+            {/* Contacto - Solo visual, sin edición */}
             <div className="p-6 space-y-3">
               <div className="flex items-center gap-3 text-sm">
                 <Mail size={16} className="text-gray-400" />
@@ -117,44 +93,9 @@ const Perfil = () => {
               
               <div className="flex items-center gap-3 text-sm">
                 <Phone size={16} className="text-gray-400" />
-                {editandoTelefono ? (
-                  <div className="flex-1 flex gap-2">
-                    <input
-                      type="tel"
-                      value={telefono}
-                      onChange={(e) => setTelefono(e.target.value)}
-                      className="flex-1 px-2 py-1 border rounded-lg text-sm"
-                      autoFocus
-                    />
-                    <button
-                      onClick={handleActualizarTelefono}
-                      className="p-1 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                    >
-                      <Save size={14} />
-                    </button>
-                    <button
-                      onClick={() => {
-                        setEditandoTelefono(false);
-                        setTelefono(user.telefono || '');
-                      }}
-                      className="p-1 bg-gray-200 rounded-lg hover:bg-gray-300"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    <span className="text-gray-600 flex-1">
-                      {user.telefono || 'No registrado'}
-                    </span>
-                    <button
-                      onClick={() => setEditandoTelefono(true)}
-                      className="p-1 hover:bg-gray-100 rounded-lg"
-                    >
-                      <Edit2 size={14} className="text-gray-500" />
-                    </button>
-                  </>
-                )}
+                <span className="text-gray-600">
+                  {user.telefono || 'No registrado'}
+                </span>
               </div>
             </div>
           </div>
@@ -206,17 +147,7 @@ const Perfil = () => {
             </div>
           </div>
 
-          {/* Seguridad */}
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <Lock size={18} className="text-blue-600" />
-              Seguridad
-            </h3>
-            
-            <button className="w-full text-left p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-              <span className="text-sm font-medium text-gray-700">Cambiar contraseña</span>
-            </button>
-          </div>
+          {/* SECCIÓN DE SEGURIDAD ELIMINADA COMPLETAMENTE */}
         </div>
       </div>
 

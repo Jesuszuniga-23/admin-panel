@@ -41,6 +41,12 @@ export const ENDPOINTS = {
     CERRAR_MASIVO: `${BASE_URL}/admin/alertas/cerrar-masivo`,
     FORZAR_EXPIRACION: `${BASE_URL}/admin/alertas/forzar-expiracion`
   },
+  ALERTAS_PANEL: {
+  ACTIVAS: `${BASE_URL}/admin/alertas-panel/activas`,
+  EN_PROCESO: `${BASE_URL}/admin/alertas-panel/en-proceso`,
+  CERRADAS: `${BASE_URL}/admin/alertas-panel/cerradas`,
+  DETALLE: (id) => `${BASE_URL}/admin/alertas-panel/${id}`,
+},  
 
   REASIGNACIONES: {
     PENDIENTES: `${BASE_URL}/admin/reasignaciones/pendientes`,
