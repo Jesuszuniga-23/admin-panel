@@ -10,6 +10,62 @@ import unidadService from '../../../services/admin/unidad.service';
 import personalService from '../../../services/admin/personal.service';
 import toast from 'react-hot-toast';
 
+// =====================================================
+// FUNCIÓN PARA CORREGIR CARACTERES MAL CODIFICADOS
+// =====================================================
+const corregirTexto = (texto) => {
+  if (!texto) return '';
+  
+  const correcciones = {
+    'Ã¡': 'á', 'Ã©': 'é', 'Ã­': 'í', 'Ã³': 'ó', 'Ãº': 'ú',
+    'Ã�': 'Á', 'Ã‰': 'É', 'Ã�': 'Í', 'Ã“': 'Ó', 'Ãš': 'Ú',
+    'Ã±': 'ñ', 'Ã‘': 'Ñ', 'Â¿': '¿', 'Â¡': '¡',
+    '£': 'ú', '¤': 'ñ', '€': 'é', '‚': 'é', '¢': 'ó',
+    'Ram¡rez': 'Ramírez', 'Z£¤iga': 'Zúñiga', 'L¢pez': 'López',
+    'Jes£s': 'Jesús', 'Param‚dico': 'Paramédico'
+  };
+  
+  let textoCorregido = texto;
+  Object.entries(correcciones).forEach(([de, para]) => {
+    textoCorregido = textoCorregido.split(de).join(para);
+  });
+  
+  return textoCorregido;
+};
+
+// =====================================================
+// MODAL PARA ACCIONES NO PERMITIDAS
+// =====================================================
+const ModalAccionNoPermitida = ({ isOpen, onClose, mensaje }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full animate-fadeIn">
+        <div className="p-6">
+          <div className="flex items-center gap-4 mb-4">
+            <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
+              <AlertCircle size={24} className="text-yellow-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-800">Acción no permitida</h3>
+          </div>
+          
+          <p className="text-sm text-gray-600 mb-6">{mensaje}</p>
+          
+          <div className="flex justify-end">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const UnidadDetail = () => {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -20,18 +76,41 @@ const UnidadDetail = () => {
   const [mostrarAsignacion, setMostrarAsignacion] = useState(false);
   const [personalSeleccionado, setPersonalSeleccionado] = useState('');
   const [cargandoPersonal, setCargandoPersonal] = useState(false);
+  const [modalInfo, setModalInfo] = useState({
+    show: false,
+    mensaje: ''
+  });
 
   useEffect(() => {
     cargarUnidad();
   }, [id]);
 
+  // =====================================================
+  // CARGA UNIDAD Y CORRIGE TEXTOS
+  // =====================================================
   const cargarUnidad = async () => {
     try {
       setLoading(true);
-      console.log("📡 Cargando unidad ID:", id);
       const response = await unidadService.obtenerUnidad(id);
-      console.log("✅ Datos recibidos:", response.data);
-      setUnidad(response.data);
+      
+      // Corregir textos de la unidad y relacionados
+      const dataCorregida = {
+        ...response.data,
+        creador: response.data.creador ? {
+          ...response.data.creador,
+          nombre: corregirTexto(response.data.creador.nombre)
+        } : null,
+        actualizador: response.data.actualizador ? {
+          ...response.data.actualizador,
+          nombre: corregirTexto(response.data.actualizador.nombre)
+        } : null,
+        personal_asignado: response.data.personal_asignado?.map(p => ({
+          ...p,
+          nombre: corregirTexto(p.nombre)
+        })) || []
+      };
+      
+      setUnidad(dataCorregida);
     } catch (error) {
       console.error("Error cargando unidad:", error);
       if (error.response?.status === 429) {
@@ -46,11 +125,21 @@ const UnidadDetail = () => {
     }
   };
 
+  // =====================================================
+  // CARGA PERSONAL DISPONIBLE Y CORRIGE TEXTOS
+  // =====================================================
   const cargarPersonalDisponible = async () => {
     try {
       setCargandoPersonal(true);
       const response = await unidadService.personalDisponible(id, unidad?.tipo);
-      setPersonalDisponible(response.data || []);
+      
+      // Corregir nombres del personal disponible
+      const personalCorregido = (response.data || []).map(p => ({
+        ...p,
+        nombre: corregirTexto(p.nombre)
+      }));
+      
+      setPersonalDisponible(personalCorregido);
       setMostrarAsignacion(true);
     } catch (error) {
       console.error("Error cargando personal disponible:", error);
@@ -75,7 +164,7 @@ const UnidadDetail = () => {
       toast.success('✅ Personal asignado correctamente');
       setMostrarAsignacion(false);
       setPersonalSeleccionado('');
-      cargarUnidad();
+      await cargarUnidad();
     } catch (error) {
       console.error("Error asignando personal:", error);
       if (error.response?.status === 429) {
@@ -86,15 +175,29 @@ const UnidadDetail = () => {
     }
   };
 
+  // =====================================================
+  // REMOVER PERSONAL CON VALIDACIÓN DE UNIDAD OCUPADA
+  // =====================================================
   const handleRemover = async (personalId, nombre) => {
-    if (!window.confirm(`¿Remover a ${nombre} de esta unidad?`)) return;
+    // Validar si la unidad está ocupada
+    if (unidad.estado === 'ocupada') {
+      setModalInfo({
+        show: true,
+        mensaje: `No es posible remover personal de la unidad mientras se encuentra en estado OCUPADA atendiendo una emergencia activa.`
+      });
+      return;
+    }
+
+    const nombreCorregido = corregirTexto(nombre);
+    if (!window.confirm(`¿Remover a ${nombreCorregido} de esta unidad?`)) return;
 
     try {
       await unidadService.removerPersonal(id, personalId);
       toast.success('✅ Personal removido correctamente');
-      cargarUnidad();
+      await cargarUnidad();
     } catch (error) {
       console.error("Error removiendo personal:", error);
+      
       if (error.response?.status === 429) {
         toast.error('⏳ Demasiadas peticiones. Espera unos segundos...');
       } else {
@@ -103,7 +206,19 @@ const UnidadDetail = () => {
     }
   };
 
+  // =====================================================
+  // TOGGLE ACTIVA CON VALIDACIÓN DE UNIDAD OCUPADA
+  // =====================================================
   const handleToggleActiva = async () => {
+    // Validar si la unidad está ocupada
+    if (unidad.estado === 'ocupada') {
+      setModalInfo({
+        show: true,
+        mensaje: `No es posible ${unidad.activa ? 'desactivar' : 'activar'} la unidad mientras se encuentra en estado OCUPADA atendiendo una emergencia activa.`
+      });
+      return;
+    }
+
     const accion = unidad.activa ? 'desactivar' : 'activar';
     if (!window.confirm(`¿Estás seguro de ${accion} esta unidad?`)) return;
 
@@ -113,7 +228,7 @@ const UnidadDetail = () => {
     try {
       await unidadService.toggleActiva(id, !unidad.activa);
       toast.success(`✅ Unidad ${!unidad.activa ? 'activada' : 'desactivada'} correctamente`);
-      cargarUnidad();
+      await cargarUnidad();
     } catch (error) {
       setUnidad(prev => ({ ...prev, activa: estadoAnterior }));
       
@@ -126,7 +241,19 @@ const UnidadDetail = () => {
     }
   };
 
+  // =====================================================
+  // ELIMINAR CON VALIDACIÓN DE UNIDAD OCUPADA
+  // =====================================================
   const handleEliminar = async () => {
+    // Validar si la unidad está ocupada
+    if (unidad.estado === 'ocupada') {
+      setModalInfo({
+        show: true,
+        mensaje: `No es posible eliminar la unidad mientras se encuentra en estado OCUPADA atendiendo una emergencia activa.`
+      });
+      return;
+    }
+
     if (!window.confirm(`¿Estás seguro de eliminar la unidad ${unidad.codigo}?`)) return;
 
     try {
@@ -141,6 +268,20 @@ const UnidadDetail = () => {
         toast.error(error.error || 'Error al eliminar unidad');
       }
     }
+  };
+
+  // =====================================================
+  // EDITAR CON VALIDACIÓN DE UNIDAD OCUPADA
+  // =====================================================
+  const handleEditar = () => {
+    if (unidad.estado === 'ocupada') {
+      setModalInfo({
+        show: true,
+        mensaje: `No es posible editar la unidad mientras se encuentra en estado OCUPADA atendiendo una emergencia activa.`
+      });
+      return;
+    }
+    navigate(`/admin/unidades/editar/${id}`);
   };
 
   const formatDate = (dateString) => {
@@ -185,6 +326,13 @@ const UnidadDetail = () => {
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
+      {/* Modal de acción no permitida */}
+      <ModalAccionNoPermitida
+        isOpen={modalInfo.show}
+        onClose={() => setModalInfo({ show: false, mensaje: '' })}
+        mensaje={modalInfo.mensaje}
+      />
+
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
@@ -215,7 +363,8 @@ const UnidadDetail = () => {
             unidad.estado === 'ocupada' ? 'bg-red-100 text-red-700' :
             'bg-gray-100 text-gray-700'
           }`}>
-            {unidad.estado}
+            {unidad.estado === 'disponible' ? 'Disponible' :
+             unidad.estado === 'ocupada' ? 'Ocupada' : 'Inactiva'}
           </span>
         </div>
       </div>
@@ -314,7 +463,7 @@ const UnidadDetail = () => {
                       <option value="">Seleccionar...</option>
                       {personalDisponible.map(p => (
                         <option key={p.id} value={p.id}>
-                          {p.nombre} - {p.rol} ({p.placa})
+                          {p.nombre} - {p.rol === 'policia' ? 'Policía' : p.rol === 'ambulancia' ? 'Ambulancia' : p.rol} ({p.placa})
                         </option>
                       ))}
                     </select>
@@ -351,7 +500,8 @@ const UnidadDetail = () => {
                       <div>
                         <p className="font-medium text-gray-800">{persona.nombre}</p>
                         <p className="text-xs text-gray-500 flex items-center gap-1">
-                          {persona.rol} • {persona.placa}
+                          {persona.rol === 'policia' ? 'Policía' : 
+                           persona.rol === 'ambulancia' ? 'Ambulancia' : persona.rol} • {persona.placa}
                         </p>
                       </div>
                     </div>
@@ -382,7 +532,7 @@ const UnidadDetail = () => {
               <AuditItem 
                 icon={User} 
                 label="Creado por" 
-                value={unidad.creador?.nombre || 'Sistema'} 
+                value={corregirTexto(unidad.creador?.nombre) || 'Sistema'} 
               />
               <AuditItem 
                 icon={Calendar} 
@@ -392,7 +542,7 @@ const UnidadDetail = () => {
               <AuditItem 
                 icon={User} 
                 label="Actualizado por" 
-                value={unidad.actualizador?.nombre || 'Sistema'} 
+                value={corregirTexto(unidad.actualizador?.nombre) || 'Sistema'} 
               />
             </div>
           </div>
@@ -413,7 +563,7 @@ const UnidadDetail = () => {
           </button>
           
           <button
-            onClick={() => navigate(`/admin/unidades/editar/${id}`)}
+            onClick={handleEditar}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
           >
             <Edit size={18} />

@@ -25,6 +25,37 @@ import useAuthStore from '../../store/authStore';
 import authService from '../../services/auth.service';
 import toast from 'react-hot-toast';
 
+// Función para formatear nombres (acentos y mayúsculas)
+const formatearNombre = (nombre) => {
+  if (!nombre) return '';
+  
+  // Mapa de caracteres mal codificados
+  const reemplazos = [
+    { de: 'Ã¡', para: 'á' }, { de: 'Ã©', para: 'é' }, { de: 'Ã­', para: 'í' },
+    { de: 'Ã³', para: 'ó' }, { de: 'Ãº', para: 'ú' }, { de: 'Ã�', para: 'Á' },
+    { de: 'Ã‰', para: 'É' }, { de: 'Ã�', para: 'Í' }, { de: 'Ã“', para: 'Ó' },
+    { de: 'Ãš', para: 'Ú' }, { de: 'Ã±', para: 'ñ' }, { de: 'Ã‘', para: 'Ñ' },
+    { de: 'Â¿', para: '¿' }, { de: 'Â¡', para: '¡' },
+    { de: '£', para: 'ú' }, { de: '¤', para: 'ñ' }, { de: '€', para: 'é' },
+    { de: '‚', para: 'é' }, { de: '¢', para: 'ó' },
+    { de: 'Ram¡rez', para: 'Ramírez' }, { de: 'Z£¤iga', para: 'Zúñiga' },
+    { de: 'L¢pez', para: 'López' }, { de: 'Jes£s', para: 'Jesús' },
+    { de: 'Param‚dico', para: 'Paramédico' }, { de: 'Oficial', para: 'Oficial' }
+  ];
+  
+  let nombreFormateado = nombre;
+  reemplazos.forEach(({ de, para }) => {
+    nombreFormateado = nombreFormateado.split(de).join(para);
+  });
+  
+  // Capitalizar primera letra de cada palabra
+  return nombreFormateado
+    .toLowerCase()
+    .split(' ')
+    .map(palabra => palabra.charAt(0).toUpperCase() + palabra.slice(1))
+    .join(' ');
+};
+
 const Sidebar = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
@@ -56,6 +87,9 @@ const Sidebar = () => {
   };
 
   if (!user) return null;
+
+  // Formatear nombre del usuario
+  const nombreFormateado = formatearNombre(user.nombre);
 
   return (
     <aside className="w-72 bg-white shadow-lg flex flex-col h-screen overflow-y-auto">
@@ -297,10 +331,10 @@ const Sidebar = () => {
       <div className="border-t p-4">
         <div className="flex items-center gap-3 mb-3">
           <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg flex items-center justify-center text-white font-bold">
-            {user.nombre?.charAt(0).toUpperCase()}
+            {nombreFormateado?.charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-800 truncate">{user.nombre}</p>
+            <p className="text-sm font-medium text-gray-800 truncate">{nombreFormateado}</p>
             <p className="text-xs text-gray-500 truncate capitalize">{user.rol}</p>
           </div>
         </div>
