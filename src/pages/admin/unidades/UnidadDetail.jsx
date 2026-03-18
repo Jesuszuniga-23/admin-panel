@@ -4,7 +4,7 @@ import {
   Truck, MapPin, Hash, Edit, Trash2, Power,
   ChevronLeft, Loader, AlertCircle, Users,
   Shield, Ambulance, Calendar, User, Mail, Phone,
-  X, Check, Plus, FileText,
+  X, Check, Plus, FileText,UserMinus,UserPlus 
 } from 'lucide-react';
 import unidadService from '../../../services/admin/unidad.service';
 import personalService from '../../../services/admin/personal.service';
