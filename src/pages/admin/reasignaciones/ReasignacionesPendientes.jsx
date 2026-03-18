@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle, Clock, MapPin, User, Calendar,
   ChevronLeft, RefreshCw, Truck, XCircle, CheckCircle,
-  Loader, AlertCircle, Phone, Shield, X
+  Loader, AlertCircle, Phone, Shield, X, Bell, BellRing
 } from 'lucide-react';
 import reasignacionService from '../../../services/admin/reasignacion.service';
 import alertasService from '../../../services/admin/alertas.service';
@@ -23,15 +23,15 @@ const ReasignacionesPendientes = () => {
   const [motivoCierre, setMotivoCierre] = useState('');
   const [ultimaActualizacion, setUltimaActualizacion] = useState(new Date());
 
-  // =====================================================
+
   // TIEMPO REAL - Cargar cada 30 segundos
-  // =====================================================
+
   useEffect(() => {
     cargarPendientes();
-    
+
     // Configurar intervalo para recarga automática cada 30 segundos
     const intervalo = setInterval(() => {
-      console.log('🔄 Recargando alertas pendientes (tiempo real)');
+      console.log('Recargando alertas pendientes');
       cargarPendientes(true); // true = silencioso (sin mostrar loading)
     }, 30000); // 30 segundos
 
@@ -45,11 +45,11 @@ const ReasignacionesPendientes = () => {
       const response = await reasignacionService.obtenerPendientes();
       setAlertas(response.data || []);
       setUltimaActualizacion(new Date());
-      
+
       // Si hay cambios y el modal está abierto, mostrar indicador sutil
       if (mostrarModal && response.data?.length !== alertas.length) {
-        toast('🔄 Nuevas alertas disponibles', {
-          icon: '📢',
+        toast('Nuevas alertas disponibles', {
+          icon: <BellRing size={18} className="text-blue-500 animate-pulse" />,
           duration: 3000
         });
       }
@@ -88,8 +88,10 @@ const ReasignacionesPendientes = () => {
         unidadSeleccionada,
         motivoReasignacion
       );
-      
-      toast.success('✅ Alerta reasignada correctamente');
+
+      toast.success('Alerta reasignada correctamente', {
+        icon: <CheckCircle size={18} className="text-green-500" />
+      });
       setMostrarModal(false);
       cargarPendientes(); // Recargar inmediatamente después de reasignar
     } catch (error) {
@@ -109,8 +111,10 @@ const ReasignacionesPendientes = () => {
     setProcesando(true);
     try {
       await alertasService.cerrarManual(alertaSeleccionada.id, motivoCierre);
-      
-      toast.success('✅ Alerta cerrada manualmente');
+
+      toast.success('Alerta cerrada manualmente', {
+        icon: <CheckCircle size={18} className="text-green-500" />
+      });
       setMostrarModalCierre(false);
       setAlertaSeleccionada(null);
       setMotivoCierre('');
@@ -124,8 +128,8 @@ const ReasignacionesPendientes = () => {
   };
 
   const getTipoColor = (tipo) => {
-    return tipo === 'panico' 
-      ? 'bg-red-100 text-red-700 border-red-200' 
+    return tipo === 'panico'
+      ? 'bg-red-100 text-red-700 border-red-200'
       : 'bg-yellow-100 text-yellow-700 border-yellow-200';
   };
 
@@ -149,13 +153,21 @@ const ReasignacionesPendientes = () => {
       {/* Header con indicador de tiempo real */}
       <div className="flex justify-between items-center mb-6">
         <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-gray-800">Reasignaciones Pendientes</h1>
-            <span className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full flex items-center gap-1">
-              <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
-              Tiempo real
-            </span>
-          </div>
+         <div className="flex items-center gap-2 sm:gap-3">
+  <div className="bg-gradient-to-br from-blue-500 to-cyan-600 p-2 sm:p-2.5 md:p-3 rounded-lg sm:rounded-xl shadow-lg shadow-blue-200">
+    <RefreshCw size={20} className="sm:w-5 sm:h-5 md:w-6 md:h-6 text-white" />
+  </div>
+  <div>
+    <div className="flex items-center gap-3">
+      <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Reasignaciones Pendientes</h1>
+      <span className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full flex items-center gap-1">
+        <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
+        Tiempo real
+      </span>
+    </div>
+    <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Solicitudes de reasignación de alertas</p>
+  </div>
+</div>
           <p className="text-sm text-gray-500 mt-1">
             Alertas activas sin asignar por más de 5 minutos
           </p>
@@ -164,22 +176,27 @@ const ReasignacionesPendientes = () => {
           </p>
         </div>
         <div className="flex gap-3">
-          <button
-            onClick={() => cargarPendientes()}
-            className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
-            title="Actualizar manualmente"
-          >
-            <RefreshCw size={18} className={`text-gray-500 ${cargando ? 'animate-spin' : ''}`} />
-            Actualizar
-          </button>
-          <button
-            onClick={() => navigate('/admin/dashboard')}
-            className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
-          >
-            <ChevronLeft size={18} />
-            Volver
-          </button>
-        </div>
+  {/* Botón Actualizar */}
+  <button
+    onClick={() => cargarPendientes()}
+    className="flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-white border border-slate-200 rounded-xl shadow-sm hover:bg-amber-50 hover:border-amber-200 hover:text-amber-700 transition-all text-slate-600 text-xs sm:text-sm font-medium whitespace-nowrap"
+    title="Actualizar manualmente"
+  >
+    <RefreshCw size={14} className={`sm:w-4 sm:h-4 text-slate-500 ${cargando ? 'animate-spin' : ''}`} />
+    <span className="hidden xs:inline">Actualizar</span>
+    <span className="xs:hidden">Actualizar</span>
+  </button>
+
+  {/* Botón Dashboard (mismo estilo que Alertas Expiradas) */}
+  <button
+    onClick={() => navigate('/admin/dashboard')}
+    className="flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-white border border-slate-200 rounded-xl shadow-sm hover:bg-amber-50 hover:border-amber-200 hover:text-amber-700 transition-all text-slate-600 text-xs sm:text-sm font-medium whitespace-nowrap"
+  >
+    <ChevronLeft size={14} className="sm:w-4 sm:h-4" />
+    <span className="hidden xs:inline">Dashboard</span>
+    <span className="xs:hidden">Dashboard</span>
+  </button>
+</div>
       </div>
 
       {/* Indicador de recarga automática */}
@@ -216,11 +233,11 @@ const ReasignacionesPendientes = () => {
                       {alerta.minutos_espera} minutos esperando
                     </span>
                   </div>
-                  
+
                   <h3 className="text-lg font-semibold text-gray-800 mb-2">
                     Alerta #{alerta.id}
                   </h3>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600">
                     <div className="flex items-center gap-2">
                       <User size={14} className="text-gray-400" />

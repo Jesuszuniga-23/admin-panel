@@ -2,9 +2,7 @@ import axiosInstance from '../api/axiosConfig';
 import { ENDPOINTS } from '../api/endpoints';
 
 class UnidadService {
-  // =====================================================
   // LISTAR UNIDADES
-  // =====================================================
   async listarUnidades(filtros = {}) {
     try {
       const params = new URLSearchParams();
@@ -16,7 +14,7 @@ class UnidadService {
       if (filtros.limite) params.append('limite', filtros.limite);
 
       const url = `${ENDPOINTS.UNIDADES.LIST}?${params.toString()}`;//OBTIENE LOS RESULTADOS DEL ENDPOINT DE UNIDADES
-      console.log("📡 Listando unidades:", url);
+      console.log(" Listando unidades:", url);
       const response = await axiosInstance.get(url);
       return response.data;
     } catch (error) {
@@ -25,9 +23,7 @@ class UnidadService {
     }
   }
 
-  // =====================================================
   // OBTENER UNIDAD POR ID
-  // =====================================================
   async obtenerUnidad(id) {
     try {
       const url = ENDPOINTS.UNIDADES.GET(id);
@@ -40,9 +36,7 @@ class UnidadService {
     }
   }
 
-  // =====================================================
   // CREAR UNIDAD
-  // =====================================================
   async crearUnidad(datos) {
     try {
       console.log("📡 Creando unidad:", datos);
@@ -54,9 +48,7 @@ class UnidadService {
     }
   }
 
-  // =====================================================
   // ACTUALIZAR UNIDAD
-  // =====================================================
   async actualizarUnidad(id, datos) {
     try {
       console.log("📡 Actualizando unidad:", id, datos);
@@ -68,9 +60,7 @@ class UnidadService {
     }
   }
 
-  // =====================================================
   // ELIMINAR UNIDAD (SOFT DELETE)
-  // =====================================================
   async eliminarUnidad(id) {
     try {
       console.log("📡 Eliminando unidad:", id);
@@ -82,9 +72,7 @@ class UnidadService {
     }
   }
 
-  // =====================================================
   // ACTIVAR/DESACTIVAR UNIDAD
-  // =====================================================
   async toggleActiva(id, activa) {
     try {
       const response = await axiosInstance.patch(ENDPOINTS.UNIDADES.TOGGLE_ACTIVA(id), { activa });
@@ -95,9 +83,7 @@ class UnidadService {
     }
   }
 
-  // =====================================================
   // RESTAURAR UNIDAD ELIMINADA
-  // =====================================================
   async restaurarUnidad(id) {
     try {
       const response = await axiosInstance.post(ENDPOINTS.UNIDADES.RESTAURAR(id));
@@ -108,9 +94,7 @@ class UnidadService {
     }
   }
 
-  // =====================================================
   // ASIGNAR PERSONAL A UNIDAD
-  // =====================================================
   async asignarPersonal(unidadId, personalId) {
     try {
       const response = await axiosInstance.post(ENDPOINTS.UNIDADES.ASIGNAR(unidadId), { personal_id: personalId });
@@ -121,9 +105,7 @@ class UnidadService {
     }
   }
 
-  // =====================================================
   // REMOVER PERSONAL DE UNIDAD
-  // =====================================================
   async removerPersonal(unidadId, personalId) {
     try {
       const response = await axiosInstance.post(ENDPOINTS.UNIDADES.REMOVER(unidadId), { personal_id: personalId });
@@ -134,9 +116,7 @@ class UnidadService {
     }
   }
 
-  // =====================================================
   // OBTENER PERSONAL DISPONIBLE PARA ASIGNAR
-  // =====================================================
   async personalDisponible(unidadId, tipo) {
     try {
       const url = tipo

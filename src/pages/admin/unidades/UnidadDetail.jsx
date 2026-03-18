@@ -10,12 +10,10 @@ import unidadService from '../../../services/admin/unidad.service';
 import personalService from '../../../services/admin/personal.service';
 import toast from 'react-hot-toast';
 
-// =====================================================
 // FUNCIÓN PARA CORREGIR CARACTERES MAL CODIFICADOS
-// =====================================================
 const corregirTexto = (texto) => {
   if (!texto) return '';
-  
+
   const correcciones = {
     'Ã¡': 'á', 'Ã©': 'é', 'Ã­': 'í', 'Ã³': 'ó', 'Ãº': 'ú',
     'Ã�': 'Á', 'Ã‰': 'É', 'Ã�': 'Í', 'Ã“': 'Ó', 'Ãš': 'Ú',
@@ -24,18 +22,16 @@ const corregirTexto = (texto) => {
     'Ram¡rez': 'Ramírez', 'Z£¤iga': 'Zúñiga', 'L¢pez': 'López',
     'Jes£s': 'Jesús', 'Param‚dico': 'Paramédico'
   };
-  
+
   let textoCorregido = texto;
   Object.entries(correcciones).forEach(([de, para]) => {
     textoCorregido = textoCorregido.split(de).join(para);
   });
-  
+
   return textoCorregido;
 };
 
-// =====================================================
 // MODAL PARA ACCIONES NO PERMITIDAS
-// =====================================================
 const ModalAccionNoPermitida = ({ isOpen, onClose, mensaje }) => {
   if (!isOpen) return null;
 
@@ -49,9 +45,9 @@ const ModalAccionNoPermitida = ({ isOpen, onClose, mensaje }) => {
             </div>
             <h3 className="text-lg font-semibold text-gray-800">Acción no permitida</h3>
           </div>
-          
+
           <p className="text-sm text-gray-600 mb-6">{mensaje}</p>
-          
+
           <div className="flex justify-end">
             <button
               onClick={onClose}
@@ -85,14 +81,13 @@ const UnidadDetail = () => {
     cargarUnidad();
   }, [id]);
 
-  // =====================================================
   // CARGA UNIDAD Y CORRIGE TEXTOS
-  // =====================================================
+
   const cargarUnidad = async () => {
     try {
       setLoading(true);
       const response = await unidadService.obtenerUnidad(id);
-      
+
       // Corregir textos de la unidad y relacionados
       const dataCorregida = {
         ...response.data,
@@ -109,13 +104,14 @@ const UnidadDetail = () => {
           nombre: corregirTexto(p.nombre)
         })) || []
       };
-      
+
       setUnidad(dataCorregida);
     } catch (error) {
       console.error("Error cargando unidad:", error);
       if (error.response?.status === 429) {
-        toast.error('⏳ Demasiadas peticiones. Espera unos segundos...');
-        setTimeout(() => cargarUnidad(), 5000);
+        toast.error('Demasiadas peticiones. Espera unos segundos...', {
+          icon: <Clock size={18} className="text-yellow-500" />
+        }); setTimeout(() => cargarUnidad(), 5000);
       } else {
         setError(error.error || 'Error al cargar los datos');
         toast.error('No se pudo cargar la información');
@@ -125,26 +121,26 @@ const UnidadDetail = () => {
     }
   };
 
-  // =====================================================
   // CARGA PERSONAL DISPONIBLE Y CORRIGE TEXTOS
-  // =====================================================
   const cargarPersonalDisponible = async () => {
     try {
       setCargandoPersonal(true);
       const response = await unidadService.personalDisponible(id, unidad?.tipo);
-      
+
       // Corregir nombres del personal disponible
       const personalCorregido = (response.data || []).map(p => ({
         ...p,
         nombre: corregirTexto(p.nombre)
       }));
-      
+
       setPersonalDisponible(personalCorregido);
       setMostrarAsignacion(true);
     } catch (error) {
       console.error("Error cargando personal disponible:", error);
       if (error.response?.status === 429) {
-        toast.error('⏳ Demasiadas peticiones. Espera unos segundos...');
+        toast.error('Demasiadas peticiones. Espera unos segundos...', {
+          icon: <Clock size={18} className="text-yellow-500" />
+        });
       } else {
         toast.error('Error al cargar personal disponible');
       }
@@ -161,23 +157,25 @@ const UnidadDetail = () => {
 
     try {
       await unidadService.asignarPersonal(id, personalSeleccionado);
-      toast.success('✅ Personal asignado correctamente');
+      toast.success('Personal asignado correctamente', {
+        icon: <UserPlus size={18} className="text-green-500" />
+      });
       setMostrarAsignacion(false);
       setPersonalSeleccionado('');
       await cargarUnidad();
     } catch (error) {
       console.error("Error asignando personal:", error);
       if (error.response?.status === 429) {
-        toast.error('⏳ Demasiadas peticiones. Espera unos segundos...');
+        toast.error('Demasiadas peticiones. Espera unos segundos...', {
+          icon: <Clock size={18} className="text-yellow-500" />
+        });
       } else {
         toast.error(error.error || 'Error al asignar personal');
       }
     }
   };
 
-  // =====================================================
   // REMOVER PERSONAL CON VALIDACIÓN DE UNIDAD OCUPADA
-  // =====================================================
   const handleRemover = async (personalId, nombre) => {
     // Validar si la unidad está ocupada
     if (unidad.estado === 'ocupada') {
@@ -193,22 +191,24 @@ const UnidadDetail = () => {
 
     try {
       await unidadService.removerPersonal(id, personalId);
-      toast.success('✅ Personal removido correctamente');
-      await cargarUnidad();
+      toast.success('Personal removido correctamente', {
+        icon: <UserMinus size={18} className="text-green-500" />
+      }); await cargarUnidad();
     } catch (error) {
       console.error("Error removiendo personal:", error);
-      
+
       if (error.response?.status === 429) {
-        toast.error('⏳ Demasiadas peticiones. Espera unos segundos...');
+        toast.error('Demasiadas peticiones. Espera unos segundos...', {
+          icon: <Clock size={18} className="text-yellow-500" />
+        });
       } else {
         toast.error(error.error || 'Error al remover personal');
       }
     }
   };
 
-  // =====================================================
+
   // TOGGLE ACTIVA CON VALIDACIÓN DE UNIDAD OCUPADA
-  // =====================================================
   const handleToggleActiva = async () => {
     // Validar si la unidad está ocupada
     if (unidad.estado === 'ocupada') {
@@ -227,23 +227,24 @@ const UnidadDetail = () => {
 
     try {
       await unidadService.toggleActiva(id, !unidad.activa);
-      toast.success(`✅ Unidad ${!unidad.activa ? 'activada' : 'desactivada'} correctamente`);
-      await cargarUnidad();
+      toast.success(`Unidad ${!unidad.activa ? 'activada' : 'desactivada'} correctamente`, {
+        icon: <Power size={18} className={`${!unidad.activa ? 'text-green-500' : 'text-yellow-500'}`} />
+      }); await cargarUnidad();
     } catch (error) {
       setUnidad(prev => ({ ...prev, activa: estadoAnterior }));
-      
+
       console.error("Error cambiando estado:", error);
       if (error.response?.status === 429) {
-        toast.error('⏳ Demasiadas peticiones. Espera unos segundos...');
+        toast.error('Demasiadas peticiones. Espera unos segundos...', {
+          icon: <Clock size={18} className="text-yellow-500" />
+        });
       } else {
         toast.error(error.error || 'Error al cambiar estado');
       }
     }
   };
 
-  // =====================================================
   // ELIMINAR CON VALIDACIÓN DE UNIDAD OCUPADA
-  // =====================================================
   const handleEliminar = async () => {
     // Validar si la unidad está ocupada
     if (unidad.estado === 'ocupada') {
@@ -258,21 +259,24 @@ const UnidadDetail = () => {
 
     try {
       await unidadService.eliminarUnidad(id);
-      toast.success('✅ Unidad eliminada correctamente');
+      toast.success('Unidad eliminada correctamente', {
+        icon: <Trash2 size={18} className="text-red-500" />
+      });
       navigate('/admin/unidades');
     } catch (error) {
       console.error("Error eliminando unidad:", error);
       if (error.response?.status === 429) {
-        toast.error('⏳ Demasiadas peticiones. Espera unos segundos...');
+        toast.error('Demasiadas peticiones. Espera unos segundos...', {
+          icon: <Clock size={18} className="text-yellow-500" />
+        });
       } else {
         toast.error(error.error || 'Error al eliminar unidad');
       }
     }
   };
 
-  // =====================================================
+
   // EDITAR CON VALIDACIÓN DE UNIDAD OCUPADA
-  // =====================================================
   const handleEditar = () => {
     if (unidad.estado === 'ocupada') {
       setModalInfo({
@@ -351,20 +355,18 @@ const UnidadDetail = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          <span className={`px-3 py-1 rounded-full text-sm ${
-            unidad.activa 
-              ? 'bg-green-100 text-green-700' 
-              : 'bg-red-100 text-red-700'
-          }`}>
+          <span className={`px-3 py-1 rounded-full text-sm ${unidad.activa
+            ? 'bg-green-100 text-green-700'
+            : 'bg-red-100 text-red-700'
+            }`}>
             {unidad.activa ? 'Activa' : 'Inactiva'}
           </span>
-          <span className={`px-3 py-1 rounded-full text-sm ${
-            unidad.estado === 'disponible' ? 'bg-green-100 text-green-700' :
+          <span className={`px-3 py-1 rounded-full text-sm ${unidad.estado === 'disponible' ? 'bg-green-100 text-green-700' :
             unidad.estado === 'ocupada' ? 'bg-red-100 text-red-700' :
-            'bg-gray-100 text-gray-700'
-          }`}>
+              'bg-gray-100 text-gray-700'
+            }`}>
             {unidad.estado === 'disponible' ? 'Disponible' :
-             unidad.estado === 'ocupada' ? 'Ocupada' : 'Inactiva'}
+              unidad.estado === 'ocupada' ? 'Ocupada' : 'Inactiva'}
           </span>
         </div>
       </div>
@@ -372,11 +374,10 @@ const UnidadDetail = () => {
       {/* Tarjeta principal */}
       <div className="bg-white rounded-xl shadow overflow-hidden">
         {/* Cabecera con icono */}
-        <div className={`bg-gradient-to-r px-6 py-8 ${
-          unidad.tipo === 'policia' 
-            ? 'from-blue-600 to-blue-800' 
-            : 'from-green-600 to-green-800'
-        }`}>
+        <div className={`bg-gradient-to-r px-6 py-8 ${unidad.tipo === 'policia'
+          ? 'from-blue-600 to-blue-800'
+          : 'from-green-600 to-green-800'
+          }`}>
           <div className="flex items-center gap-6">
             <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-lg">
               <Truck size={36} className={unidad.tipo === 'policia' ? 'text-blue-600' : 'text-green-600'} />
@@ -392,36 +393,35 @@ const UnidadDetail = () => {
         <div className="p-6">
           {/* Información básica */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            <InfoItem 
+            <InfoItem
               icon={unidad.tipo === 'policia' ? Shield : Ambulance}
-              label="Tipo de unidad" 
+              label="Tipo de unidad"
               value={
-                <span className={`px-2 py-1 rounded-full text-xs ${
-                  unidad.tipo === 'policia' 
-                    ? 'bg-blue-100 text-blue-700' 
-                    : 'bg-green-100 text-green-700'
-                }`}>
+                <span className={`px-2 py-1 rounded-full text-xs ${unidad.tipo === 'policia'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'bg-green-100 text-green-700'
+                  }`}>
                   {unidad.tipo === 'policia' ? 'Policía' : 'Ambulancia'}
                 </span>
-              } 
+              }
             />
-            <InfoItem 
-              icon={Hash} 
-              label="Código" 
-              value={unidad.codigo} 
+            <InfoItem
+              icon={Hash}
+              label="Código"
+              value={unidad.codigo}
             />
-            <InfoItem 
-              icon={MapPin} 
-              label="Ubicación" 
-              value={unidad.lat && unidad.lng 
+            <InfoItem
+              icon={MapPin}
+              label="Ubicación"
+              value={unidad.lat && unidad.lng
                 ? `${unidad.lat.toFixed(6)}, ${unidad.lng.toFixed(6)}`
                 : 'No disponible'
-              } 
+              }
             />
-            <InfoItem 
-              icon={FileText} 
-              label="Descripción" 
-              value={unidad.descripcion || 'Sin descripción'} 
+            <InfoItem
+              icon={FileText}
+              label="Descripción"
+              value={unidad.descripcion || 'Sin descripción'}
             />
           </div>
 
@@ -500,8 +500,8 @@ const UnidadDetail = () => {
                       <div>
                         <p className="font-medium text-gray-800">{persona.nombre}</p>
                         <p className="text-xs text-gray-500 flex items-center gap-1">
-                          {persona.rol === 'policia' ? 'Policía' : 
-                           persona.rol === 'ambulancia' ? 'Ambulancia' : persona.rol} • {persona.placa}
+                          {persona.rol === 'policia' ? 'Policía' :
+                            persona.rol === 'ambulancia' ? 'Ambulancia' : persona.rol} • {persona.placa}
                         </p>
                       </div>
                     </div>
@@ -524,25 +524,25 @@ const UnidadDetail = () => {
           <div className="border-t pt-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Información de auditoría</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <AuditItem 
-                icon={Calendar} 
-                label="Creado el" 
-                value={formatDate(unidad.creado_en)} 
+              <AuditItem
+                icon={Calendar}
+                label="Creado el"
+                value={formatDate(unidad.creado_en)}
               />
-              <AuditItem 
-                icon={User} 
-                label="Creado por" 
-                value={corregirTexto(unidad.creador?.nombre) || 'Sistema'} 
+              <AuditItem
+                icon={User}
+                label="Creado por"
+                value={corregirTexto(unidad.creador?.nombre) || 'Sistema'}
               />
-              <AuditItem 
-                icon={Calendar} 
-                label="Actualizado el" 
-                value={formatDate(unidad.actualizado_en)} 
+              <AuditItem
+                icon={Calendar}
+                label="Actualizado el"
+                value={formatDate(unidad.actualizado_en)}
               />
-              <AuditItem 
-                icon={User} 
-                label="Actualizado por" 
-                value={corregirTexto(unidad.actualizador?.nombre) || 'Sistema'} 
+              <AuditItem
+                icon={User}
+                label="Actualizado por"
+                value={corregirTexto(unidad.actualizador?.nombre) || 'Sistema'}
               />
             </div>
           </div>
@@ -552,16 +552,15 @@ const UnidadDetail = () => {
         <div className="border-t px-6 py-4 bg-gray-50 flex justify-end gap-3">
           <button
             onClick={handleToggleActiva}
-            className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${
-              unidad.activa 
-                ? 'bg-yellow-600 text-white hover:bg-yellow-700' 
-                : 'bg-green-600 text-white hover:bg-green-700'
-            }`}
+            className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${unidad.activa
+              ? 'bg-yellow-600 text-white hover:bg-yellow-700'
+              : 'bg-green-600 text-white hover:bg-green-700'
+              }`}
           >
             <Power size={18} />
             {unidad.activa ? 'Desactivar' : 'Activar'}
           </button>
-          
+
           <button
             onClick={handleEditar}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
@@ -569,7 +568,7 @@ const UnidadDetail = () => {
             <Edit size={18} />
             Editar
           </button>
-          
+
           <button
             onClick={handleEliminar}
             className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"

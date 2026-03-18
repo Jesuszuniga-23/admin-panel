@@ -34,7 +34,7 @@ export const useApi = (apiFunction, options = {}) => {
             return result;
 
         } catch (err) {
-            console.error("❌ Error en API:", err);
+            console.error("Error en API:", err);
 
             // Manejo especial para rate limit
             if (err.rateLimit || err.response?.status === 429) {

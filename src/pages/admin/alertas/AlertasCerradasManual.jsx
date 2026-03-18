@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ChevronLeft, ChevronRight, Filter, Search, Calendar, User, MapPin,
-  Shield, XCircle, Clock, X
+  Shield, XCircle, Clock, X, AlertTriangle, Heart
 } from 'lucide-react';
 import alertasService from '../../../services/admin/alertas.service';
 import useAuthStore from '../../../store/authStore';
+import MapaConDireccion from '../../../components/maps/MapaConDireccion';
 
-// Función para normalizar texto (corregir acentos y caracteres especiales)
+// Función para normalizar texto 
 const normalizarTexto = (texto) => {
   if (!texto) return '';
   
@@ -43,12 +44,25 @@ const formatearNombre = (nombre) => {
 const AlertasCerradasManual = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  
+  // Estado para TODAS las alertas (sin filtrar)
+  const [todasLasAlertas, setTodasLasAlertas] = useState([]);
+  
+  // Estado para las alertas filtradas y paginadas
   const [alertas, setAlertas] = useState([]);
   const [cargando, setCargando] = useState(true);
   
-  // =====================================================
-  // FILTROS QUE SE ENVÍAN AL BACKEND
-  // =====================================================
+  // Estado para el modal del mapa
+  const [mapaModal, setMapaModal] = useState({
+    abierto: false,
+    lat: null,
+    lng: null,
+    titulo: null,
+    alertaId: null,
+    tipo: null
+  });
+  
+  // FILTROS
   const [filtros, setFiltros] = useState({
     limite: 10,
     pagina: 1,
@@ -66,22 +80,17 @@ const AlertasCerradasManual = () => {
   });
 
   // =====================================================
-  // CARGAR ALERTAS - ENVÍA FILTROS AL BACKEND
+  // CARGAR TODAS LAS ALERTAS (UNA SOLA VEZ)
   // =====================================================
-  const cargarAlertas = async () => {
+  useEffect(() => {
+    cargarTodasLasAlertas();
+  }, []);
+
+  const cargarTodasLasAlertas = async () => {
     setCargando(true);
     try {
-      // Construir parámetros solo con valores definidos
-      const params = {
-        limite: filtros.limite,
-        pagina: filtros.pagina
-      };
-      
-      if (filtros.desde) params.desde = filtros.desde;
-      if (filtros.hasta) params.hasta = filtros.hasta;
-      if (filtros.search) params.search = filtros.search;
-      
-      const resultado = await alertasService.obtenerCerradasManual(params);
+      // Traer TODAS las alertas sin filtros
+      const resultado = await alertasService.obtenerCerradasManual({ limite: 1000 });
       
       // Formatear datos para visualización
       const alertasFormateadas = (resultado.data || []).map(alerta => ({
@@ -96,13 +105,7 @@ const AlertasCerradasManual = () => {
         } : null
       }));
       
-      setAlertas(alertasFormateadas);
-      setPaginacion({
-        total: resultado.total || 0,
-        pagina: resultado.pagina || 1,
-        limite: resultado.limite || 10,
-        total_paginas: resultado.total_paginas || 1
-      });
+      setTodasLasAlertas(alertasFormateadas);
       
     } catch (error) {
       console.error("Error:", error);
@@ -112,11 +115,64 @@ const AlertasCerradasManual = () => {
   };
 
   // =====================================================
-  // EFECTOS - SOLO CUANDO CAMBIAN FILTROS
+  // FILTRADO LOCAL (CADA VEZ QUE CAMBIAN LOS FILTROS)
   // =====================================================
   useEffect(() => {
-    cargarAlertas();
-  }, [filtros.desde, filtros.hasta, filtros.search, filtros.pagina]);
+    if (todasLasAlertas.length === 0) return;
+    
+    aplicarFiltrosYOrden();
+  }, [filtros, todasLasAlertas]);
+
+  const aplicarFiltrosYOrden = () => {
+    // 1. FILTRAR POR BÚSQUEDA (texto)
+    let datosFiltrados = [...todasLasAlertas];
+    
+    if (filtros.search) {
+      const busqueda = filtros.search.toLowerCase().trim();
+      datosFiltrados = datosFiltrados.filter(alerta => {
+        // Buscar en varios campos
+        const idMatch = alerta.id?.toString().includes(busqueda);
+        const tipoMatch = alerta.tipo?.toLowerCase().includes(busqueda);
+        const ciudadanoMatch = alerta.ciudadano?.nombre?.toLowerCase().includes(busqueda);
+        const motivoMatch = alerta.motivo_cierre_manual?.toLowerCase().includes(busqueda);
+        const cerradorMatch = alerta.cerrador?.nombre?.toLowerCase().includes(busqueda);
+        
+        return idMatch || tipoMatch || ciudadanoMatch || motivoMatch || cerradorMatch;
+      });
+    }
+    
+    // 2. FILTRAR POR FECHA (local)
+    if (filtros.desde && filtros.hasta) {
+      const desde = new Date(filtros.desde);
+      desde.setHours(0, 0, 0, 0);
+      
+      const hasta = new Date(filtros.hasta);
+      hasta.setHours(23, 59, 59, 999);
+      
+      console.log('🔍 Filtrando desde:', desde.toLocaleString(), 'hasta:', hasta.toLocaleString());
+      
+      datosFiltrados = datosFiltrados.filter(alerta => {
+        if (!alerta.fecha_cierre) return false;
+        const fechaCierre = new Date(alerta.fecha_cierre);
+        return fechaCierre >= desde && fechaCierre <= hasta;
+      });
+    }
+    
+    // 3. CALCULAR PAGINACIÓN
+    const total = datosFiltrados.length;
+    const totalPaginas = Math.ceil(total / filtros.limite);
+    const inicio = (filtros.pagina - 1) * filtros.limite;
+    const fin = inicio + filtros.limite;
+    const datosPaginados = datosFiltrados.slice(inicio, fin);
+    
+    setAlertas(datosPaginados);
+    setPaginacion({
+      total,
+      pagina: filtros.pagina,
+      limite: filtros.limite,
+      total_paginas: totalPaginas
+    });
+  };
 
   // Manejadores
   const handleSearchChange = (e) => {
@@ -149,6 +205,29 @@ const AlertasCerradasManual = () => {
     });
   };
 
+  const abrirMapaModal = (e, alerta) => {
+    e.stopPropagation();
+    setMapaModal({
+      abierto: true,
+      lat: alerta.lat,
+      lng: alerta.lng,
+      titulo: alerta.tipo === 'panico' ? 'Alerta de Pánico' : 'Alerta Médica',
+      alertaId: alerta.id,
+      tipo: alerta.tipo
+    });
+  };
+
+  const cerrarMapaModal = () => {
+    setMapaModal({
+      abierto: false,
+      lat: null,
+      lng: null,
+      titulo: null,
+      alertaId: null,
+      tipo: null
+    });
+  };
+
   const handleRowClick = (alertaId) => {
     navigate(`/admin/alertas/${alertaId}`);
   };
@@ -172,12 +251,12 @@ const AlertasCerradasManual = () => {
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className="bg-white p-1.5 sm:p-2 rounded-xl shadow-lg shadow-slate-200/50">
-              <XCircle size={20} className="sm:w-6 sm:h-6 text-purple-600" />
+            <div className="bg-gradient-to-br from-purple-500 to-indigo-600 p-2 sm:p-2.5 md:p-3 rounded-lg sm:rounded-xl shadow-lg shadow-purple-200">
+              <XCircle size={20} className="sm:w-5 sm:h-5 md:w-6 md:h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-slate-800">Alertas Cerradas Manualmente</h1>
-              <p className="text-xs text-slate-500">Historial de alertas cerradas por administradores</p>
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Alertas Cerradas Manualmente</h1>
+              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Historial de alertas cerradas por administradores</p>
             </div>
           </div>
           
@@ -187,7 +266,7 @@ const AlertasCerradasManual = () => {
           >
             <ChevronLeft size={14} className="sm:w-4 sm:h-4" />
             <span className="hidden xs:inline">Dashboard</span>
-            <span className="xs:hidden">Volver</span>
+            <span className="xs:hidden">Dashboard</span>
           </button>
         </div>
 
@@ -197,7 +276,7 @@ const AlertasCerradasManual = () => {
             <Filter size={14} className="sm:w-4 sm:h-4 text-purple-500" />
             <span className="text-xs sm:text-sm font-medium text-slate-700">Filtros</span>
             <span className="text-xs bg-purple-50 text-purple-600 px-1.5 sm:px-2 py-0.5 rounded-full ml-2">
-              Filtros del servidor
+              Filtrado local
             </span>
           </div>
           
@@ -268,6 +347,12 @@ const AlertasCerradasManual = () => {
             <div className="mt-3 flex items-center gap-2 text-xs">
               <span className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-pulse"></span>
               <span className="text-purple-600">Filtros aplicados - {paginacion.total} resultados</span>
+              <button
+                onClick={limpiarFiltros}
+                className="text-xs text-purple-600 hover:text-purple-800 underline ml-2"
+              >
+                Limpiar todo
+              </button>
             </div>
           )}
         </div>
@@ -285,12 +370,16 @@ const AlertasCerradasManual = () => {
                 <XCircle size={24} className="md:w-7 md:h-7 text-slate-400" />
               </div>
               <h3 className="text-sm md:text-base font-medium text-slate-700 mb-1">No hay alertas cerradas</h3>
-              <p className="text-xs text-slate-400">Las alertas cerradas manualmente aparecerán aquí</p>
+              <p className="text-xs text-slate-400">
+                {filtros.desde || filtros.hasta || filtros.search
+                  ? 'No se encontraron resultados con los filtros aplicados'
+                  : 'Las alertas cerradas manualmente aparecerán aquí'}
+              </p>
             </div>
           ) : (
             <>
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[800px] md:min-w-full">
+                <table className="w-full min-w-[900px] md:min-w-full">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200">
                       <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-slate-500 uppercase">ID</th>
@@ -350,12 +439,14 @@ const AlertasCerradasManual = () => {
                         </td>
                         <td className="px-3 md:px-6 py-2 md:py-3">
                           {alerta.lat && alerta.lng ? (
-                            <div className="flex items-center gap-1">
-                              <MapPin size={12} className="md:w-4 md:h-4 text-slate-400 flex-shrink-0" />
-                              <span className="text-xs text-slate-500 truncate max-w-[70px] md:max-w-[120px]">
-                                {alerta.lat.toFixed(2)}, {alerta.lng.toFixed(2)}
-                              </span>
-                            </div>
+                            <button
+                              onClick={(e) => abrirMapaModal(e, alerta)}
+                              className="flex items-center gap-1 text-purple-600 hover:text-purple-700 hover:bg-purple-50 px-2 py-1 rounded-lg transition-all group"
+                              title="Ver ubicación en mapa"
+                            >
+                              <MapPin size={16} className="md:w-4 md:h-4 group-hover:scale-110 transition-transform" />
+                              <span className="text-xs hidden md:inline">Ver mapa</span>
+                            </button>
                           ) : (
                             <span className="text-xs text-slate-400">—</span>
                           )}
@@ -397,6 +488,79 @@ const AlertasCerradasManual = () => {
           )}
         </div>
       </div>
+
+      {/* MODAL DEL MAPA */}
+      {mapaModal.abierto && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+          onClick={cerrarMapaModal}
+        >
+          <div 
+            className="bg-white rounded-xl shadow-2xl w-full max-w-3xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header del modal */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-indigo-50">
+              <div className="flex items-center gap-2">
+                <div className={`p-2 rounded-lg ${
+                  mapaModal.tipo === 'panico' ? 'bg-red-100' : 'bg-green-100'
+                }`}>
+                  {mapaModal.tipo === 'panico' ? (
+                    <AlertTriangle size={18} className="text-red-600" />
+                  ) : (
+                    <Heart size={18} className="text-green-600" />
+                  )}
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-800">Ubicación de la Alerta</h3>
+                  <p className="text-xs text-gray-500">ID: #{mapaModal.alertaId} • {mapaModal.titulo}</p>
+                </div>
+              </div>
+              <button
+                onClick={cerrarMapaModal}
+                className="p-2 hover:bg-white rounded-lg transition-colors"
+              >
+                <X size={18} className="text-gray-500" />
+              </button>
+            </div>
+
+            {/* Contenido del modal - Mapa */}
+            <div className="p-4">
+              <MapaConDireccion
+                lat={mapaModal.lat}
+                lng={mapaModal.lng}
+                titulo={
+                  <div className="flex items-center gap-1.5">
+                    {mapaModal.tipo === 'panico' ? (
+                      <>
+                        <AlertTriangle size={14} className="text-red-500" />
+                        <span className="text-xs font-medium text-gray-700">Alerta de Pánico</span>
+                      </>
+                    ) : (
+                      <>
+                        <Heart size={14} className="text-green-500" />
+                        <span className="text-xs font-medium text-gray-700">Alerta Médica</span>
+                      </>
+                    )}
+                  </div>
+                }
+                alertaId={mapaModal.alertaId}
+                altura="400px"
+              />
+            </div>
+
+            {/* Footer del modal */}
+            <div className="p-4 border-t border-gray-200 bg-gray-50 flex justify-end">
+              <button
+                onClick={cerrarMapaModal}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

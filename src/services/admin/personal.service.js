@@ -2,9 +2,7 @@ import axiosInstance from '../api/axiosConfig';
 import { ENDPOINTS } from '../api/endpoints';
 
 class PersonalService {
-  // =====================================================
   // LISTAR PERSONAL
-  // =====================================================
   async listarPersonal(filtros = {}) {
     try {
       const params = new URLSearchParams();
@@ -22,9 +20,9 @@ class PersonalService {
 
 
       const url = `${ENDPOINTS.PERSONAL.LIST}?${params.toString()}`;
-      console.log("📡 Listando personal:", url);
+      console.log(" Listando personal:", url);
       const response = await axiosInstance.get(url);
-      console.log("✅ Personal recibido:", response.data);
+      console.log(" Personal recibido:", response.data);
       return response.data;
     } catch (error) {
       console.error('Error listando personal:', error);
@@ -32,15 +30,13 @@ class PersonalService {
     }
   }
 
-  // =====================================================
   // OBTENER PERSONAL POR ID
-  // =====================================================
   async obtenerPersonal(id) {
     try {
       const url = ENDPOINTS.PERSONAL.GET(id);
-      console.log("📡 Obteniendo personal:", url);
+      console.log("Obteniendo personal:", url);
       const response = await axiosInstance.get(url);
-      console.log("✅ Personal obtenido:", response.data);
+      console.log("Personal obtenido:", response.data);
       return response.data;
     } catch (error) {
       console.error('Error obteniendo personal:', error);
@@ -48,14 +44,12 @@ class PersonalService {
     }
   }
 
-  // =====================================================
   // CREAR PERSONAL
-  // =====================================================
   async crearPersonal(datos) {
     try {
-      console.log("📡 Creando personal:", datos);
+      console.log("Creando personal:", datos);
       const response = await axiosInstance.post(ENDPOINTS.PERSONAL.CREATE, datos);
-      console.log("✅ Personal creado:", response.data);
+      console.log(" Personal creado:", response.data);
       return response.data;
     } catch (error) {
       console.error('Error creando personal:', error);
@@ -63,9 +57,8 @@ class PersonalService {
     }
   }
 
-  // =====================================================
+  
   // ACTUALIZAR PERSONAL
-  // =====================================================
   async actualizarPersonal(id, datos) {
     try {
       const response = await axiosInstance.put(ENDPOINTS.PERSONAL.UPDATE(id), datos);
@@ -76,14 +69,13 @@ class PersonalService {
     }
   }
 
-  // =====================================================
+  
   // ELIMINAR PERSONAL (SOFT DELETE)
-  // =====================================================
   async eliminarPersonal(id) {
     try {
-      console.log("📡 Eliminando personal:", id);
+      console.log(" Eliminando personal:", id);
       const response = await axiosInstance.delete(ENDPOINTS.PERSONAL.DELETE(id));
-      console.log("✅ Personal eliminado:", response.data);
+      console.log("Personal eliminado:", response.data);
       return response.data;
     } catch (error) {
       console.error('Error eliminando personal:', error);
@@ -91,14 +83,12 @@ class PersonalService {
     }
   }
 
-  // =====================================================
   // ACTIVAR/DESACTIVAR PERSONAL
-  // =====================================================
   async toggleActivo(id, activo) {
     try {
-      console.log("📡 Cambiando estado personal:", id, activo);
+      console.log(" Cambiando estado personal:", id, activo);
       const response = await axiosInstance.patch(ENDPOINTS.PERSONAL.TOGGLE_ACTIVO(id), { activo });
-      console.log("✅ Estado cambiado:", response.data);
+      console.log(" Estado cambiado:", response.data);
       return response.data;
     } catch (error) {
       console.error('Error cambiando estado:', error);
@@ -106,14 +96,12 @@ class PersonalService {
     }
   }
 
-  // =====================================================
   // RESTAURAR PERSONAL ELIMINADO
-  // =====================================================
   async restaurarPersonal(id) {
     try {
-      console.log("📡 Restaurando personal:", id);
+      console.log("Restaurando personal:", id);
       const response = await axiosInstance.post(ENDPOINTS.PERSONAL.RESTAURAR(id));
-      console.log("✅ Personal restaurado:", response.data);
+      console.log(" Personal restaurado:", response.data);
       return response.data;
     } catch (error) {
       console.error('Error restaurando personal:', error);

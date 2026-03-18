@@ -10,13 +10,13 @@ export const useAuth = () => {
 
  const login = useGoogleLogin({
   onSuccess: async (response) => {
-    console.log("✅ Respuesta completa de Google:", response);
+    console.log("Respuesta completa de Google:", response);
     
-    // Ahora el token viene en response.credential
+    //  el token viene en response.credential
     const token = response.credential;
     
     if (!token) {
-      console.error("❌ No se encontró credential en la respuesta:", response);
+      console.error("No se encontró credential en la respuesta:", response);
       toast.error('Error: No se pudo obtener el token de Google');
       return;
     }
@@ -27,7 +27,7 @@ export const useAuth = () => {
       const result = await authService.loginWithGoogle(token);
       
       toast.dismiss('login');
-      console.log("✅ Resultado del login:", result);
+      console.log("Resultado del login:", result);
       
       if (result?.success) {
         setUser(result.usuario);
@@ -43,15 +43,15 @@ export const useAuth = () => {
       }
     } catch (error) {
       toast.dismiss('login');
-      console.error("❌ Error en proceso de login:", error);
+      console.error("Error en proceso de login:", error);
       toast.error(error?.error || 'Error al conectar con el servidor');
     }
   },
   onError: (error) => {
-    console.error("❌ Error de Google OAuth:", error);
+    console.error("Error de Google OAuth:", error);
     toast.error('Error en autenticación con Google');
   },
-  flow: 'implicit', // ← CAMBIA DE 'popup' a 'implicit'
+  flow: 'implicit', //'implicit'
   scope: 'openid email profile',
 });
 

@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Activity, MapPin, User, Phone, Clock, Eye, 
   Truck, AlertTriangle, Heart, Filter, Calendar,
-  ChevronLeft, ChevronRight, X
+  ChevronLeft, ChevronRight, X, MapPinned
 } from 'lucide-react';
 import alertasPanelService from '../../../services/admin/alertasPanel.service';
-import Loader from '../../../components/common/Loader';
+import Loader from '../../../components/common/Loader'; // Solo este Loader (el personalizado)
+import MapaConDireccion from '../../../components/maps/MapaConDireccion';
 import toast from 'react-hot-toast';
 
 // Función para normalizar texto
@@ -66,7 +67,7 @@ const AlertasEnProceso = () => {
 
   useEffect(() => {
     cargarAlertas();
-  }, []); // Solo cargar una vez
+  }, []);
 
   const cargarAlertas = async () => {
     try {
@@ -74,7 +75,6 @@ const AlertasEnProceso = () => {
       const response = await alertasPanelService.obtenerEnProceso({ limite: 1000 });
       
       if (response.success) {
-        // Formatear datos
         const alertasFormateadas = (response.data || []).map(alerta => ({
           ...alerta,
           ciudadano: alerta.ciudadano ? {
@@ -85,13 +85,11 @@ const AlertasEnProceso = () => {
         
         setAlertasOriginal(alertasFormateadas);
         
-        // Extraer unidades únicas para el filtro
         const unidades = [...new Set(alertasFormateadas
           .filter(a => a.unidad?.codigo)
           .map(a => a.unidad.codigo))];
         setUnidadesDisponibles(unidades);
         
-        // Aplicar filtros iniciales
         aplicarFiltrosLocal(alertasFormateadas);
       }
     } catch (error) {
@@ -101,24 +99,20 @@ const AlertasEnProceso = () => {
     }
   };
 
-  // Función para filtrar datos localmente
   const aplicarFiltrosLocal = (datos = alertasOriginal) => {
     let datosFiltrados = datos;
     let filtrosAplicados = false;
     
-    // Filtro por tipo de alerta
     if (filtros.tipo !== 'todos') {
       filtrosAplicados = true;
       datosFiltrados = datosFiltrados.filter(a => a.tipo === filtros.tipo);
     }
     
-    // Filtro por unidad
     if (filtros.unidad !== 'todas') {
       filtrosAplicados = true;
       datosFiltrados = datosFiltrados.filter(a => a.unidad?.codigo === filtros.unidad);
     }
     
-    // Filtro por fechas
     if (filtros.desde && filtros.hasta) {
       filtrosAplicados = true;
       
@@ -148,7 +142,6 @@ const AlertasEnProceso = () => {
     
     setFiltrosActivos(filtrosAplicados);
     
-    // Calcular paginación
     const total = datosFiltrados.length;
     const totalPaginas = Math.ceil(total / 10);
     const inicio = (pagina - 1) * 10;
@@ -165,7 +158,7 @@ const AlertasEnProceso = () => {
 
   const handleFiltroChange = (nombre, valor) => {
     setFiltros(prev => ({ ...prev, [nombre]: valor }));
-    setPagina(1); // Resetear a primera página
+    setPagina(1);
   };
 
   const limpiarFiltros = () => {
@@ -179,7 +172,6 @@ const AlertasEnProceso = () => {
     setFiltrosActivos(false);
   };
 
-  // Efecto para aplicar filtros cuando cambian
   useEffect(() => {
     if (alertasOriginal.length) {
       aplicarFiltrosLocal();
@@ -233,8 +225,8 @@ const AlertasEnProceso = () => {
 
   if (loading && alertas.length === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 sm:p-6 md:p-8">
-        <div className="max-w-7xl mx-auto">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 md:py-8">
           <Loader />
         </div>
       </div>
@@ -242,18 +234,18 @@ const AlertasEnProceso = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 sm:p-6 md:p-8">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 md:py-8">
         {/* Header con estilo profesional */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-          <div className="flex items-center gap-3">
-            <div className="bg-gradient-to-br from-yellow-500 to-amber-600 p-3 rounded-xl shadow-lg shadow-yellow-200">
-              <Activity className="text-white" size={24} />
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 mb-4 sm:mb-6 md:mb-8">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="bg-gradient-to-br from-yellow-500 to-amber-600 p-2 sm:p-2.5 md:p-3 rounded-lg sm:rounded-xl shadow-lg shadow-yellow-200">
+              <Activity size={20} className="sm:w-5 sm:h-5 md:w-6 md:h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Alertas en Proceso</h1>
-              <p className="text-sm text-gray-500 mt-1 flex items-center gap-2">
-                <span>Alertas siendo atendidas por unidades</span>
+              <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-gray-800">Alertas en Proceso</h1>
+              <p className="text-xs sm:text-sm text-gray-500 mt-0.5 flex items-center gap-2">
+                <span>Alertas siendo atendidas</span>
                 {filtrosActivos && (
                   <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium">
                     {paginacion.total} resultados
@@ -265,33 +257,33 @@ const AlertasEnProceso = () => {
           
           <button
             onClick={() => navigate('/admin/dashboard')}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl shadow-sm hover:bg-gray-50 transition-colors text-gray-600 text-sm font-medium whitespace-nowrap"
+            className="flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-white border border-gray-200 rounded-lg sm:rounded-xl shadow-sm hover:bg-gray-50 transition-colors text-gray-600 text-xs sm:text-sm font-medium"
           >
-            <ChevronLeft size={16} />
-            Dashboard
+            <ChevronLeft size={14} className="sm:w-4 sm:h-4" />
+            <span>Dashboard</span>
           </button>
         </div>
 
         {/* Panel de filtros */}
-        <div className="bg-white rounded-xl shadow-lg p-5 mb-8 border border-gray-100">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="p-1.5 bg-yellow-50 rounded-lg">
-              <Filter size={16} className="text-yellow-600" />
+        <div className="bg-white rounded-lg sm:rounded-xl shadow-lg p-3 sm:p-4 md:p-5 mb-4 sm:mb-6 md:mb-8 border border-gray-100">
+          <div className="flex items-center gap-2 mb-3 sm:mb-4">
+            <div className="p-1 sm:p-1.5 bg-yellow-50 rounded-lg">
+              <Filter size={14} className="sm:w-4 sm:h-4 text-yellow-600" />
             </div>
-            <span className="text-sm font-semibold text-gray-700">Filtros</span>
+            <span className="text-xs sm:text-sm font-semibold text-gray-700">Filtros</span>
             <span className="text-xs bg-yellow-50 text-yellow-600 px-2 py-0.5 rounded-full ml-2">
               Tiempo real
             </span>
           </div>
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
             {/* Filtro por tipo */}
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5">Tipo de alerta</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Tipo de alerta</label>
               <select
                 value={filtros.tipo}
                 onChange={(e) => handleFiltroChange('tipo', e.target.value)}
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-yellow-500/20 focus:border-yellow-500 transition-all text-sm"
+                className="w-full px-3 sm:px-4 py-2 sm:py-2.5 bg-gray-50 border border-gray-200 rounded-lg sm:rounded-xl focus:bg-white focus:ring-2 focus:ring-yellow-500/20 focus:border-yellow-500 transition-all text-xs sm:text-sm"
               >
                 <option value="todos">Todos los tipos</option>
                 <option value="panico">Pánico</option>
@@ -301,11 +293,11 @@ const AlertasEnProceso = () => {
 
             {/* Filtro por unidad */}
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5">Unidad</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Unidad</label>
               <select
                 value={filtros.unidad}
                 onChange={(e) => handleFiltroChange('unidad', e.target.value)}
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-yellow-500/20 focus:border-yellow-500 transition-all text-sm"
+                className="w-full px-3 sm:px-4 py-2 sm:py-2.5 bg-gray-50 border border-gray-200 rounded-lg sm:rounded-xl focus:bg-white focus:ring-2 focus:ring-yellow-500/20 focus:border-yellow-500 transition-all text-xs sm:text-sm"
               >
                 <option value="todas">Todas las unidades</option>
                 {unidadesDisponibles.map(unidad => (
@@ -316,28 +308,28 @@ const AlertasEnProceso = () => {
 
             {/* Fecha desde */}
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5">Desde</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Desde</label>
               <div className="relative">
-                <Calendar size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <Calendar size={14} className="absolute left-2.5 sm:left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                 <input
                   type="date"
                   value={filtros.desde}
                   onChange={(e) => handleFiltroChange('desde', e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-yellow-500/20 focus:border-yellow-500 transition-all text-sm"
+                  className="w-full pl-8 sm:pl-10 pr-3 sm:pr-4 py-2 sm:py-2.5 bg-gray-50 border border-gray-200 rounded-lg sm:rounded-xl focus:bg-white focus:ring-2 focus:ring-yellow-500/20 focus:border-yellow-500 transition-all text-xs sm:text-sm"
                 />
               </div>
             </div>
 
             {/* Fecha hasta */}
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5">Hasta</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Hasta</label>
               <div className="relative">
-                <Calendar size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <Calendar size={14} className="absolute left-2.5 sm:left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                 <input
                   type="date"
                   value={filtros.hasta}
                   onChange={(e) => handleFiltroChange('hasta', e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-yellow-500/20 focus:border-yellow-500 transition-all text-sm"
+                  className="w-full pl-8 sm:pl-10 pr-3 sm:pr-4 py-2 sm:py-2.5 bg-gray-50 border border-gray-200 rounded-lg sm:rounded-xl focus:bg-white focus:ring-2 focus:ring-yellow-500/20 focus:border-yellow-500 transition-all text-xs sm:text-sm"
                 />
               </div>
             </div>
@@ -346,7 +338,7 @@ const AlertasEnProceso = () => {
             <div className="flex items-end">
               <button
                 onClick={limpiarFiltros}
-                className="w-full px-6 py-2.5 border border-gray-200 bg-white rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all text-sm font-medium text-gray-600"
+                className="w-full px-4 sm:px-6 py-2 sm:py-2.5 border border-gray-200 bg-white rounded-lg sm:rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all text-xs sm:text-sm font-medium text-gray-600"
               >
                 Limpiar filtros
               </button>
@@ -369,12 +361,12 @@ const AlertasEnProceso = () => {
 
         {/* Lista de Alertas */}
         {alertas.length === 0 ? (
-          <div className="bg-white rounded-2xl shadow-lg p-16 text-center border border-gray-100">
-            <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Activity size={32} className="text-gray-400" />
+          <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-8 sm:p-12 md:p-16 text-center border border-gray-100">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Activity size={24} className="sm:w-8 sm:h-8 text-gray-400" />
             </div>
-            <h3 className="text-xl font-semibold text-gray-700 mb-2">No hay alertas en proceso</h3>
-            <p className="text-sm text-gray-400">
+            <h3 className="text-lg sm:text-xl font-semibold text-gray-700 mb-2">No hay alertas en proceso</h3>
+            <p className="text-xs sm:text-sm text-gray-400">
               {filtrosActivos 
                 ? 'No se encontraron alertas con los filtros seleccionados'
                 : 'Las alertas asignadas aparecerán aquí'}
@@ -384,7 +376,7 @@ const AlertasEnProceso = () => {
           <>
             {/* Indicador de resultados */}
             <div className="flex justify-between items-center mb-4">
-              <p className="text-sm text-gray-500">
+              <p className="text-xs sm:text-sm text-gray-500">
                 Mostrando <span className="font-medium text-gray-700">{inicio}</span> a{' '}
                 <span className="font-medium text-gray-700">{fin}</span> de{' '}
                 <span className="font-medium text-gray-700">{paginacion.total}</span> alertas
@@ -399,49 +391,55 @@ const AlertasEnProceso = () => {
               )}
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-4 sm:space-y-6">
               {alertas.map((alerta) => (
                 <div 
                   key={alerta.id} 
-                  className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all border border-gray-100 overflow-hidden group"
+                  className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all border border-gray-100 overflow-hidden"
                 >
                   {/* Barra superior con información de tiempo */}
-                  <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-2 border-b border-gray-100 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Clock size={14} className="text-gray-400" />
+                  <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-3 sm:px-4 md:px-6 py-2 border-b border-gray-100 flex flex-col xs:flex-row items-start xs:items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      <Clock size={12} className="sm:w-3.5 sm:h-3.5 text-gray-400" />
                       <span className="text-xs font-medium text-gray-600">
                         Asignada: {formatearFecha(alerta.fecha_asignacion)}
                       </span>
                     </div>
-                    <span className="text-xs bg-yellow-50 text-yellow-600 px-2 py-1 rounded-full">
+                    <span className="text-xs bg-yellow-50 text-yellow-600 px-2 py-1 rounded-full self-start xs:self-auto">
                       {alerta.estado === 'asignada' ? 'En espera' : 'En atención'}
                     </span>
                   </div>
 
-                  <div className="p-6">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        {/* Header con tipo y estado */}
-                        <div className="flex items-center gap-3 mb-4">
-                          <div className={`p-2.5 rounded-xl ${
-                            alerta.tipo === 'panico' ? 'bg-red-50' : 'bg-green-50'
-                          }`}>
-                            {getIconByTipo(alerta.tipo)}
-                          </div>
-                          <span className={`px-3 py-1.5 rounded-full text-xs font-bold border ${getColorByTipo(alerta.tipo)}`}>
-                            {alerta.tipo === 'panico' ? 'PÁNICO' : 'MÉDICA'}
-                          </span>
-                          <span className={`px-3 py-1.5 rounded-full text-xs font-bold ${getEstadoColor(alerta.estado)}`}>
-                            {alerta.estado === 'asignada' ? 'ASIGNADA' : 'ATENDIENDO'}
-                          </span>
-                          <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-full">
-                            #{alerta.id}
-                          </span>
-                        </div>
+                  <div className="p-3 sm:p-4 md:p-6">
+                    {/* Header con tipo y estado - responsive */}
+                    <div className="flex flex-wrap items-center gap-2 mb-4">
+                      <div className={`p-1.5 sm:p-2 rounded-lg ${
+                        alerta.tipo === 'panico' ? 'bg-red-50' : 'bg-green-50'
+                      }`}>
+                        {getIconByTipo(alerta.tipo)}
+                      </div>
+                      <span className={`px-2 sm:px-3 py-1 rounded-full text-xs font-bold border ${getColorByTipo(alerta.tipo)}`}>
+                        {alerta.tipo === 'panico' ? 'PÁNICO' : 'MÉDICA'}
+                      </span>
+                      <span className={`px-2 sm:px-3 py-1 rounded-full text-xs font-bold ${getEstadoColor(alerta.estado)}`}>
+                        {alerta.estado === 'asignada' ? 'ASIGNADA' : 'ATENDIENDO'}
+                      </span>
+                      <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-full">
+                        #{alerta.id}
+                      </span>
+                    </div>
 
+                    {/* Grid principal - responsive */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+                      {/* Columna izquierda: Información del ciudadano y unidad */}
+                      <div className="lg:col-span-1 space-y-4">
                         {/* Unidad asignada */}
                         {alerta.unidad && (
-                          <div className="bg-blue-50 rounded-lg p-4 mb-4 border border-blue-100">
+                          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-3 sm:p-4 border border-blue-100">
+                            <h3 className="text-xs font-semibold text-blue-800 uppercase tracking-wider mb-3 flex items-center gap-2">
+                              <Truck size={14} className="text-blue-600" />
+                              UNIDAD ASIGNADA
+                            </h3>
                             <div className="flex items-center gap-3">
                               <div className="p-2 bg-white rounded-lg">
                                 <Truck size={18} className="text-blue-600" />
@@ -454,51 +452,93 @@ const AlertasEnProceso = () => {
                           </div>
                         )}
 
-                        {/* Grid de información */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                            <User size={16} className="text-gray-400" />
-                            <div>
-                              <p className="text-xs text-gray-500">Ciudadano</p>
-                              <p className="text-sm font-medium text-gray-800">
-                                {alerta.ciudadano?.nombre || 'Desconocido'}
-                              </p>
-                            </div>
-                          </div>
-                          
-                          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                            <Phone size={16} className="text-gray-400" />
-                            <div>
-                              <p className="text-xs text-gray-500">Teléfono</p>
-                              <p className="text-sm font-medium text-gray-800">
-                                {alerta.ciudadano?.telefono || 'N/A'}
-                              </p>
-                            </div>
-                          </div>
-                          
-                          {alerta.lat && alerta.lng && (
-                            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                              <MapPin size={16} className="text-gray-400" />
+                        {/* Información del ciudadano */}
+                        <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg p-3 sm:p-4 border border-purple-100">
+                          <h3 className="text-xs font-semibold text-purple-800 uppercase tracking-wider mb-3 flex items-center gap-2">
+                            <User size={14} className="text-purple-600" />
+                            CIUDADANO
+                          </h3>
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                <span className="text-purple-700 font-semibold">
+                                  {alerta.ciudadano?.nombre?.charAt(0).toUpperCase() || '?'}
+                                </span>
+                              </div>
                               <div>
-                                <p className="text-xs text-gray-500">Ubicación</p>
-                                <p className="text-sm font-medium text-gray-800 font-mono">
-                                  {alerta.lat.toFixed(4)}, {alerta.lng.toFixed(4)}
-                                </p>
+                                <p className="text-sm font-medium text-gray-800">{alerta.ciudadano?.nombre || 'Desconocido'}</p>
+                                <p className="text-xs text-gray-500">Ciudadano</p>
                               </div>
                             </div>
-                          )}
+                            
+                            {alerta.ciudadano?.telefono && (
+                              <div className="flex items-center gap-2 p-2 bg-white rounded-lg border border-purple-100">
+                                <Phone size={14} className="text-purple-500" />
+                                <span className="text-sm text-gray-700">{alerta.ciudadano.telefono}</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
+
+                        {/* Coordenadas (solo para referencia) */}
+                        {alerta.lat && alerta.lng && (
+                          <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                            <div className="flex items-center gap-2">
+                              <MapPin size={14} className="text-gray-400" />
+                              <span className="text-xs text-gray-500">Coordenadas:</span>
+                              <span className="text-xs font-mono text-gray-700">
+                                {parseFloat(alerta.lat).toFixed(4)}, {parseFloat(alerta.lng).toFixed(4)}
+                              </span>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
-                      {/* Botón de acción */}
-                      <button
-                        onClick={() => navigate(`/admin/alertas/${alerta.id}`)}
-                        className="ml-4 p-3 bg-gray-50 hover:bg-blue-50 rounded-xl transition-all group self-start"
-                        title="Ver detalle completo"
-                      >
-                        <Eye size={20} className="text-gray-400 group-hover:text-blue-600 transition-colors" />
-                      </button>
+                      {/* Columna derecha: Mapa */}
+                      <div className="lg:col-span-2">
+                        <div className="bg-gray-50 rounded-lg p-3 sm:p-4 border border-gray-200 h-full">
+                          <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-3 flex items-center gap-2">
+                            <MapPinned size={14} className="text-blue-600" />
+                            UBICACIÓN DEL EVENTO
+                          </h3>
+
+                          <div className="rounded-lg overflow-hidden border border-gray-200">
+                            <MapaConDireccion
+                              lat={alerta.lat}
+                              lng={alerta.lng}
+                              titulo={
+                                <div className="flex items-center gap-1.5">
+                                  {alerta.tipo === 'panico' ? (
+                                    <>
+                                      <AlertTriangle size={14} className="text-red-500" />
+                                      <span className="text-xs font-medium text-gray-700">Alerta de Pánico</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Heart size={14} className="text-green-500" />
+                                      <span className="text-xs font-medium text-gray-700">Alerta Médica</span>
+                                    </>
+                                  )}
+                                </div>
+                              }
+                              alertaId={alerta.id}
+                              altura={window.innerWidth < 640 ? "250px" : "280px"}
+                            />
+                          </div>
+                        </div>
+                      </div>
                     </div>
+                  </div>
+
+                  {/* Footer con botón de acción */}
+                  <div className="bg-gray-50 px-3 sm:px-4 md:px-6 py-3 border-t border-gray-100 flex justify-end">
+                    <button
+                      onClick={() => navigate(`/admin/alertas/${alerta.id}`)}
+                      className="flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-white border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-200 hover:text-blue-600 transition-all text-xs sm:text-sm font-medium text-gray-600 group"
+                    >
+                      <Eye size={14} className="sm:w-4 sm:h-4 group-hover:text-blue-600" />
+                      <span>Ver detalle completo</span>
+                    </button>
                   </div>
                 </div>
               ))}
@@ -506,8 +546,8 @@ const AlertasEnProceso = () => {
 
             {/* Paginación profesional */}
             {paginacion.total_paginas > 1 && (
-              <div className="mt-8 bg-white rounded-xl shadow-sm p-4 border border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <p className="text-sm text-gray-500">
+              <div className="mt-6 sm:mt-8 bg-white rounded-lg sm:rounded-xl shadow-sm p-3 sm:p-4 border border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <p className="text-xs sm:text-sm text-gray-500">
                   Mostrando <span className="font-medium text-gray-700">{inicio}</span> a{' '}
                   <span className="font-medium text-gray-700">{fin}</span> de{' '}
                   <span className="font-medium text-gray-700">{paginacion.total}</span> alertas
@@ -517,10 +557,10 @@ const AlertasEnProceso = () => {
                   <button
                     onClick={() => cambiarPagina(paginacion.pagina - 1)}
                     disabled={paginacion.pagina === 1}
-                    className="px-4 py-2 border border-gray-200 bg-white rounded-lg hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 transition-all text-sm font-medium flex items-center gap-2"
+                    className="px-3 sm:px-4 py-1.5 sm:py-2 border border-gray-200 bg-white rounded-lg hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 transition-all text-xs sm:text-sm font-medium flex items-center gap-1 sm:gap-2"
                   >
-                    <ChevronLeft size={16} />
-                    Anterior
+                    <ChevronLeft size={14} className="sm:w-4 sm:h-4" />
+                    <span className="hidden xs:inline">Anterior</span>
                   </button>
                   
                   <div className="flex items-center gap-1">
@@ -534,7 +574,7 @@ const AlertasEnProceso = () => {
                           <button
                             key={i}
                             onClick={() => cambiarPagina(paginaMostrar)}
-                            className={`w-8 h-8 rounded-lg text-sm font-medium transition-all ${
+                            className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg text-xs sm:text-sm font-medium transition-all ${
                               paginacion.pagina === paginaMostrar
                                 ? 'bg-yellow-600 text-white'
                                 : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
@@ -551,10 +591,10 @@ const AlertasEnProceso = () => {
                   <button
                     onClick={() => cambiarPagina(paginacion.pagina + 1)}
                     disabled={paginacion.pagina === paginacion.total_paginas}
-                    className="px-4 py-2 border border-gray-200 bg-white rounded-lg hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 transition-all text-sm font-medium flex items-center gap-2"
+                    className="px-3 sm:px-4 py-1.5 sm:py-2 border border-gray-200 bg-white rounded-lg hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 transition-all text-xs sm:text-sm font-medium flex items-center gap-1 sm:gap-2"
                   >
-                    Siguiente
-                    <ChevronRight size={16} />
+                    <span className="hidden xs:inline">Siguiente</span>
+                    <ChevronRight size={14} className="sm:w-4 sm:h-4" />
                   </button>
                 </div>
               </div>

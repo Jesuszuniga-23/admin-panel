@@ -22,9 +22,9 @@ const PersonalDetail = () => {
   const cargarPersonal = async () => {
     try {
       setLoading(true);
-      console.log("📡 Cargando detalle personal ID:", id);
+      console.log(" Cargando detalle personal ID:", id);
       const response = await personalService.obtenerPersonal(id);
-      console.log("✅ Datos recibidos:", response.data);
+      console.log("Datos recibidos:", response.data);
       setPersonal(response.data);
     } catch (error) {
       console.error("Error cargando personal:", error);

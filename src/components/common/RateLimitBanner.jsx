@@ -30,7 +30,7 @@ const RateLimitBanner = () => {
             <h4 className={`font-semibold text-sm ${
               esAdmin ? 'text-blue-800' : 'text-amber-800'
             }`}>
-              {esAdmin ? '⚡ Límite temporal' : '⏳ Sistema limitado'}
+              {esAdmin ? ' Límite temporal' : 'Sistema limitado'}
             </h4>
             
             <p className={`text-xs mt-1 ${

@@ -3,12 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import {
   Truck, Plus, Search, Filter, ChevronLeft, ChevronRight,
   Eye, Edit, Trash2, Power, RotateCcw, Shield, Ambulance,
-  MapPin, Users, MoreVertical, Download, AlertCircle, X
+  MapPin, Users, MoreVertical, Download, AlertCircle, X,
+  Clock, FileSpreadsheet, FilePieChart
 } from 'lucide-react';
 import unidadService from '../../../services/admin/unidad.service';
 import toast from 'react-hot-toast';
 import { useDebounce } from '../../../hooks/useDebounce';
 import ReporteBase from '../../../components/reportes/ReporteBase';
+import reportesService from '../../../services/admin/reportes.service';
+import useAuthStore from '../../../store/authStore';
 
 // Función para capitalizar primera letra
 const capitalizar = (texto) => {
@@ -30,9 +33,9 @@ const ModalAccionNoPermitida = ({ isOpen, onClose, mensaje }) => {
             </div>
             <h3 className="text-base sm:text-lg font-semibold text-gray-800">Acción no permitida</h3>
           </div>
-          
+
           <p className="text-xs sm:text-sm text-gray-600 mb-4 sm:mb-6">{mensaje}</p>
-          
+
           <div className="flex justify-end">
             <button
               onClick={onClose}
@@ -49,9 +52,11 @@ const ModalAccionNoPermitida = ({ isOpen, onClose, mensaje }) => {
 
 const UnidadesList = () => {
   const navigate = useNavigate();
+  const { user } = useAuthStore();
   const [unidades, setUnidades] = useState([]);
   const [loading, setLoading] = useState(true);
   const [mostrarReporte, setMostrarReporte] = useState(false);
+  const [exportando, setExportando] = useState(false);
   const [modalInfo, setModalInfo] = useState({
     show: false,
     mensaje: ''
@@ -92,7 +97,9 @@ const UnidadesList = () => {
     } catch (error) {
       console.error('Error:', error);
       if (error.response?.status === 429) {
-        toast.error('⏳ Demasiadas peticiones. Espera unos segundos...');
+        toast.error('Demasiadas peticiones. Espera unos segundos...', {
+          icon: <Clock size={18} className="text-yellow-500" />
+        });
       } else {
         toast.error('Error al cargar unidades');
       }
@@ -105,16 +112,65 @@ const UnidadesList = () => {
     cargarUnidades();
   }, [cargarUnidades]);
 
-  // =====================================================
   // VALIDACIÓN: Unidad ocupada
-  // =====================================================
   const isUnidadOcupada = (unidad) => {
     return unidad.estado === 'ocupada';
   };
 
   // =====================================================
-  // MANEJADORES DE ACCIONES CON VALIDACIÓN
+  // FUNCIONES DE EXPORTACIÓN PROFESIONAL
   // =====================================================
+  
+  const exportarExcel = async () => {
+    try {
+      setExportando(true);
+      toast.loading('Generando reporte de Excel...', { id: 'export' });
+      
+      // Usar todas las unidades (sin paginación) para el reporte
+      const response = await unidadService.listarUnidades({ limite: 1000 });
+      const todasUnidades = response.data || [];
+      
+      await reportesService.generarExcelPersonalizado(
+        todasUnidades, 
+        'unidades', 
+        filtros, 
+        user
+      );
+      
+      toast.success('Reporte de Excel generado correctamente', { id: 'export' });
+    } catch (error) {
+      console.error('Error exportando Excel:', error);
+      toast.error('Error al generar reporte de Excel', { id: 'export' });
+    } finally {
+      setExportando(false);
+    }
+  };
+
+  const exportarPDF = async () => {
+    try {
+      setExportando(true);
+      toast.loading('Generando reporte PDF...', { id: 'export' });
+      
+      const response = await unidadService.listarUnidades({ limite: 1000 });
+      const todasUnidades = response.data || [];
+      
+      reportesService.generarPDFPersonalizado(
+        todasUnidades, 
+        'unidades', 
+        filtros, 
+        user
+      );
+      
+      toast.success('Reporte PDF generado correctamente', { id: 'export' });
+    } catch (error) {
+      console.error('Error exportando PDF:', error);
+      toast.error('Error al generar reporte PDF', { id: 'export' });
+    } finally {
+      setExportando(false);
+    }
+  };
+
+  // MANEJADORES DE ACCIONES CON VALIDACIÓN
   const handleToggleActivo = async (id, codigo, unidad) => {
     if (isUnidadOcupada(unidad)) {
       setModalInfo({
@@ -131,10 +187,10 @@ const UnidadesList = () => {
       prevUnidades.map(u =>
         u.id === id
           ? {
-              ...u,
-              activa: !activa,
-              estado: !activa ? 'disponible' : 'inactiva'
-            }
+            ...u,
+            activa: !activa,
+            estado: !activa ? 'disponible' : 'inactiva'
+          }
           : u
       )
     );
@@ -147,16 +203,18 @@ const UnidadesList = () => {
           prevUnidades.map(u =>
             u.id === id
               ? {
-                  ...u,
-                  estado: response.data.estado,
-                  activa: response.data.activa
-                }
+                ...u,
+                estado: response.data.estado,
+                activa: response.data.activa
+              }
               : u
           )
         );
       }
 
-      toast.success(`✅ Unidad ${!activa ? 'activada' : 'desactivada'}`);
+      toast.success(`Unidad ${!activa ? 'activada' : 'desactivada'}`, {
+        icon: <Power size={18} className={!activa ? 'text-green-500' : 'text-gray-500'} />
+      });
     } catch (error) {
       setUnidades(prevUnidades =>
         prevUnidades.map(u =>
@@ -167,7 +225,9 @@ const UnidadesList = () => {
       );
 
       if (error.response?.status === 429) {
-        toast.error('⏳ Demasiadas peticiones. Espera unos segundos...');
+        toast.error('Demasiadas peticiones. Espera unos segundos...', {
+          icon: <Clock size={18} className="text-yellow-500" />
+        });
       } else {
         toast.error(error.error || 'Error al cambiar estado');
       }
@@ -191,7 +251,9 @@ const UnidadesList = () => {
       cargarUnidades();
     } catch (error) {
       if (error.response?.status === 429) {
-        toast.error('⏳ Demasiadas peticiones. Espera unos segundos...');
+        toast.error('Demasiadas peticiones. Espera unos segundos...', {
+          icon: <Clock size={18} className="text-yellow-500" />
+        });
       } else {
         toast.error(error.error || 'Error al eliminar');
       }
@@ -234,19 +296,47 @@ const UnidadesList = () => {
 
       {/* Header - RESPONSIVE */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
-        <div>
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800">Unidades</h1>
-          <p className="text-xs sm:text-sm text-gray-500 mt-0.5 sm:mt-1">
-            Gestión de unidades operativas
-          </p>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="bg-gradient-to-br from-purple-500 to-indigo-600 p-2 sm:p-2.5 md:p-3 rounded-lg sm:rounded-xl shadow-lg shadow-purple-200">
+            <Truck size={20} className="sm:w-5 sm:h-5 md:w-6 md:h-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Unidades</h1>
+            <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
+              Gestión de unidades operativas
+            </p>
+          </div>
         </div>
-        <button
-          onClick={() => navigate('/admin/unidades/crear')}
-          className="w-full sm:w-auto flex items-center justify-center gap-2 bg-blue-600 text-white px-3 sm:px-4 py-2 text-sm sm:text-base rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <Plus size={16} className="sm:w-[18px] sm:h-[18px]" />
-          <span>Nueva Unidad</span>
-        </button>
+        <div className="flex gap-2 w-full sm:w-auto">
+          <button
+            onClick={exportarExcel}
+            disabled={exportando}
+            className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-green-600 text-white px-3 sm:px-4 py-2 text-sm sm:text-base rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+            title="Exportar a Excel"
+          >
+            <FileSpreadsheet size={16} className="sm:w-[18px] sm:h-[18px]" />
+            <span className="sm:hidden">Excel</span>
+            <span className="hidden sm:inline">Excel</span>
+          </button>
+          <button
+            onClick={exportarPDF}
+            disabled={exportando}
+            className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-red-600 text-white px-3 sm:px-4 py-2 text-sm sm:text-base rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+            title="Exportar a PDF"
+          >
+            <FilePieChart size={16} className="sm:w-[18px] sm:h-[18px]" />
+            <span className="sm:hidden">PDF</span>
+            <span className="hidden sm:inline">PDF</span>
+          </button>
+          <button
+            onClick={() => navigate('/admin/unidades/crear')}
+            className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-blue-600 text-white px-3 sm:px-4 py-2 text-sm sm:text-base rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Plus size={16} className="sm:w-[18px] sm:h-[18px]" />
+            <span className="sm:hidden">Nueva</span>
+            <span className="hidden sm:inline">Nueva Unidad</span>
+          </button>
+        </div>
       </div>
 
       {/* Filtros - COMPLETAMENTE RESPONSIVE */}
@@ -268,7 +358,7 @@ const UnidadesList = () => {
         </div>
 
         <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3">
-          {/* Buscador - ocupa más espacio en móvil */}
+          {/* Buscador */}
           <div className="xs:col-span-2 lg:col-span-2 relative">
             <Search size={14} className="sm:w-4 sm:h-4 absolute left-2.5 sm:left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <input
@@ -303,21 +393,13 @@ const UnidadesList = () => {
             <option value="inactiva">Inactiva</option>
           </select>
 
-          {/* Botones en fila en móvil */}
+          {/* Botón Aplicar */}
           <div className="flex gap-2 xs:col-span-2 lg:col-span-1">
             <button
               onClick={() => setFiltros(prev => ({ ...prev, pagina: 1 }))}
               className="flex-1 px-2 sm:px-3 py-1.5 sm:py-2 bg-blue-600 text-white text-xs sm:text-sm rounded-lg hover:bg-blue-700 transition-colors"
             >
               Aplicar
-            </button>
-            
-            <button
-              onClick={() => setMostrarReporte(true)}
-              className="flex-1 px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center gap-1 text-xs sm:text-sm text-gray-600"
-            >
-              <Download size={14} className="sm:w-4 sm:h-4" />
-              <span className="hidden xs:inline">Exportar</span>
             </button>
           </div>
         </div>
@@ -371,11 +453,13 @@ const UnidadesList = () => {
                     <tr key={unidad.id} className="hover:bg-gray-50">
                       <td className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 lg:py-4">
                         <div className="flex items-center gap-2 sm:gap-3">
-                          <div className={`w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                            unidad.tipo === 'policia' ? 'bg-blue-100' : 'bg-green-100'
-                          }`}>
-                            <Truck size={12} className="sm:w-[14px] sm:h-[14px] lg:w-4 lg:h-4" 
-                                   className={unidad.tipo === 'policia' ? 'text-blue-600' : 'text-green-600'} />
+                          <div className={`w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 rounded-full flex items-center justify-center flex-shrink-0 ${unidad.tipo === 'policia' ? 'bg-blue-100' : 'bg-green-100'
+                            }`}>
+                            <Truck
+                              size={12}
+                              className={`sm:w-[14px] sm:h-[14px] lg:w-4 lg:h-4 ${unidad.tipo === 'policia' ? 'text-blue-600' : 'text-green-600'
+                                }`}
+                            />
                           </div>
                           <span className="text-xs sm:text-sm font-medium text-gray-800 truncate max-w-[80px] sm:max-w-[120px]">
                             {unidad.codigo}
@@ -383,18 +467,16 @@ const UnidadesList = () => {
                         </div>
                       </td>
                       <td className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 lg:py-4">
-                        <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs whitespace-nowrap ${
-                          unidad.tipo === 'policia' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
-                        }`}>
+                        <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs whitespace-nowrap ${unidad.tipo === 'policia' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
+                          }`}>
                           {unidad.tipo === 'policia' ? 'Policía' : 'Ambulancia'}
                         </span>
                       </td>
                       <td className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 lg:py-4">
-                        <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs whitespace-nowrap ${
-                          unidad.estado === 'disponible' ? 'bg-green-100 text-green-700' :
+                        <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs whitespace-nowrap ${unidad.estado === 'disponible' ? 'bg-green-100 text-green-700' :
                           unidad.estado === 'ocupada' ? 'bg-red-100 text-red-700' :
-                          'bg-gray-100 text-gray-700'
-                        }`}>
+                            'bg-gray-100 text-gray-700'
+                          }`}>
                           {capitalizar(unidad.estado)}
                         </span>
                       </td>
@@ -422,9 +504,8 @@ const UnidadesList = () => {
                         <div className="flex items-center justify-end gap-1 sm:gap-1.5 lg:gap-2">
                           <button
                             onClick={() => handleToggleActivo(unidad.id, unidad.codigo, unidad)}
-                            className={`p-1 rounded-lg transition-colors ${
-                              unidad.activa ? 'hover:bg-yellow-50 text-yellow-600' : 'hover:bg-green-50 text-green-600'
-                            }`}
+                            className={`p-1 rounded-lg transition-colors ${unidad.activa ? 'hover:bg-yellow-50 text-yellow-600' : 'hover:bg-green-50 text-green-600'
+                              }`}
                             title={unidad.activa ? 'Desactivar' : 'Activar'}
                           >
                             <Power size={14} className="sm:w-4 sm:h-4 lg:w-[18px] lg:h-[18px]" />
@@ -498,7 +579,7 @@ const UnidadesList = () => {
         )}
       </div>
 
-      {/* Modal de Reporte */}
+      {/* Modal de Reporte (ReporteBase) - MANTENIDO PARA COMPATIBILIDAD */}
       {mostrarReporte && (
         <ReporteBase
           titulo="Reporte de Unidades"

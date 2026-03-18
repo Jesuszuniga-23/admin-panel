@@ -11,9 +11,7 @@ const axiosInstance = axios.create({
   },
 });
 
-// =====================================================
 // INTERCEPTOR DE RESPUESTA - AHORA USA retryAfter
-// =====================================================
 axiosInstance.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -23,9 +21,9 @@ axiosInstance.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    console.log('⏳ Rate limit alcanzado:', error.response.data);
+    console.log('Rate limit alcanzado:', error.response.data);
 
-    // 🔥 NUEVO: Leer los datos mejorados del backend
+    // Leer los datos mejorados del backend
     const errorData = error.response.data || {};
     const retryAfter = errorData.retryAfter || 60; // segundos
     const mensaje = errorData.message || 'Demasiadas peticiones';
@@ -56,7 +54,7 @@ axiosInstance.interceptors.response.use(
       originalRequest._retry = true;
       
       setTimeout(() => {
-        toast.loading('🔄 Reintentando...', { duration: 2000 });
+        toast.loading('Reintentando...', { duration: 2000 });
         return axiosInstance(originalRequest);
       }, retryAfter * 1000);
     }

@@ -9,7 +9,7 @@ class DashboardService {
   // OBTENER TODAS LAS ESTADÍSTICAS DEL DASHBOARD
   async obtenerEstadisticas() {
     try {
-      console.log("📊 Cargando estadísticas del dashboard...");
+      console.log("Cargando estadísticas del dashboard...");
       
       // Obtener datos en paralelo (incluyendo los nuevos endpoints)
       const [
@@ -93,7 +93,7 @@ class DashboardService {
         cerradasTotales: alertasCerradas.length
       };
 
-      // ===== CÁLCULO DE KPIs CON DATOS REALES =====
+      //  CÁLCULO DE KPIs CON DATOS REALES 
       
       // Obtener datos del período anterior (para calcular variación)
       const mesActual = new Date().getMonth();

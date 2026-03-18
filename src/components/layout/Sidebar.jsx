@@ -19,7 +19,7 @@ import {
   XCircle,
   UserPlus,
   Key,
-  Activity
+  Activity, Globe 
 } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
 import authService from '../../services/auth.service';
@@ -28,7 +28,7 @@ import toast from 'react-hot-toast';
 // Función para formatear nombres (acentos y mayúsculas)
 const formatearNombre = (nombre) => {
   if (!nombre) return '';
-  
+
   // Mapa de caracteres mal codificados
   const reemplazos = [
     { de: 'Ã¡', para: 'á' }, { de: 'Ã©', para: 'é' }, { de: 'Ã­', para: 'í' },
@@ -42,12 +42,12 @@ const formatearNombre = (nombre) => {
     { de: 'L¢pez', para: 'López' }, { de: 'Jes£s', para: 'Jesús' },
     { de: 'Param‚dico', para: 'Paramédico' }, { de: 'Oficial', para: 'Oficial' }
   ];
-  
+
   let nombreFormateado = nombre;
   reemplazos.forEach(({ de, para }) => {
     nombreFormateado = nombreFormateado.split(de).join(para);
   });
-  
+
   // Capitalizar primera letra de cada palabra
   return nombreFormateado
     .toLowerCase()
@@ -68,12 +68,12 @@ const Sidebar = () => {
 
   const handleLogout = async () => {
     try {
-      console.log("🚪 Cerrando sesión...");
+      console.log("Cerrando sesión...");
       await authService.logout();
       logout();
       navigate('/');
     } catch (error) {
-      console.error("❌ Error al cerrar sesión:", error);
+      console.error("Error al cerrar sesión:", error);
       toast.error('Error al cerrar sesión');
       window.location.href = '/';
     }
@@ -102,7 +102,7 @@ const Sidebar = () => {
 
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
 
-        {/* ========== DASHBOARD ========== */}
+        {/*  DASHBOARD  */}
         <NavLink
           to="/admin/dashboard"
           className={({ isActive }) =>
@@ -116,7 +116,7 @@ const Sidebar = () => {
           <span>Dashboard</span>
         </NavLink>
 
-        {/* ========== PERFIL ========== */}
+        {/*  PERFIL  */}
         <NavLink
           to="/admin/perfil"
           className={({ isActive }) =>
@@ -130,7 +130,7 @@ const Sidebar = () => {
           <span>Perfil</span>
         </NavLink>
 
-        {/* ========== ALERTAS (MENÚ PRINCIPAL) ========== */}
+        {/*  ALERTAS (MENÚ PRINCIPAL)  */}
         <div className="border-t pt-2 mt-2">
           <button
             onClick={() => toggleMenu('alertas')}
@@ -155,10 +155,10 @@ const Sidebar = () => {
 
               </button>
 
-             
 
-            
-              {/* Alertas Activas (NUEVO) */}
+
+
+              {/* Alertas Activas */}
               <NavLink
                 to="/admin/alertas/activas"
                 className={({ isActive }) =>
@@ -172,7 +172,7 @@ const Sidebar = () => {
                 <span>Activas</span>
               </NavLink>
 
-              {/* Alertas en Proceso (NUEVO) */}
+              {/* Alertas en Proceso  */}
               <NavLink
                 to="/admin/alertas/en-proceso"
                 className={({ isActive }) =>
@@ -199,7 +199,7 @@ const Sidebar = () => {
                 <CheckCircle size={16} />
                 <span>Cerradas</span>
               </NavLink>
-               {/* Alertas Expiradas */}
+              {/* Alertas Expiradas */}
               <NavLink
                 to="/admin/alertas/expiradas"
                 className={({ isActive }) =>
@@ -212,7 +212,7 @@ const Sidebar = () => {
                 <Clock size={16} />
                 <span>Expiradas</span>
               </NavLink>
-               {/* Alertas Cerradas Manualmente */}
+              {/* Alertas Cerradas Manualmente */}
               <NavLink
                 to="/admin/alertas/cerradas-manual"
                 className={({ isActive }) =>
@@ -229,7 +229,7 @@ const Sidebar = () => {
           )}
         </div>
 
-        {/* ========== REASIGNACIONES ========== */}
+        {/*  REASIGNACIONES  */}
         <NavLink
           to="/admin/reasignaciones/pendientes"
           className={({ isActive }) =>
@@ -243,7 +243,7 @@ const Sidebar = () => {
           <span>Reasignaciones</span>
         </NavLink>
 
-        {/* ========== GESTIÓN DE USUARIOS (MENÚ PRINCIPAL) ========== */}
+        {/*  GESTIÓN DE USUARIOS  */}
         <div className="border-t pt-2 mt-2">
           <button
             onClick={() => toggleMenu('usuarios')}
@@ -289,7 +289,7 @@ const Sidebar = () => {
           )}
         </div>
 
-        {/* ========== UNIDADES ========== */}
+        {/*  UNIDADES  */}
         <NavLink
           to="/admin/unidades"
           className={({ isActive }) =>
@@ -303,7 +303,7 @@ const Sidebar = () => {
           <span>Unidades</span>
         </NavLink>
 
-        {/* ========== ESTADÍSTICAS (próximamente) ========== */}
+        {/* */}
         <button
           onClick={() => console.log("Estadísticas - en construcción")}
           className="w-full flex items-center gap-3 px-4 py-3 text-gray-400 cursor-not-allowed hover:bg-gray-50 rounded-lg transition-all"
@@ -312,7 +312,7 @@ const Sidebar = () => {
 
         </button>
 
-        {/* ========== CENTRO DE REPORTES ========== */}
+        {/*  CENTRO DE REPORTES  */}
         <NavLink
           to="/admin/reportes"
           className={({ isActive }) =>
@@ -325,6 +325,19 @@ const Sidebar = () => {
           <FileText size={18} />
           <span>Centro de Reportes</span>
         </NavLink>
+        <NavLink
+          to="/admin/analisis/geografico"
+          className={({ isActive }) =>
+            `flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive
+              ? 'bg-indigo-50 text-indigo-600 font-semibold border-l-4 border-indigo-600'
+              : 'text-gray-700 hover:bg-gray-50 hover:text-indigo-600'
+            }`
+          }
+        >
+          <Globe size={18} />
+          <span>Análisis Geográfico</span>
+        </NavLink>
+        
       </nav>
 
       {/* Información del usuario y Logout */}

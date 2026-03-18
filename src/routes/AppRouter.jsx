@@ -23,6 +23,7 @@ import AlertasActivas from '../pages/admin/alertas/AlertasActivas';
 import AlertasEnProceso from '../pages/admin/alertas/AlertasEnProceso';
 import AlertasCerradas from '../pages/admin/alertas/AlertasCerradas';
 import AlertaPanelDetail from '../pages/admin/alertas/AlertaPanelDetail';
+import AnalisisGeografico from '../pages/admin/analisis/AnalisisGeografico';
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 const AppRouter = () => {
@@ -63,6 +64,7 @@ const AppRouter = () => {
             <Route path="reasignaciones/pendientes" element={<ReasignacionesPendientes />} />
             <Route path="reportes" element={<ReportesMenu />} />
             <Route path="reportes/:tipo" element={<GeneradorReporte />} />
+            <Route path="analisis/geografico" element={<AnalisisGeografico />} />
             
             <Route index element={<Navigate to="/admin/dashboard" />} />
           </Route>

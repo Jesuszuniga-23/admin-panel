@@ -13,13 +13,13 @@ function App() {
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
       <BrowserRouter>
         <Routes>
-          {/* 🏠 LANDING PAGE - Página principal */}
+          {/*Página principal */}
           <Route path="/" element={<Home />} />
           
-          {/* 🔐 LOGIN - Acceso administrativo */}
+          {/*  LOGIN - Acceso administrativo */}
           <Route path="/login" element={<Login />} />
 
-          {/* 🛡️ RUTAS PROTEGIDAS - Admin Dashboard */}
+          {/*RUTAS PROTEGIDAS - Admin Dashboard */}
           <Route path="/admin" element={
             <PrivateRoute allowedRoles={['admin', 'superadmin']}>
               <AdminLayout />
@@ -29,7 +29,7 @@ function App() {
             <Route index element={<Navigate to="/admin/dashboard" />} />
           </Route>
 
-          {/* 👑 RUTAS PROTEGIDAS - SuperAdmin Dashboard */}
+          {/*  RUTAS PROTEGIDAS - SuperAdmin Dashboard */}
           <Route path="/superadmin" element={
             <PrivateRoute allowedRoles={['superadmin']}>
               <AdminLayout />

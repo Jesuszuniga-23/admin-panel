@@ -14,8 +14,10 @@
     "@react-oauth/google": "^0.13.4",
     "axios": "^1.13.6",
     "date-fns": "^4.1.0",
+    "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",
-    "jspdf": "^4.2.0",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.7",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.577.0",
@@ -26,6 +28,7 @@
     "react-router-dom": "^7.13.1",
     "recharts": "^3.8.0",
     "xlsx": "^0.18.5",
+    "xlsx-style": "^0.8.13",
     "zustand": "^5.0.11"
   },
   "devDependencies": {

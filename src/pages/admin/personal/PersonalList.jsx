@@ -297,12 +297,17 @@ const PersonalList = () => {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Personal</h1>
-            <p className="text-sm text-gray-500 mt-1">
-              Gestión de personal operativo y administrativo
-            </p>
-          </div>
+          <div className="flex items-center gap-2 sm:gap-3">
+  <div className="bg-gradient-to-br from-blue-500 to-indigo-600 p-2 sm:p-2.5 md:p-3 rounded-lg sm:rounded-xl shadow-lg shadow-blue-200">
+    <Users size={20} className="sm:w-5 sm:h-5 md:w-6 md:h-6 text-white" />
+  </div>
+  <div>
+    <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Personal</h1>
+    <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
+      Gestión de personal operativo y administrativo
+    </p>
+  </div>
+</div>
           <button
             onClick={() => navigate('/admin/personal/crear')}
             className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap"

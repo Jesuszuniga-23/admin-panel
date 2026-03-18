@@ -474,7 +474,7 @@ const Home = () => {
           
           <div className="border-t border-gray-800 mt-12 pt-8 text-center text-gray-400 text-sm">
             © 2026 Sistema de Emergencias. Todos los derechos reservados. 
-            <span className="block mt-2 text-xs">Hecho con ❤️ para salvar vidas</span>
+            <span className="block mt-2 text-xs">Hecho por Alumnos de UTTEHUACAN</span>
           </div>
         </div>
       </footer>

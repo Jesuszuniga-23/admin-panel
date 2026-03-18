@@ -23,18 +23,18 @@ const PrivateRoute = ({ children, allowedRoles = ['admin', 'superadmin'] }) => {
 
   // Si no hay usuario, redirigir a login
   if (!user) {
-    console.log("🚫 No hay usuario, redirigiendo...");
+    console.log(" No hay usuario, redirigiendo...");
     return <Navigate to="/login" replace />;
   }
 
   // Verificar rol
   if (!allowedRoles.includes(user.rol)) {
-    console.log("🚫 Rol no autorizado:", user.rol);
+    console.log(" Rol no autorizado:", user.rol);
     return <Navigate to="/login" replace />;
   }
 
   // Todo bien, mostrar contenido
-  console.log("✅ Acceso permitido para:", user.rol);
+  console.log("Acceso permitido para:", user.rol);
   return children;
 };
 

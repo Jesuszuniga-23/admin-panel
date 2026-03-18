@@ -10,14 +10,14 @@ class AlertasService {
       if (filtros.pagina) params.append('pagina', filtros.pagina);
       
       const url = `${ENDPOINTS.ALERTAS.EXPIRADAS}?${params.toString()}`;
-      console.log("📡 Llamando a alertas expiradas:", url);
+      console.log(" Llamando a alertas expiradas:", url);
       
       const response = await axiosInstance.get(url);
-      console.log("✅ Respuesta alertas:", response.data);
+      console.log("Respuesta alertas:", response.data);
       
       return response.data;
     } catch (error) {
-      console.error("❌ Error cargando alertas:", error);
+      console.error(" Error cargando alertas:", error);
       return { data: [] };
     }
   }
@@ -32,14 +32,14 @@ async obtenerCerradasManual(filtros = {}) {
     if (filtros.admin_id) params.append('admin_id', filtros.admin_id);
     
     const url = `${ENDPOINTS.ALERTAS.CERRADAS_MANUAL}?${params.toString()}`;
-    console.log("📡 Llamando a alertas cerradas manual:", url);
+    console.log(" Llamando a alertas cerradas manual:", url);
     
     const response = await axiosInstance.get(url);
-    console.log("✅ Respuesta alertas cerradas:", response.data);
+    console.log("Respuesta alertas cerradas:", response.data);
     
     return response.data;
   } catch (error) {
-    console.error("❌ Error cargando alertas cerradas:", error);
+    console.error(" Error cargando alertas cerradas:", error);
     return { 
       data: [], 
       total: 0,
@@ -58,24 +58,24 @@ async obtenerCerradasManual(filtros = {}) {
       const response = await axiosInstance.get(url);
       return response.data;
     } catch (error) {
-      console.error("❌ Error cargando estadísticas:", error);
+      console.error(" Error cargando estadísticas:", error);
       return { estadisticas: [] };
     }
   }
    async cerrarManual(alertaId, motivo) {
     try {
-      console.log(`📡 Cerrando manualmente alerta ${alertaId} con motivo:`, motivo);
+      console.log(` Cerrando manualmente alerta ${alertaId} con motivo:`, motivo);
       
       const response = await axiosInstance.post(
         ENDPOINTS.ALERTAS.CERRAR_INDIVIDUAL(alertaId),
         { motivo }
       );
       
-      console.log("✅ Respuesta cierre manual:", response.data);
+      console.log(" Respuesta cierre manual:", response.data);
       return response.data;
       
     } catch (error) {
-      console.error('❌ Error cerrando alerta manual:', error);
+      console.error(' Error cerrando alerta manual:', error);
       throw error.response?.data || { error: 'Error al cerrar alerta' };
     }
   }
@@ -94,6 +94,58 @@ async obtenerCerradasManual(filtros = {}) {
       return null;
     }
   }
+  async obtenerParaReportes(filtros = {}) {
+  try {
+    const params = new URLSearchParams();
+    if (filtros.desde) params.append('desde', filtros.desde);
+    if (filtros.hasta) params.append('hasta', filtros.hasta);
+    if (filtros.tipo) params.append('tipo', filtros.tipo);
+    if (filtros.zona) params.append('zona', filtros.zona);
+    if (filtros.limite) params.append('limite', filtros.limite || 1000);
+    
+    const url = `${BASE_URL}/admin/reportes/alertas?${params.toString()}`;
+    console.log('📡 Obteniendo alertas para reportes:', url);
+    
+    const response = await axiosInstance.get(url);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Error obteniendo alertas para reportes:', error);
+    return { data: [], total: 0 };
+  }
+}
+// OBTENER TODAS LAS ALERTAS PARA ANÁLISIS GEOGRÁFICO
+async obtenerAlertasGeograficas(filtros = {}) {
+  try {
+    const params = new URLSearchParams();
+    if (filtros.desde) params.append('desde', filtros.desde);
+    if (filtros.hasta) params.append('hasta', filtros.hasta);
+    if (filtros.tipo) params.append('tipo', filtros.tipo);
+    if (filtros.limite) params.append('limite', filtros.limite || 1000);
+    
+    // Obtener alertas de todas las fuentes
+    const [activas, proceso, cerradas, expiradas] = await Promise.all([
+      axiosInstance.get(`${ENDPOINTS.ALERTAS_PANEL.ACTIVAS}?${params.toString()}`).catch(() => ({ data: { data: [] } })),
+      axiosInstance.get(`${ENDPOINTS.ALERTAS_PANEL.EN_PROCESO}?${params.toString()}`).catch(() => ({ data: { data: [] } })),
+      axiosInstance.get(`${ENDPOINTS.ALERTAS_PANEL.CERRADAS}?${params.toString()}`).catch(() => ({ data: { data: [] } })),
+      axiosInstance.get(`${ENDPOINTS.ALERTAS.EXPIRADAS}?${params.toString()}`).catch(() => ({ data: { data: [] } }))
+    ]);
+
+    // Combinar todas las alertas
+    const todasAlertas = [
+      ...(activas.data?.data || []),
+      ...(proceso.data?.data || []),
+      ...(cerradas.data?.data || []),
+      ...(expiradas.data?.data || [])
+    ];
+
+    console.log(`📍 ${todasAlertas.length} alertas cargadas para análisis geográfico`);
+    return { data: todasAlertas, total: todasAlertas.length };
+
+  } catch (error) {
+    console.error('Error obteniendo alertas geográficas:', error);
+    return { data: [], total: 0 };
+  }
+}
 }
 
 export default new AlertasService();

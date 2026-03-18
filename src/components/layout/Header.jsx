@@ -116,7 +116,7 @@ const Header = ({ titulo = 'Panel de Administración', subtitulo = 'Gestión del
                     </button>
                     <button
                       onClick={() => {
-                        // Configuración - por implementar
+                        // Configuración 
                         setUserMenuOpen(false);
                       }}
                       className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"

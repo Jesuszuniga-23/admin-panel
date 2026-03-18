@@ -31,7 +31,6 @@ const MapaConDireccion = ({
     setCargandoDireccion(true);
 
     try {
-      // SOLO UNA PETICIÓN - cuando el usuario hace clic
       const response = await fetch(
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=es`,
         {
@@ -57,7 +56,6 @@ const MapaConDireccion = ({
   return (
     <div className="space-y-2">
       {!mostrarMapa ? (
-        /* Botón para mostrar el mapa - SOLO UNA VEZ POR ALERTA */
         <button
           onClick={handleVerUbicacion}
           className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-50 hover:bg-blue-100 border-2 border-blue-200 rounded-xl text-blue-700 font-medium transition-all group"
@@ -66,7 +64,6 @@ const MapaConDireccion = ({
           <span>Ver ubicación en mapa</span>
         </button>
       ) : (
-        /* Mapa con la dirección */
         <div className="space-y-3">
           <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
             {cargandoDireccion ? (
@@ -78,13 +75,14 @@ const MapaConDireccion = ({
               <p className="text-sm text-red-600">{error}</p>
             ) : direccion ? (
               <div className="text-sm text-gray-700">
-                <span className="font-semibold text-blue-800">📍 Dirección:</span>
+                <span className="font-semibold text-blue-800 flex items-center gap-1">
+                  <MapPin size={14} className="text-blue-600" /> Dirección:
+                </span>
                 <p className="mt-1">{direccion}</p>
               </div>
             ) : null}
           </div>
 
-          {/* ✅ CORREGIDO: Ahora usa MapaOSM, no a sí mismo */}
           <MapaOSM
             lat={lat}
             lng={lng}

@@ -10,14 +10,14 @@ class RecuperacionService {
       if (filtros.pagina) params.append('pagina', filtros.pagina);
       
       const url = `${ENDPOINTS.RECUPERACIONES.PENDIENTES}?${params.toString()}`;
-      console.log("📡 Llamando a recuperaciones pendientes:", url);
+      console.log("Llamando a recuperaciones pendientes:", url);
       
       const response = await axiosInstance.get(url);
-      console.log("✅ Respuesta recuperaciones:", response.data);
+      console.log(" Respuesta recuperaciones:", response.data);
       
       return response.data;
     } catch (error) {
-      console.error("❌ Error cargando recuperaciones:", error);
+      console.error(" Error cargando recuperaciones:", error);
       return { data: [], total: 0 };
     }
   }
@@ -28,7 +28,7 @@ class RecuperacionService {
       const response = await axiosInstance.post(ENDPOINTS.RECUPERACIONES.APROBAR(id));
       return response.data;
     } catch (error) {
-      console.error("❌ Error aprobando solicitud:", error);
+      console.error(" Error aprobando solicitud:", error);
       throw error;
     }
   }
@@ -39,7 +39,7 @@ class RecuperacionService {
       const response = await axiosInstance.post(ENDPOINTS.RECUPERACIONES.RECHAZAR(id), { motivo });
       return response.data;
     } catch (error) {
-      console.error("❌ Error rechazando solicitud:", error);
+      console.error(" Error rechazando solicitud:", error);
       throw error;
     }
   }

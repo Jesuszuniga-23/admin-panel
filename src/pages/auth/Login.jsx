@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import useAuthStore from '../../store/authStore';
 import authService from '../../services/auth.service';
 import { useEffect, useState } from 'react';
+import { ArrowLeft } from 'lucide-react';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -24,50 +25,50 @@ const Login = () => {
   }, [user, navigate]);
 
   const handleGoogleSuccess = async (credentialResponse) => {
-    console.log("✅ Google Success:", credentialResponse);
-    
+    console.log("Google Success:", credentialResponse);
+
     try {
       setIsLoading(true);
       toast.loading('Verificando credenciales...', { id: 'login' });
-      
+
       const result = await authService.loginWithGoogle(credentialResponse.credential);
-      
+
       toast.dismiss('login');
-      console.log("✅ Login exitoso:", result);
-      
+      console.log("Login exitoso:", result);
+
       if (result?.success) {
         // Verificar si el usuario tiene rol admin o superadmin
         if (result.usuario?.rol === 'admin' || result.usuario?.rol === 'superadmin') {
-          // ✅ Usuario autorizado
+          // Usuario autorizado
           setUser(result.usuario);
           toast.success(`Bienvenido ${result.usuario?.nombre || result.usuario?.email}`);
           // El useEffect redirige
         } else {
-          // ❌ Usuario NO autorizado
-          console.log("🚫 Usuario no autorizado - rol:", result.usuario?.rol);
-          
+          // Usuario NO autorizado
+          console.log("Usuario no autorizado - rol:", result.usuario?.rol);
+
           setUser(null);
           localStorage.removeItem('user');
           localStorage.removeItem('auth_token');
           localStorage.removeItem('auth-storage');
-          
-          window.location.href = '/?error=unauthorized&message=' + 
+
+          window.location.href = '/?error=unauthorized&message=' +
             encodeURIComponent('Acceso restringido: Solo personal administrativo autorizado');
         }
       }
     } catch (error) {
       toast.dismiss('login');
-      console.error("❌ Error:", error);
-      
+      console.error(" Error:", error);
+
       if (error.response?.status === 403 || error.error === 'Usuario no autorizado') {
-        console.log("🚫 Usuario no autorizado (error 403)");
-        
+        console.log(" Usuario no autorizado (error 403)");
+
         setUser(null);
         localStorage.removeItem('user');
         localStorage.removeItem('auth_token');
         localStorage.removeItem('auth-storage');
-        
-        window.location.href = '/?error=unauthorized&message=' + 
+
+        window.location.href = '/?error=unauthorized&message=' +
           encodeURIComponent('Acceso restringido: Solo personal administrativo autorizado');
       } else {
         toast.error(error?.error || 'Error al iniciar sesión');
@@ -91,7 +92,7 @@ const Login = () => {
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-blue-900 flex items-center justify-center p-4">
       <div className="relative w-full max-w-md">
         <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl overflow-hidden">
-          
+
           {/* Header */}
           <div className="bg-gradient-to-r from-blue-600 to-blue-800 px-8 py-6 text-center">
             <div className="flex justify-center mb-3">
@@ -154,15 +155,15 @@ const Login = () => {
               />
             </div>
 
-            <div className="text-center">
+            <div className="flex justify-center mt-8">
               <button
                 onClick={() => window.location.href = '/'}
-                className="text-sm text-gray-500 hover:text-blue-600 transition-colors"
+                className="flex items-center gap-2 px-6 py-3 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-blue-300 hover:text-blue-600 transition-all group"
               >
-                ← Regresar al inicio
+                <ArrowLeft size={18} className="text-gray-400 group-hover:text-blue-600 group-hover:-translate-x-1 transition-all" />
+                <span className="text-sm font-medium text-gray-600 group-hover:text-blue-600">Regresar al inicio</span>
               </button>
             </div>
-
             <p className="mt-6 text-center text-xs text-gray-500">
               © 2026 Sistema de Emergencias
             </p>

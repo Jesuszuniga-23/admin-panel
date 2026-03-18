@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import {
   User, Mail, Phone, Shield, Hash, Save, X,
   ChevronLeft, AlertCircle, CheckCircle, Loader,
-  AlertTriangle, Info
+  AlertTriangle, Info,Lock 
 } from 'lucide-react';
 import personalService from '../../../services/admin/personal.service';
 import toast from 'react-hot-toast';
@@ -272,22 +272,22 @@ const PersonalForm = () => {
       }
       
       // Placa y email NO se pueden modificar en edición
-      if (name === 'placa' || name === 'email') {
-        toast.error('Este campo no se puede modificar', {
-          duration: 2000,
-          icon: '🔒'
-        });
-        return;
-      }
-      
-      // Rol no se puede modificar en edición
-      if (name === 'rol') {
-        toast.error('El rol no se puede modificar', {
-          duration: 2000,
-          icon: '🔒'
-        });
-        return;
-      }
+     if (name === 'placa' || name === 'email') {
+  toast.error('Este campo no se puede modificar', {
+    duration: 2000,
+    icon: <Lock size={18} className="text-yellow-500" /> 
+  });
+  return;
+}
+
+// Rol no se puede modificar en edición
+if (name === 'rol') {
+  toast.error('El rol no se puede modificar', {
+    duration: 2000,
+    icon: <Lock size={18} className="text-yellow-500" /> 
+  });
+  return;
+}
     }
     
     // Limpiar errores del campo
@@ -563,7 +563,7 @@ const PersonalForm = () => {
               {duplicados.email?.existe && !errors.email && (
                 <p className="text-xs text-yellow-600 mt-2 flex items-center gap-1">
                   <AlertTriangle size={12} />
-                  ⚠️ Este email ya está registrado por {duplicados.email.usuario}
+                   Este email ya está registrado por {duplicados.email.usuario}
                 </p>
               )}
               {isEditing && (
@@ -580,7 +580,7 @@ const PersonalForm = () => {
                 Teléfono
                 {isEditing && telefonoBloqueado && (
                   <span className="ml-2 text-xs text-amber-600 font-normal">
-                    (🔒 {getClicksRestantes()})
+                    ( {getClicksRestantes()})
                   </span>
                 )}
               </label>
@@ -608,7 +608,7 @@ const PersonalForm = () => {
               {duplicados.telefono?.existe && !errors.telefono && formData.telefono.length === 10 && (
                 <p className="text-xs text-yellow-600 mt-2 flex items-center gap-1">
                   <AlertTriangle size={12} />
-                  ⚠️ Este teléfono ya está registrado por {duplicados.telefono.usuario}
+                  Este teléfono ya está registrado por {duplicados.telefono.usuario}
                 </p>
               )}
               {formData.telefono && formData.telefono.length < 10 && (
@@ -653,7 +653,7 @@ const PersonalForm = () => {
               {duplicados.placa?.existe && !errors.placa && (
                 <p className="text-xs text-yellow-600 mt-2 flex items-center gap-1">
                   <AlertTriangle size={12} />
-                  ⚠️ Esta placa ya está registrada por {duplicados.placa.usuario}
+                  Esta placa ya está registrada por {duplicados.placa.usuario}
                 </p>
               )}
               {isEditing && (
@@ -664,7 +664,7 @@ const PersonalForm = () => {
               )}
             </div>
 
-            {/* Rol - AHORA SIMPLE Y BLOQUEADO */}
+            {/* Rol*/}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Rol <span className="text-red-500">*</span>

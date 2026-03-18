@@ -19,7 +19,7 @@ const UnidadForm = () => {
   const [verificandoCodigo, setVerificandoCodigo] = useState(false);
   const [codigoValido, setCodigoValido] = useState(true);
   const [codigoMensaje, setCodigoMensaje] = useState('');
-  
+
   const [formData, setFormData] = useState({
     codigo: '',
     tipo: 'policia',
@@ -49,9 +49,9 @@ const UnidadForm = () => {
   const cargarUnidad = async () => {
     try {
       setCargandoDatos(true);
-      console.log("📡 Cargando unidad ID:", id);
+      console.log("Cargando unidad ID:", id);
       const response = await unidadService.obtenerUnidad(id);
-      console.log("✅ Datos recibidos:", response.data);
+      console.log("Datos recibidos:", response.data);
 
       setFormData({
         codigo: response.data.codigo || '',
@@ -71,9 +71,8 @@ const UnidadForm = () => {
     }
   };
 
-  // =====================================================
-  // VALIDAR CÓDIGO ÚNICO EN TIEMPO REAL (SOLO EN CREACIÓN)
-  // =====================================================
+  // VALIDAR CÓDIGO ÚNICO EN TIEMPO REAL 
+
   const validarCodigoUnico = async (codigo) => {
     if (!codigo || codigo.length < 3) {
       setCodigoValido(false);
@@ -85,17 +84,27 @@ const UnidadForm = () => {
       setVerificandoCodigo(true);
       // Llamar al backend para verificar si el código existe
       const response = await unidadService.listarUnidades({ search: codigo, limite: 1 });
-      
-      const existe = response.data?.some(u => 
+
+      const existe = response.data?.some(u =>
         u.codigo.toLowerCase() === codigo.toLowerCase()
       );
 
       if (existe) {
         setCodigoValido(false);
-        setCodigoMensaje('❌ Este código ya está registrado por otra unidad');
+        setCodigoMensaje(
+          <span className="flex items-center gap-1">
+            <XCircle size={14} className="text-red-500" />
+            Este código ya está registrado por otra unidad
+          </span>
+        );
       } else {
         setCodigoValido(true);
-        setCodigoMensaje('✅ Código disponible');
+        setCodigoMensaje(
+          <span className="flex items-center gap-1">
+            <CheckCircle size={14} className="text-green-500" />
+            Código disponible
+          </span>
+        );
       }
     } catch (error) {
       console.error('Error verificando código:', error);
@@ -108,23 +117,23 @@ const UnidadForm = () => {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    
+
     // Para coordenadas, solo permitir números y punto
     if (name === 'lat' || name === 'lng') {
       const valorLimpio = value.replace(/[^0-9.-]/g, '');
       setFormData(prev => ({ ...prev, [name]: valorLimpio }));
-    } 
+    }
     // Para código - validar en tiempo real (solo en creación)
     else if (name === 'codigo') {
       const valorLimpio = value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
       setFormData(prev => ({ ...prev, codigo: valorLimpio }));
-      
+
       if (!isEditing) {
         // Limpiar timeout anterior
         if (debounceTimeout.current) {
           clearTimeout(debounceTimeout.current);
         }
-        
+
         // Nuevo timeout para validar después de 500ms
         debounceTimeout.current = setTimeout(() => {
           if (valorLimpio.length >= 3) {
@@ -168,10 +177,10 @@ const UnidadForm = () => {
     setLoading(true);
 
     try {
-      // =====================================================
-      // VALIDACIONES ANTES DE ENVIAR
-      // =====================================================
       
+      // VALIDACIONES ANTES DE ENVIAR
+      
+
       // Validar código único (solo en creación)
       if (!isEditing && !codigoValido) {
         toast.error('El código no está disponible o es inválido');
@@ -199,7 +208,7 @@ const UnidadForm = () => {
         activa: formData.activa
       };
 
-      console.log("📤 Enviando datos:", datosAEnviar);
+      console.log(" Enviando datos:", datosAEnviar);
 
       if (isEditing) {
         await unidadService.actualizarUnidad(id, datosAEnviar);
@@ -208,11 +217,11 @@ const UnidadForm = () => {
         await unidadService.crearUnidad(datosAEnviar);
         toast.success('Unidad creada correctamente');
       }
-      
+
       navigate('/admin/unidades');
     } catch (error) {
       console.error('Error guardando unidad:', error);
-      
+
       const mensajeError = error.error || error.message || '';
       toast.error(mensajeError || 'Error al guardar');
 
@@ -230,7 +239,7 @@ const UnidadForm = () => {
         setCampoError('lng');
         lngRef.current?.focus();
       }
-      
+
       setTimeout(() => setCampoError(''), 3000);
     } finally {
       setLoading(false);
@@ -290,17 +299,16 @@ const UnidadForm = () => {
                 onChange={handleChange}
                 readOnly={isEditing} // ← BLOQUEADO EN EDICIÓN
                 required
-                className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
-                  campoError === 'codigo'
+                className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${campoError === 'codigo'
                     ? 'border-red-500 bg-red-50 focus:ring-red-500'
                     : isEditing
                       ? 'bg-gray-100 border-gray-200 cursor-not-allowed'
                       : 'border-gray-200 focus:ring-blue-500'
-                }`}
+                  }`}
                 placeholder="Ej: UNI-001"
               />
             </div>
-            
+
             {/* Indicador de validación de código (solo en creación) */}
             {!isEditing && formData.codigo && formData.codigo.length >= 3 && (
               <div className="mt-2 flex items-center gap-1 text-xs">
@@ -323,7 +331,7 @@ const UnidadForm = () => {
                 )}
               </div>
             )}
-            
+
             {isEditing && (
               <p className="text-xs text-gray-400 mt-2">
                 El código no se puede modificar después de crear la unidad
@@ -345,13 +353,12 @@ const UnidadForm = () => {
                 onChange={handleChange}
                 disabled={isEditing} // ← BLOQUEADO EN EDICIÓN
                 required
-                className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 appearance-none ${
-                  campoError === 'tipo'
+                className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 appearance-none ${campoError === 'tipo'
                     ? 'border-red-500 bg-red-50 focus:ring-red-500'
                     : isEditing
                       ? 'bg-gray-100 border-gray-200 cursor-not-allowed'
                       : 'border-gray-200 focus:ring-blue-500 bg-white'
-                }`}
+                  }`}
               >
                 <option value="policia">Policía</option>
                 <option value="ambulancia">Ambulancia</option>
@@ -396,11 +403,10 @@ const UnidadForm = () => {
                   name="lat"
                   value={formData.lat}
                   onChange={handleChange}
-                  className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
-                    campoError === 'lat'
+                  className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${campoError === 'lat'
                       ? 'border-red-500 bg-red-50 focus:ring-red-500'
                       : 'border-gray-200 focus:ring-blue-500'
-                  }`}
+                    }`}
                   placeholder="Ej: 18.8667 (opcional)"
                 />
               </div>
@@ -417,11 +423,10 @@ const UnidadForm = () => {
                   name="lng"
                   value={formData.lng}
                   onChange={handleChange}
-                  className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
-                    campoError === 'lng'
+                  className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${campoError === 'lng'
                       ? 'border-red-500 bg-red-50 focus:ring-red-500'
                       : 'border-gray-200 focus:ring-blue-500'
-                  }`}
+                    }`}
                   placeholder="Ej: -97.1533 (opcional)"
                 />
               </div>
@@ -458,9 +463,8 @@ const UnidadForm = () => {
             </div>
 
             <div className="flex items-center pt-8">
-              <label className={`flex items-center gap-2 p-3 rounded-lg cursor-pointer ${
-                formData.activa ? 'bg-blue-50' : 'bg-gray-50'
-              }`}>
+              <label className={`flex items-center gap-2 p-3 rounded-lg cursor-pointer ${formData.activa ? 'bg-blue-50' : 'bg-gray-50'
+                }`}>
                 <input
                   type="checkbox"
                   name="activa"
@@ -477,7 +481,7 @@ const UnidadForm = () => {
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
             <p className="text-xs text-blue-700 flex items-center gap-1">
               <Info size={14} />
-              <strong>Relación Estado-Activa:</strong> Si seleccionas "Disponible", la unidad estará activa. 
+              <strong>Relación Estado-Activa:</strong> Si seleccionas "Disponible", la unidad estará activa.
               Si seleccionas "Inactiva", se desmarcará automáticamente.
             </p>
           </div>

@@ -9,7 +9,7 @@ const useAuthStore = create(
       isLoading: true,
       
       setUser: (userData) => {
-        console.log("📝 Store actualizado:", userData?.email);
+        console.log("Store actualizado:", userData?.email);
         set({ user: userData, isLoading: false });
         
         // 🔥 SOLO guardar en localStorage si es admin o superadmin
@@ -23,7 +23,7 @@ const useAuthStore = create(
       setLoading: (isLoading) => set({ isLoading }),
       
       logout: () => {
-        console.log("🚪 Logout desde store");
+        console.log("Logout desde store");
         authService.logout();
         set({ user: null, isLoading: false });
         localStorage.removeItem('user');
@@ -34,7 +34,7 @@ const useAuthStore = create(
       },
       
       initFromService: async () => {
-        console.log("🔄 Inicializando store desde servicio...");
+        console.log("Inicializando store desde servicio...");
         const user = authService.getCurrentUser();
         if (user) {
           set({ user, isLoading: false });
@@ -54,7 +54,7 @@ const useAuthStore = create(
 if (typeof window !== 'undefined') {
   window.addEventListener('storage', (e) => {
     if (e.key === 'user' && !e.newValue) {
-      console.log("🚪 Logout detectado en otra pestaña");
+      console.log(" Logout detectado en otra pestaña");
       // Alguien hizo logout, redirigir inmediatamente
       window.location.href = '/login';
     }

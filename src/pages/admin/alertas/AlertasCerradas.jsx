@@ -5,7 +5,7 @@ import {
   Filter, FileText, Image as ImageIcon,
   Truck, Download, X, AlertTriangle, Heart,
   Calendar, ChevronLeft, ChevronRight,
-  CalendarClock, CalendarCheck, MapPinned
+  CalendarClock, CalendarCheck, MapPinned,
 } from 'lucide-react';
 import alertasPanelService from '../../../services/admin/alertasPanel.service';
 import Loader from '../../../components/common/Loader';
@@ -420,11 +420,25 @@ const AlertasCerradas = () => {
                           </h3>
 
                           <div className="rounded-lg overflow-hidden border border-gray-200">
-                            {/* ✅ Mapa con petición bajo demanda */}
+                            {/* Mapa con petición bajo demanda */}
                             <MapaConDireccion
                               lat={alerta.lat}
                               lng={alerta.lng}
-                              titulo={alerta.tipo === 'panico' ? '🔴 Alerta de Pánico' : '🟢 Alerta Médica'}
+                              titulo={
+                                <div className="flex items-center gap-1.5">
+                                  {alerta.tipo === 'panico' ? (
+                                    <>
+                                      <AlertTriangle size={14} className="text-red-500" />
+                                      <span className="text-xs font-medium text-gray-700">Alerta de Pánico</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Heart size={14} className="text-green-500" />
+                                      <span className="text-xs font-medium text-gray-700">Alerta Médica</span>
+                                    </>
+                                  )}
+                                </div>
+                              }
                               alertaId={alerta.id}
                               altura="320px"
                             />

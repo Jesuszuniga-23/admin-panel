@@ -2,6 +2,7 @@
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { renderToString } from 'react-dom/server'; // 👈 IMPORTAR ESTO
 
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -15,12 +16,10 @@ const MapaOSM = ({ lat, lng, titulo, subtitulo, altura = '320px', zoom = 16 }) =
   const mapaInstancia = useRef(null);
 
   useEffect(() => {
-    // Validar coordenadas
     if (!lat || !lng || isNaN(parseFloat(lat)) || isNaN(parseFloat(lng)) || !mapaRef.current) {
       return;
     }
 
-    // Limpiar instancia anterior
     if (mapaInstancia.current) {
       mapaInstancia.current.remove();
       mapaInstancia.current = null;
@@ -37,10 +36,21 @@ const MapaOSM = ({ lat, lng, titulo, subtitulo, altura = '320px', zoom = 16 }) =
       }).addTo(mapa);
 
       const marcador = L.marker(posicion).addTo(mapa);
+      
+      // 🔥 CONVERTIR JSX A HTML STRING
+      let tituloHTML = '';
+      if (typeof titulo === 'string') {
+        tituloHTML = titulo;
+      } else if (titulo) {
+        tituloHTML = renderToString(titulo);
+      } else {
+        tituloHTML = 'Ubicación';
+      }
+
       marcador.bindPopup(`
-        <div style="text-align: center;">
-          <strong>${titulo}</strong>
-          ${subtitulo ? `<br/><small>${subtitulo}</small>` : ''}
+        <div style="text-align: center; padding: 8px; min-width: 150px;">
+          ${tituloHTML}
+          ${subtitulo ? `<div style="margin-top: 4px; font-size: 11px; color: #666;">${subtitulo}</div>` : ''}
         </div>
       `).openPopup();
 

@@ -10,19 +10,19 @@ class AuthService {
       throw new Error('No se recibió el token de Google');
     }
 
-    console.log("📤 Enviando token al backend...");
+    console.log(" Enviando token al backend...");
     
     const response = await axiosInstance.post(ENDPOINTS.AUTH.GOOGLE_ADMIN_LOGIN, {
       idToken: token
     });
     
-    console.log("✅ Respuesta del backend:", response.data);
+    console.log("Respuesta del backend:", response.data);
     
     if (response.data?.success) {
       // Guardar en memoria temporalmente
       this.#currentUser = response.data.usuario;
       
-      // ✅ IMPORTANTE: NO guardar en localStorage aquí
+      // NO guardar en localStorage aquí
       // El Login.jsx decidirá si guardar o no según el rol
       
       return response.data;
@@ -30,7 +30,7 @@ class AuthService {
       throw new Error(response.data?.error || 'Error en la respuesta del servidor');
     }
   } catch (error) {
-    console.error("❌ Error:", error);
+    console.error(" Error:", error);
     throw error.response?.data || { error: 'Error de autenticación' };
   }
 }

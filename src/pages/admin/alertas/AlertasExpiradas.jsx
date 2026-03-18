@@ -5,6 +5,7 @@ import {
   AlertTriangle, Clock, X
 } from 'lucide-react';
 import alertasService from '../../../services/admin/alertas.service';
+import MapaConDireccion from '../../../components/maps/MapaConDireccion';
 
 // Función para normalizar texto (corregir acentos y caracteres especiales)
 const normalizarTexto = (texto) => {
@@ -45,6 +46,16 @@ const AlertasExpiradas = () => {
   const [alertasOriginal, setAlertasOriginal] = useState([]);
   const [cargando, setCargando] = useState(true);
   
+  // Estado para el modal del mapa
+  const [mapaModal, setMapaModal] = useState({
+    abierto: false,
+    lat: null,
+    lng: null,
+    titulo: null,
+    alertaId: null,
+    tipo: null
+  });
+  
   const [filtros, setFiltros] = useState({
     limite: 10,
     pagina: 1,
@@ -68,9 +79,8 @@ const AlertasExpiradas = () => {
   // Función para filtrar datos localmente
   const filtrarDatos = (datos) => {
     return datos.filter(item => {
-      // =====================================================
-      // 🔥 BUSCADOR MEJORADO
-      // =====================================================
+      
+      // BUSCADOR 
       if (filtros.search) {
         const termino = filtros.search.toLowerCase().trim();
         
@@ -92,9 +102,7 @@ const AlertasExpiradas = () => {
         }
       }
       
-      // =====================================================
-      // 🔥 FILTRO DE FECHAS CORREGIDO
-      // =====================================================
+      // FILTRO DE FECHAS 
       if (filtros.desde && filtros.hasta) {
         const fechaCreacion = new Date(item.fecha_creacion);
         
@@ -221,6 +229,31 @@ const AlertasExpiradas = () => {
     });
   };
 
+  // Función para abrir el modal del mapa
+  const abrirMapaModal = (e, alerta) => {
+    e.stopPropagation(); // Evitar que se active el clic en la fila
+    setMapaModal({
+      abierto: true,
+      lat: alerta.lat,
+      lng: alerta.lng,
+      titulo: alerta.tipo === 'panico' ? 'Alerta de Pánico' : 'Alerta Médica',
+      alertaId: alerta.id,
+      tipo: alerta.tipo
+    });
+  };
+
+  // Función para cerrar el modal
+  const cerrarMapaModal = () => {
+    setMapaModal({
+      abierto: false,
+      lat: null,
+      lng: null,
+      titulo: null,
+      alertaId: null,
+      tipo: null
+    });
+  };
+
   // Efecto para aplicar filtros cuando cambian
   useEffect(() => {
     if (alertasOriginal.length) {
@@ -264,12 +297,12 @@ const AlertasExpiradas = () => {
         {/* Header - RESPONSIVE */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className="bg-white p-1.5 sm:p-2 rounded-xl shadow-lg shadow-slate-200/50">
-              <AlertTriangle size={20} className="sm:w-6 sm:h-6 text-amber-600" />
+            <div className="bg-gradient-to-br from-amber-500 to-orange-600 p-2 sm:p-2.5 md:p-3 rounded-lg sm:rounded-xl shadow-lg shadow-amber-200">
+              <AlertTriangle size={20} className="sm:w-5 sm:h-5 md:w-6 md:h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-lg sm:text-xl font-bold text-slate-800">Alertas Expiradas</h1>
-              <p className="text-xs text-slate-500">Alertas que no fueron atendidas a tiempo</p>
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Alertas Expiradas</h1>
+              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Alertas que no fueron atendidas a tiempo</p>
             </div>
           </div>
           
@@ -279,7 +312,7 @@ const AlertasExpiradas = () => {
           >
             <ChevronLeft size={14} className="sm:w-4 sm:h-4" />
             <span className="hidden xs:inline">Dashboard</span>
-            <span className="xs:hidden">Volver</span>
+            <span className="xs:hidden">Dashboard</span>
           </button>
         </div>
 
@@ -434,12 +467,14 @@ const AlertasExpiradas = () => {
                         </td>
                         <td className="px-3 md:px-6 py-2 md:py-3">
                           {alerta.lat && alerta.lng ? (
-                            <div className="flex items-center gap-1">
-                              <MapPin size={12} className="md:w-4 md:h-4 text-slate-400 flex-shrink-0" />
-                              <span className="text-xs text-slate-500 truncate max-w-[70px] md:max-w-[120px]">
-                                {alerta.lat.toFixed(2)}, {alerta.lng.toFixed(2)}
-                              </span>
-                            </div>
+                            <button
+                              onClick={(e) => abrirMapaModal(e, alerta)}
+                              className="flex items-center gap-1 text-amber-600 hover:text-amber-700 hover:bg-amber-50 px-2 py-1 rounded-lg transition-all group"
+                              title="Ver ubicación en mapa"
+                            >
+                              <MapPin size={16} className="md:w-4 md:h-4 group-hover:scale-110 transition-transform" />
+                              <span className="text-xs hidden md:inline">Ver mapa</span>
+                            </button>
                           ) : (
                             <span className="text-xs text-slate-400">—</span>
                           )}
@@ -465,7 +500,7 @@ const AlertasExpiradas = () => {
                 </table>
               </div>
 
-              {/* PAGINACIÓN - Formato correcto */}
+              {/* PAGINACIÓN */}
               <div className="px-4 md:px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-3">
                 <p className="text-xs sm:text-sm text-slate-600">
                   Mostrando <span className="font-medium">{inicio}</span> a <span className="font-medium">{fin}</span> de{' '}
@@ -499,6 +534,79 @@ const AlertasExpiradas = () => {
           )}
         </div>
       </div>
+
+      {/* MODAL DEL MAPA */}
+      {mapaModal.abierto && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+          onClick={cerrarMapaModal}
+        >
+          <div 
+            className="bg-white rounded-xl shadow-2xl w-full max-w-3xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header del modal */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-amber-50 to-orange-50">
+              <div className="flex items-center gap-2">
+                <div className={`p-2 rounded-lg ${
+                  mapaModal.tipo === 'panico' ? 'bg-red-100' : 'bg-green-100'
+                }`}>
+                  {mapaModal.tipo === 'panico' ? (
+                    <AlertTriangle size={18} className="text-red-600" />
+                  ) : (
+                    <AlertTriangle size={18} className="text-green-600" />
+                  )}
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-800">Ubicación de la Alerta</h3>
+                  <p className="text-xs text-gray-500">ID: #{mapaModal.alertaId} • {mapaModal.titulo}</p>
+                </div>
+              </div>
+              <button
+                onClick={cerrarMapaModal}
+                className="p-2 hover:bg-white rounded-lg transition-colors"
+              >
+                <X size={18} className="text-gray-500" />
+              </button>
+            </div>
+
+            {/* Contenido del modal - Mapa */}
+            <div className="p-4">
+              <MapaConDireccion
+                lat={mapaModal.lat}
+                lng={mapaModal.lng}
+                titulo={
+                  <div className="flex items-center gap-1.5">
+                    {mapaModal.tipo === 'panico' ? (
+                      <>
+                        <AlertTriangle size={14} className="text-red-500" />
+                        <span className="text-xs font-medium text-gray-700">Alerta de Pánico</span>
+                      </>
+                    ) : (
+                      <>
+                        <AlertTriangle size={14} className="text-green-500" />
+                        <span className="text-xs font-medium text-gray-700">Alerta Médica</span>
+                      </>
+                    )}
+                  </div>
+                }
+                alertaId={mapaModal.alertaId}
+                altura="400px"
+              />
+            </div>
+
+            {/* Footer del modal */}
+            <div className="p-4 border-t border-gray-200 bg-gray-50 flex justify-end">
+              <button
+                onClick={cerrarMapaModal}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
