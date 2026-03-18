@@ -70,10 +70,7 @@ const Header = ({ titulo = 'Panel de Administración', subtitulo = 'Gestión del
 
           {/* Iconos y menú de usuario */}
           <div className="flex items-center gap-2 sm:gap-4">
-            <button className="p-1.5 md:p-2 hover:bg-slate-100 rounded-xl transition-all relative">
-              <Bell size={18} className="md:w-5 md:h-5 text-slate-600" />
-              <span className="absolute top-1 right-1 w-1.5 h-1.5 md:w-2 md:h-2 bg-rose-500 rounded-full"></span>
-            </button>
+            
 
             {/* User Menu - RESPONSIVE */}
             <div className="relative" ref={menuRef}>
@@ -114,16 +111,7 @@ const Header = ({ titulo = 'Panel de Administración', subtitulo = 'Gestión del
                       <UserCircle size={16} className="text-slate-400 flex-shrink-0" />
                       <span className="truncate">Mi Perfil</span>
                     </button>
-                    <button
-                      onClick={() => {
-                        // Configuración 
-                        setUserMenuOpen(false);
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
-                    >
-                      <Settings size={16} className="text-slate-400 flex-shrink-0" />
-                      <span className="truncate">Configuración</span>
-                    </button>
+                    
                   </div>
                   <div className="border-t border-slate-100 pt-2">
                     <button
