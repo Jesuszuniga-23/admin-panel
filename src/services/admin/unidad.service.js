@@ -27,7 +27,7 @@ class UnidadService {
   async obtenerUnidad(id) {
     try {
       const url = ENDPOINTS.UNIDADES.GET(id);
-      console.log("📡 Obteniendo unidad:", url);
+      console.log("Obteniendo unidad:", url);
       const response = await axiosInstance.get(url);
       return response.data;
     } catch (error) {
@@ -39,7 +39,7 @@ class UnidadService {
   // CREAR UNIDAD
   async crearUnidad(datos) {
     try {
-      console.log("📡 Creando unidad:", datos);
+      console.log("Creando unidad:", datos);
       const response = await axiosInstance.post(ENDPOINTS.UNIDADES.CREATE, datos);
       return response.data;
     } catch (error) {
@@ -63,7 +63,7 @@ class UnidadService {
   // ELIMINAR UNIDAD (SOFT DELETE)
   async eliminarUnidad(id) {
     try {
-      console.log("📡 Eliminando unidad:", id);
+      console.log("Eliminando unidad:", id);
       const response = await axiosInstance.delete(ENDPOINTS.UNIDADES.DELETE(id));
       return response.data;
     } catch (error) {

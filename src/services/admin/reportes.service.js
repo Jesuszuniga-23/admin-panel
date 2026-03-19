@@ -152,10 +152,10 @@ class ReportesService {
   // =====================================================
   async generarExcelPersonalizado(datos, tipo, filtros, usuario) {
     try {
-      console.log(`📊 Generando Excel para ${tipo} con ${datos.length} registros`);
+      console.log(`Generando Excel para ${tipo} con ${datos.length} registros`);
       
       if (!datos || datos.length === 0) {
-        console.warn('⚠️ No hay datos para exportar');
+        console.warn('No hay datos para exportar');
         return false;
       }
       
@@ -288,7 +288,7 @@ class ReportesService {
       infoSheet.addRow({ campo: 'ROL', valor: usuario?.rol || '—' });
       infoSheet.addRow({ campo: '', valor: '' });
       
-      infoSheet.addRow({ campo: '🔍 FILTROS APLICADOS', valor: '' });
+      infoSheet.addRow({ campo: 'FILTROS APLICADOS', valor: '' });
       infoSheet.getRow(infoSheet.lastRow.number).eachCell((cell) => {
         cell.font = { bold: true, size: 12, color: { argb: COLOR_PRIMARIO } };
       });
@@ -320,10 +320,10 @@ class ReportesService {
       const fecha = new Date().toISOString().split('T')[0];
       saveAs(blob, `Reporte_${tipo}_${fecha}.xlsx`);
       
-      console.log(`✅ Excel generado correctamente con ${datos.length} registros`);
+      console.log(`Excel generado correctamente con ${datos.length} registros`);
       return true;
     } catch (error) {
-      console.error('❌ Error generando Excel:', error);
+      console.error('Error generando Excel:', error);
       throw error;
     }
   }
@@ -333,10 +333,10 @@ class ReportesService {
   // =====================================================
   generarPDFPersonalizado(datos, tipo, filtros, usuario) {
     try {
-      console.log(`📄 Generando PDF para ${tipo} con ${datos.length} registros`);
+      console.log(`Generando PDF para ${tipo} con ${datos.length} registros`);
       
       if (!datos || datos.length === 0) {
-        console.warn('⚠️ No hay datos para exportar');
+        console.warn('No hay datos para exportar');
         return false;
       }
       
@@ -509,10 +509,10 @@ class ReportesService {
       const fechaArchivo = new Date().toISOString().split('T')[0];
       doc.save(`Reporte_${tipo}_${fechaArchivo}.pdf`);
       
-      console.log(`✅ PDF generado correctamente`);
+      console.log(`PDF generado correctamente`);
       return true;
     } catch (error) {
-      console.error('❌ Error generando PDF:', error);
+      console.error('Error generando PDF:', error);
       throw error;
     }
   }

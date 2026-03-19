@@ -127,7 +127,7 @@ class ReportesGraficasService {
   
   async generarPDFConGraficas(datos, tipo, filtros, usuario, graficas) {
     try {
-      console.log('📄 Servicio PDF - Datos recibidos:', {
+      console.log('Servicio PDF - Datos recibidos:', {
         tieneMapa: !!graficas.mapa,
         mapaPreview: graficas.mapa ? graficas.mapa.substring(0, 50) + '...' : 'No',
         tieneBarras: !!graficas.barras,
@@ -250,8 +250,8 @@ class ReportesGraficasService {
         yPos += dimensiones.alto + 15;
         doc.setFontSize(8);
         doc.setTextColor(100, 100, 100);
-        doc.text('🔴 Pánico', 15, yPos);
-        doc.text('🟢 Médica', 60, yPos);
+        doc.text('Pánico', 15, yPos);
+        doc.text('Médica', 60, yPos);
       }
       
       // =====================================================
@@ -393,7 +393,7 @@ class ReportesGraficasService {
       const fechaArchivo = new Date().toISOString().split('T')[0];
       doc.save(`Analisis_Geografico_${fechaArchivo}.pdf`);
       
-      console.log('✅ PDF con gráficas y mapa generado correctamente');
+      console.log('PDF con gráficas y mapa generado correctamente');
       return true;
     } catch (error) {
       console.error('Error generando PDF con gráficas:', error);

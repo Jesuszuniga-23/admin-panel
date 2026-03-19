@@ -251,7 +251,7 @@ const ReasignacionesPendientes = () => {
                   </div>
                   <div>
                     <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getTipoColor(alerta.tipo)}`}>
-                      {alerta.tipo === 'panico' ? '🚨 PÁNICO' : '🏥 MÉDICA'}
+                      {alerta.tipo === 'panico' ? ' PÁNICO' : ' MÉDICA'}
                     </span>
                   </div>
                 </div>
