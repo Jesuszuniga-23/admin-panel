@@ -74,6 +74,7 @@ class AlertasPanelService {
       return { success: false, data: null };
     }
   }
+  
 }
 
 export default new AlertasPanelService();

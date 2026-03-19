@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle, Clock, MapPin, User, Calendar,
   ChevronLeft, RefreshCw, Truck, XCircle, CheckCircle,
-  Loader, AlertCircle, Phone, Shield, X, Bell, BellRing
+  Loader, AlertCircle, Phone, Shield, X, Bell, BellRing,
+  Mail, MapPinned, Navigation, Copy
 } from 'lucide-react';
 import reasignacionService from '../../../services/admin/reasignacion.service';
 import alertasService from '../../../services/admin/alertas.service';
+import MapaConDireccion from '../../../components/maps/MapaConDireccion';
 import toast from 'react-hot-toast';
 
 const ReasignacionesPendientes = () => {
@@ -23,19 +25,25 @@ const ReasignacionesPendientes = () => {
   const [motivoCierre, setMotivoCierre] = useState('');
   const [ultimaActualizacion, setUltimaActualizacion] = useState(new Date());
 
+  // Estado para el modal del mapa
+  const [mapaModal, setMapaModal] = useState({
+    abierto: false,
+    lat: null,
+    lng: null,
+    titulo: null,
+    alertaId: null,
+    tipo: null
+  });
 
   // TIEMPO REAL - Cargar cada 30 segundos
-
   useEffect(() => {
     cargarPendientes();
 
-    // Configurar intervalo para recarga automática cada 30 segundos
     const intervalo = setInterval(() => {
       console.log('Recargando alertas pendientes');
-      cargarPendientes(true); // true = silencioso (sin mostrar loading)
-    }, 30000); // 30 segundos
+      cargarPendientes(true);
+    }, 30000);
 
-    // Limpiar intervalo al desmontar
     return () => clearInterval(intervalo);
   }, []);
 
@@ -46,7 +54,6 @@ const ReasignacionesPendientes = () => {
       setAlertas(response.data || []);
       setUltimaActualizacion(new Date());
 
-      // Si hay cambios y el modal está abierto, mostrar indicador sutil
       if (mostrarModal && response.data?.length !== alertas.length) {
         toast('Nuevas alertas disponibles', {
           icon: <BellRing size={18} className="text-blue-500 animate-pulse" />,
@@ -93,7 +100,7 @@ const ReasignacionesPendientes = () => {
         icon: <CheckCircle size={18} className="text-green-500" />
       });
       setMostrarModal(false);
-      cargarPendientes(); // Recargar inmediatamente después de reasignar
+      cargarPendientes();
     } catch (error) {
       console.error("Error reasignando:", error);
       toast.error(error.error || 'Error al reasignar alerta');
@@ -118,13 +125,32 @@ const ReasignacionesPendientes = () => {
       setMostrarModalCierre(false);
       setAlertaSeleccionada(null);
       setMotivoCierre('');
-      cargarPendientes(); // Recargar inmediatamente después de cerrar
+      cargarPendientes();
     } catch (error) {
       console.error("Error cerrando alerta:", error);
       toast.error(error.error || 'Error al cerrar alerta');
     } finally {
       setProcesando(false);
     }
+  };
+
+  // Función para abrir el modal del mapa
+  const abrirMapaModal = (e, alerta) => {
+    e.stopPropagation();
+    setMapaModal({
+      abierto: true,
+      lat: alerta.lat,
+      lng: alerta.lng,
+      titulo: alerta.tipo === 'panico' ? 'Alerta de Pánico' : 'Alerta Médica',
+      alertaId: alerta.id,
+      tipo: alerta.tipo
+    });
+  };
+
+  const copiarCoordenadas = (e, lat, lng) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(`${lat}, ${lng}`);
+    toast.success('Coordenadas copiadas');
   };
 
   const getTipoColor = (tipo) => {
@@ -150,24 +176,24 @@ const ReasignacionesPendientes = () => {
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
-      {/* Header con indicador de tiempo real */}
+      {/* Header - IGUAL */}
       <div className="flex justify-between items-center mb-6">
         <div>
-         <div className="flex items-center gap-2 sm:gap-3">
-  <div className="bg-gradient-to-br from-blue-500 to-cyan-600 p-2 sm:p-2.5 md:p-3 rounded-lg sm:rounded-xl shadow-lg shadow-blue-200">
-    <RefreshCw size={20} className="sm:w-5 sm:h-5 md:w-6 md:h-6 text-white" />
-  </div>
-  <div>
-    <div className="flex items-center gap-3">
-      <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Reasignaciones Pendientes</h1>
-      <span className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full flex items-center gap-1">
-        <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
-        Tiempo real
-      </span>
-    </div>
-    <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Solicitudes de reasignación de alertas</p>
-  </div>
-</div>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="bg-gradient-to-br from-blue-500 to-cyan-600 p-2 sm:p-2.5 md:p-3 rounded-lg sm:rounded-xl shadow-lg shadow-blue-200">
+              <RefreshCw size={20} className="sm:w-5 sm:h-5 md:w-6 md:h-6 text-white" />
+            </div>
+            <div>
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Reasignaciones Pendientes</h1>
+                <span className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
+                  Tiempo real
+                </span>
+              </div>
+              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Solicitudes de reasignación de alertas</p>
+            </div>
+          </div>
           <p className="text-sm text-gray-500 mt-1">
             Alertas activas sin asignar por más de 5 minutos
           </p>
@@ -176,30 +202,25 @@ const ReasignacionesPendientes = () => {
           </p>
         </div>
         <div className="flex gap-3">
-  {/* Botón Actualizar */}
-  <button
-    onClick={() => cargarPendientes()}
-    className="flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-white border border-slate-200 rounded-xl shadow-sm hover:bg-amber-50 hover:border-amber-200 hover:text-amber-700 transition-all text-slate-600 text-xs sm:text-sm font-medium whitespace-nowrap"
-    title="Actualizar manualmente"
-  >
-    <RefreshCw size={14} className={`sm:w-4 sm:h-4 text-slate-500 ${cargando ? 'animate-spin' : ''}`} />
-    <span className="hidden xs:inline">Actualizar</span>
-    <span className="xs:hidden">Actualizar</span>
-  </button>
+          <button
+            onClick={() => cargarPendientes()}
+            className="flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-white border border-slate-200 rounded-xl shadow-sm hover:bg-amber-50 hover:border-amber-200 hover:text-amber-700 transition-all text-slate-600 text-xs sm:text-sm font-medium whitespace-nowrap"
+          >
+            <RefreshCw size={14} className={`sm:w-4 sm:h-4 text-slate-500 ${cargando ? 'animate-spin' : ''}`} />
+            <span className="hidden xs:inline">Actualizar</span>
+          </button>
 
-  {/* Botón Dashboard (mismo estilo que Alertas Expiradas) */}
-  <button
-    onClick={() => navigate('/admin/dashboard')}
-    className="flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-white border border-slate-200 rounded-xl shadow-sm hover:bg-amber-50 hover:border-amber-200 hover:text-amber-700 transition-all text-slate-600 text-xs sm:text-sm font-medium whitespace-nowrap"
-  >
-    <ChevronLeft size={14} className="sm:w-4 sm:h-4" />
-    <span className="hidden xs:inline">Dashboard</span>
-    <span className="xs:hidden">Dashboard</span>
-  </button>
-</div>
+          <button
+            onClick={() => navigate('/admin/dashboard')}
+            className="flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-white border border-slate-200 rounded-xl shadow-sm hover:bg-amber-50 hover:border-amber-200 hover:text-amber-700 transition-all text-slate-600 text-xs sm:text-sm font-medium whitespace-nowrap"
+          >
+            <ChevronLeft size={14} className="sm:w-4 sm:h-4" />
+            <span className="hidden xs:inline">Dashboard</span>
+          </button>
+        </div>
       </div>
 
-      {/* Indicador de recarga automática */}
+      {/* Indicador de recarga automática - IGUAL */}
       <div className="flex justify-end mb-2">
         <span className="text-xs text-gray-400 flex items-center gap-1">
           <RefreshCw size={12} className="animate-spin-slow" />
@@ -218,59 +239,170 @@ const ReasignacionesPendientes = () => {
           {alertas.map((alerta) => (
             <div
               key={alerta.id}
-              className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all border-l-4 border-amber-500"
+              className="group bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden border border-gray-100 hover:border-amber-200"
             >
-              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                {/* Información de la alerta */}
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-3">
-                    <span className={`px-3 py-1 rounded-full text-xs flex items-center gap-2 ${getTipoColor(alerta.tipo)}`}>
-                      {getTipoIcon(alerta.tipo)}
-                      {alerta.tipo === 'panico' ? 'Pánico' : 'Médica'}
-                    </span>
-                    <span className="text-sm text-gray-500 flex items-center gap-1">
-                      <Clock size={14} />
-                      {alerta.minutos_espera} minutos esperando
+              {/* Barra superior con gradiente y tiempo */}
+              <div className="bg-gradient-to-r from-amber-50 to-orange-50 px-6 py-3 border-b border-amber-100 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${
+                    alerta.tipo === 'panico' ? 'bg-red-100' : 'bg-yellow-100'
+                  }`}>
+                    {getTipoIcon(alerta.tipo)}
+                  </div>
+                  <div>
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getTipoColor(alerta.tipo)}`}>
+                      {alerta.tipo === 'panico' ? '🚨 PÁNICO' : '🏥 MÉDICA'}
                     </span>
                   </div>
+                </div>
+                <div className="flex items-center gap-2 bg-white/80 backdrop-blur-sm px-3 py-1 rounded-full shadow-sm">
+                  <Clock size={14} className="text-amber-600" />
+                  <span className="text-sm font-semibold text-amber-700">
+                    {alerta.minutos_espera} min
+                  </span>
+                  <span className="text-xs text-gray-500">esperando</span>
+                </div>
+              </div>
 
-                  <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                    Alerta #{alerta.id}
-                  </h3>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600">
-                    <div className="flex items-center gap-2">
-                      <User size={14} className="text-gray-400" />
-                      {alerta.ciudadano?.nombre || 'Desconocido'}
+              {/* Contenido principal */}
+              <div className="p-6">
+                <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+                  {/* Información de la alerta */}
+                  <div className="flex-1 space-y-4">
+                    {/* ID y tipo */}
+                    <div className="flex items-center gap-3">
+                      <h3 className="text-xl font-bold text-gray-800">
+                        Alerta #{alerta.id}
+                      </h3>
+                      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">
+                        ID: {alerta.id}
+                      </span>
                     </div>
-                    {alerta.ciudadano?.telefono && (
-                      <div className="flex items-center gap-2">
-                        <Phone size={14} className="text-gray-400" />
-                        {alerta.ciudadano.telefono}
+
+                    {/* Grid de información del ciudadano */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {/* Nombre */}
+                      <div className="flex items-center gap-3 p-3 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
+                        <div className="p-2 bg-white rounded-lg shadow-sm">
+                          <User size={16} className="text-blue-600" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-xs text-blue-600 font-semibold">CIUDADANO</p>
+                          <p className="text-sm font-medium text-gray-800 truncate">
+                            {alerta.ciudadano?.nombre || 'Desconocido'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Teléfono */}
+                      {alerta.ciudadano?.telefono && (
+                        <div className="flex items-center gap-3 p-3 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-100">
+                          <div className="p-2 bg-white rounded-lg shadow-sm">
+                            <Phone size={16} className="text-green-600" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-xs text-green-600 font-semibold">TELÉFONO</p>
+                            <a
+                              href={`tel:${alerta.ciudadano.telefono}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-sm font-medium text-gray-800 hover:text-green-600 transition-colors"
+                            >
+                              {alerta.ciudadano.telefono}
+                            </a>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Email (si existe) */}
+                      {alerta.ciudadano?.email && (
+                        <div className="flex items-center gap-3 p-3 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border border-purple-100">
+                          <div className="p-2 bg-white rounded-lg shadow-sm">
+                            <Mail size={16} className="text-purple-600" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-xs text-purple-600 font-semibold">EMAIL</p>
+                            <p className="text-sm font-medium text-gray-800 truncate">
+                              {alerta.ciudadano.email}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Sección de ubicación */}
+                    {alerta.lat && alerta.lng ? (
+                      <div className="bg-gradient-to-br from-gray-50 to-slate-50 rounded-xl p-4 border border-gray-200">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <MapPinned size={18} className="text-blue-600" />
+                            <span className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                              UBICACIÓN
+                            </span>
+                          </div>
+                          <button
+                            onClick={(e) => copiarCoordenadas(e, alerta.lat, alerta.lng)}
+                            className="p-1.5 hover:bg-white rounded-lg transition-colors group"
+                            title="Copiar coordenadas"
+                          >
+                            <Copy size={14} className="text-gray-400 group-hover:text-blue-600" />
+                          </button>
+                        </div>
+                        
+                        <div className="flex items-center justify-between">
+                          <div className="space-y-1">
+                            <p className="text-xs font-mono text-gray-600">
+                              {parseFloat(alerta.lat).toFixed(6)}, {parseFloat(alerta.lng).toFixed(6)}
+                            </p>
+                            <button
+                              onClick={(e) => abrirMapaModal(e, alerta)}
+                              className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 font-medium group"
+                            >
+                              <Navigation size={14} className="group-hover:scale-110 transition-transform" />
+                              Ver ubicación en mapa
+                            </button>
+                          </div>
+                          <a
+                            href={`https://www.google.com/maps?q=${alerta.lat},${alerta.lng}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="p-2 bg-white rounded-lg border border-gray-200 hover:border-blue-200 hover:bg-blue-50 transition-all"
+                            title="Abrir en Google Maps"
+                          >
+                            <MapPin size={18} className="text-gray-600 hover:text-blue-600" />
+                          </a>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                        <div className="flex items-center gap-2 text-gray-400">
+                          <MapPin size={18} />
+                          <span className="text-sm">Ubicación no disponible</span>
+                        </div>
                       </div>
                     )}
                   </div>
-                </div>
 
-                {/* Acciones */}
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => handleVerUnidades(alerta)}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors"
-                  >
-                    <Truck size={18} />
-                    Reasignar
-                  </button>
-                  <button
-                    onClick={() => {
-                      setAlertaSeleccionada(alerta);
-                      setMostrarModalCierre(true);
-                    }}
-                    className="flex items-center gap-2 px-4 py-2 border border-red-200 text-red-600 rounded-xl hover:bg-red-50 transition-colors"
-                  >
-                    <XCircle size={18} />
-                    Cerrar
-                  </button>
+                  {/* Acciones - IGUAL */}
+                  <div className="flex flex-row lg:flex-col gap-3">
+                    <button
+                      onClick={() => handleVerUnidades(alerta)}
+                      className="flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg shadow-blue-200 hover:shadow-xl font-medium"
+                    >
+                      <Truck size={18} />
+                      <span>Reasignar</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setAlertaSeleccionada(alerta);
+                        setMostrarModalCierre(true);
+                      }}
+                      className="flex items-center justify-center gap-2 px-6 py-3 bg-white border-2 border-red-200 text-red-600 rounded-xl hover:bg-red-50 hover:border-red-300 transition-all font-medium"
+                    >
+                      <XCircle size={18} />
+                      <span>Cerrar</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -278,7 +410,7 @@ const ReasignacionesPendientes = () => {
         </div>
       )}
 
-      {/* Modal de Reasignación */}
+      {/* Modal de Reasignación - IGUAL */}
       {mostrarModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fadeIn">
           <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full mx-4 p-6 max-h-[80vh] overflow-y-auto">
@@ -356,7 +488,7 @@ const ReasignacionesPendientes = () => {
         </div>
       )}
 
-      {/* Modal de Cierre Manual */}
+      {/* Modal de Cierre Manual - IGUAL */}
       {mostrarModalCierre && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fadeIn">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 p-6">
@@ -400,6 +532,72 @@ const ReasignacionesPendientes = () => {
                 className="px-4 py-2 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
               >
                 Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DEL MAPA - IGUAL */}
+      {mapaModal.abierto && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+          onClick={() => setMapaModal({ abierto: false })}
+        >
+          <div 
+            className="bg-white rounded-xl shadow-2xl w-full max-w-3xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-amber-50 to-orange-50">
+              <div className="flex items-center gap-2">
+                <div className={`p-2 rounded-lg ${
+                  mapaModal.tipo === 'panico' ? 'bg-red-100' : 'bg-green-100'
+                }`}>
+                  <AlertTriangle size={18} className="text-red-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-800">Ubicación de la Alerta</h3>
+                  <p className="text-xs text-gray-500">ID: #{mapaModal.alertaId} • {mapaModal.titulo}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setMapaModal({ abierto: false })}
+                className="p-2 hover:bg-white rounded-lg transition-colors"
+              >
+                <X size={18} className="text-gray-500" />
+              </button>
+            </div>
+
+            <div className="p-4">
+              <MapaConDireccion
+                lat={mapaModal.lat}
+                lng={mapaModal.lng}
+                titulo={
+                  <div className="flex items-center gap-1.5">
+                    {mapaModal.tipo === 'panico' ? (
+                      <>
+                        <AlertTriangle size={14} className="text-red-500" />
+                        <span className="text-xs font-medium text-gray-700">Alerta de Pánico</span>
+                      </>
+                    ) : (
+                      <>
+                        <AlertTriangle size={14} className="text-green-500" />
+                        <span className="text-xs font-medium text-gray-700">Alerta Médica</span>
+                      </>
+                    )}
+                  </div>
+                }
+                alertaId={mapaModal.alertaId}
+                altura="400px"
+              />
+            </div>
+
+            <div className="p-4 border-t border-gray-200 bg-gray-50 flex justify-end">
+              <button
+                onClick={() => setMapaModal({ abierto: false })}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium"
+              >
+                Cerrar
               </button>
             </div>
           </div>

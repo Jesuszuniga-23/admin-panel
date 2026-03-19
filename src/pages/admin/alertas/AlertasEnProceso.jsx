@@ -348,13 +348,8 @@ const AlertasEnProceso = () => {
           {filtrosActivos && (
             <div className="mt-3 flex items-center gap-2 text-xs">
               <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full animate-pulse"></span>
-              <span className="text-yellow-600">Filtros aplicados</span>
-              <button
-                onClick={limpiarFiltros}
-                className="text-xs text-yellow-600 hover:text-yellow-800 underline ml-2"
-              >
-                Limpiar todo
-              </button>
+              <span className="text-amber-600">Filtros aplicados - {paginacion.total} resultados</span>
+              
             </div>
           )}
         </div>

@@ -4,7 +4,7 @@ import {
   Truck, Plus, Search, Filter, ChevronLeft, ChevronRight,
   Eye, Edit, Trash2, Power, RotateCcw, Shield, Ambulance,
   MapPin, Users, MoreVertical, Download, AlertCircle, X,
-  Clock, FileSpreadsheet, FilePieChart
+  Clock, FileSpreadsheet, FilePieChart, AlertTriangle, CheckCircle
 } from 'lucide-react';
 import unidadService from '../../../services/admin/unidad.service';
 import toast from 'react-hot-toast';
@@ -50,6 +50,87 @@ const ModalAccionNoPermitida = ({ isOpen, onClose, mensaje }) => {
   );
 };
 
+// Modal de confirmación personalizado
+const ModalConfirmacion = ({ isOpen, onClose, onConfirm, titulo, mensaje, itemNombre, tipoAccion = 'eliminar' }) => {
+  if (!isOpen) return null;
+
+  const config = {
+    eliminar: {
+      icon: <AlertTriangle size={24} className="text-red-600" />,
+      bgColor: 'bg-red-100',
+      buttonColor: 'bg-red-600 hover:bg-red-700',
+      buttonIcon: <Trash2 size={16} />,
+      buttonText: 'Eliminar',
+      mensajeAdicional: 'Esta acción no se puede deshacer.'
+    },
+    desactivar: {
+      icon: <Power size={24} className="text-yellow-600" />,
+      bgColor: 'bg-yellow-100',
+      buttonColor: 'bg-yellow-600 hover:bg-yellow-700',
+      buttonIcon: <Power size={16} />,
+      buttonText: 'Desactivar',
+      mensajeAdicional: 'La unidad dejará de recibir alertas y no estará operativa.'
+    },
+    activar: {
+      icon: <CheckCircle size={24} className="text-green-600" />,
+      bgColor: 'bg-green-100',
+      buttonColor: 'bg-green-600 hover:bg-green-700',
+      buttonIcon: <Power size={16} />,
+      buttonText: 'Activar',
+      mensajeAdicional: 'La unidad volverá a estar operativa y podrá recibir alertas.'
+    }
+  };
+
+  const conf = config[tipoAccion] || config.eliminar;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full animate-fadeIn">
+        <div className="p-6">
+          <div className="flex items-center gap-4 mb-4">
+            <div className={`w-12 h-12 ${conf.bgColor} rounded-full flex items-center justify-center flex-shrink-0`}>
+              {conf.icon}
+            </div>
+            <h3 className="text-lg font-semibold text-gray-800">{titulo || 'Confirmar acción'}</h3>
+          </div>
+          
+          <p className="text-sm text-gray-600 mb-2">
+            {mensaje || `¿Estás seguro de ${tipoAccion === 'activar' ? 'activar' : tipoAccion === 'desactivar' ? 'desactivar' : 'eliminar'} la unidad`}
+          </p>
+          {itemNombre && (
+            <p className="text-base font-semibold text-center p-2 rounded-lg mb-4" style={{
+              color: tipoAccion === 'eliminar' ? '#dc2626' : tipoAccion === 'desactivar' ? '#d97706' : '#059669',
+              backgroundColor: tipoAccion === 'eliminar' ? '#fee2e2' : tipoAccion === 'desactivar' ? '#fef3c7' : '#d1fae5'
+            }}>
+              "{itemNombre}"
+            </p>
+          )}
+          <p className="text-xs text-gray-400 mb-6">{conf.mensajeAdicional}</p>
+          
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={() => {
+                onConfirm();
+                onClose();
+              }}
+              className={`px-4 py-2 ${conf.buttonColor} text-white rounded-lg transition-colors text-sm font-medium flex items-center gap-2`}
+            >
+              {conf.buttonIcon}
+              {conf.buttonText}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const UnidadesList = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
@@ -57,10 +138,32 @@ const UnidadesList = () => {
   const [loading, setLoading] = useState(true);
   const [mostrarReporte, setMostrarReporte] = useState(false);
   const [exportando, setExportando] = useState(false);
+  
+  // Estados para modales
   const [modalInfo, setModalInfo] = useState({
     show: false,
     mensaje: ''
   });
+  
+  // Estado para modal de confirmación de eliminación
+  const [modalConfirmacion, setModalConfirmacion] = useState({
+    show: false,
+    id: null,
+    codigo: '',
+    unidad: null,
+    tipoAccion: 'eliminar'
+  });
+
+  // 🔥 NUEVO: Estado para modal de confirmación de activar/desactivar
+  const [modalToggle, setModalToggle] = useState({
+    show: false,
+    id: null,
+    codigo: '',
+    unidad: null,
+    activar: false,
+    estadoActual: null
+  });
+
   const [filtros, setFiltros] = useState({
     tipo: '',
     estado: '',
@@ -126,7 +229,6 @@ const UnidadesList = () => {
       setExportando(true);
       toast.loading('Generando reporte de Excel...', { id: 'export' });
       
-      // Usar todas las unidades (sin paginación) para el reporte
       const response = await unidadService.listarUnidades({ limite: 1000 });
       const todasUnidades = response.data || [];
       
@@ -170,7 +272,7 @@ const UnidadesList = () => {
     }
   };
 
-  // MANEJADORES DE ACCIONES CON VALIDACIÓN
+  // 🔥 MODIFICADO: Ahora usa el modal de confirmación para activar/desactivar
   const handleToggleActivo = async (id, codigo, unidad) => {
     if (isUnidadOcupada(unidad)) {
       setModalInfo({
@@ -180,23 +282,39 @@ const UnidadesList = () => {
       return;
     }
 
+    // Abrir modal de confirmación para activar/desactivar
+    setModalToggle({
+      show: true,
+      id,
+      codigo,
+      unidad,
+      activar: !unidad.activa,
+      estadoActual: unidad.activa
+    });
+  };
+
+  // 🔥 NUEVO: Función para ejecutar el toggle después de confirmar
+  const ejecutarToggle = async () => {
+    const { id, codigo, unidad, activar } = modalToggle;
+    const accion = activar ? 'activar' : 'desactivar';
     const estadoAnterior = unidades.find(u => u.id === id);
     const activa = unidad.activa;
 
+    // Optimistic update
     setUnidades(prevUnidades =>
       prevUnidades.map(u =>
         u.id === id
           ? {
             ...u,
-            activa: !activa,
-            estado: !activa ? 'disponible' : 'inactiva'
+            activa: activar,
+            estado: activar ? 'disponible' : 'inactiva'
           }
           : u
       )
     );
 
     try {
-      const response = await unidadService.toggleActiva(id, !activa);
+      const response = await unidadService.toggleActiva(id, activar);
 
       if (response.data?.estado) {
         setUnidades(prevUnidades =>
@@ -212,10 +330,11 @@ const UnidadesList = () => {
         );
       }
 
-      toast.success(`Unidad ${!activa ? 'activada' : 'desactivada'}`, {
-        icon: <Power size={18} className={!activa ? 'text-green-500' : 'text-gray-500'} />
+      toast.success(`Unidad ${accion}da correctamente`, {
+        icon: <Power size={18} className={activar ? 'text-green-500' : 'text-yellow-500'} />
       });
     } catch (error) {
+      // Revertir en caso de error
       setUnidades(prevUnidades =>
         prevUnidades.map(u =>
           u.id === id
@@ -229,11 +348,12 @@ const UnidadesList = () => {
           icon: <Clock size={18} className="text-yellow-500" />
         });
       } else {
-        toast.error(error.error || 'Error al cambiar estado');
+        toast.error(error.error || `Error al ${accion} unidad`);
       }
     }
   };
 
+  // MANEJADOR PARA ELIMINAR
   const handleEliminar = async (id, codigo, unidad) => {
     if (isUnidadOcupada(unidad)) {
       setModalInfo({
@@ -243,8 +363,20 @@ const UnidadesList = () => {
       return;
     }
 
-    if (!window.confirm(`¿Estás seguro de eliminar la unidad ${codigo}?`)) return;
+    // Abrir modal de confirmación para eliminar
+    setModalConfirmacion({
+      show: true,
+      id,
+      codigo,
+      unidad,
+      tipoAccion: 'eliminar'
+    });
+  };
 
+  // Función para ejecutar la eliminación después de confirmar
+  const ejecutarEliminar = async () => {
+    const { id, codigo } = modalConfirmacion;
+    
     try {
       await unidadService.eliminarUnidad(id);
       toast.success('Unidad eliminada correctamente');
@@ -292,6 +424,30 @@ const UnidadesList = () => {
         isOpen={modalInfo.show}
         onClose={() => setModalInfo({ show: false, mensaje: '' })}
         mensaje={modalInfo.mensaje}
+      />
+
+      {/* Modal de confirmación para eliminar */}
+      <ModalConfirmacion
+        isOpen={modalConfirmacion.show}
+        onClose={() => setModalConfirmacion({ show: false, id: null, codigo: '', unidad: null, tipoAccion: 'eliminar' })}
+        onConfirm={ejecutarEliminar}
+        titulo="Confirmar eliminación"
+        mensaje="¿Estás seguro de eliminar la unidad?"
+        itemNombre={modalConfirmacion.codigo}
+        tipoAccion="eliminar"
+      />
+
+      {/* 🔥 NUEVO: Modal de confirmación para activar/desactivar */}
+      <ModalConfirmacion
+        isOpen={modalToggle.show}
+        onClose={() => setModalToggle({ show: false, id: null, codigo: '', unidad: null, activar: false, estadoActual: null })}
+        onConfirm={ejecutarToggle}
+        titulo={modalToggle.activar ? "Confirmar activación" : "Confirmar desactivación"}
+        mensaje={modalToggle.activar 
+          ? "¿Estás seguro de activar la unidad?" 
+          : "¿Estás seguro de desactivar la unidad?"}
+        itemNombre={modalToggle.codigo}
+        tipoAccion={modalToggle.activar ? "activar" : "desactivar"}
       />
 
       {/* Header - RESPONSIVE */}
@@ -444,7 +600,6 @@ const UnidadesList = () => {
                     <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
                     <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
                     <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase">Personal</th>
-                    <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase">Ubicación</th>
                     <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
                   </tr>
                 </thead>
@@ -487,18 +642,6 @@ const UnidadesList = () => {
                             {unidad.personal_asignado?.length || 0}
                           </span>
                         </div>
-                      </td>
-                      <td className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 lg:py-4">
-                        {unidad.lat && unidad.lng ? (
-                          <div className="flex items-center gap-1">
-                            <MapPin size={12} className="sm:w-3 sm:h-3 lg:w-3.5 lg:h-3.5 text-gray-400 flex-shrink-0" />
-                            <span className="text-xs text-gray-500 truncate max-w-[70px] sm:max-w-[100px] lg:max-w-[150px]">
-                              {unidad.lat.toFixed(4)}, {unidad.lng.toFixed(4)}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-gray-400">—</span>
-                        )}
                       </td>
                       <td className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 lg:py-4 text-right">
                         <div className="flex items-center justify-end gap-1 sm:gap-1.5 lg:gap-2">

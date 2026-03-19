@@ -8,6 +8,13 @@ import {
 import personalService from '../../../services/admin/personal.service';
 import toast from 'react-hot-toast';
 
+// Función para obtener nombre completo
+const getNombreCompleto = (personal) => {
+  if (!personal) return '';
+  const { nombre, apellido_paterno, apellido_materno } = personal;
+  return [nombre, apellido_paterno, apellido_materno].filter(Boolean).join(' ');
+};
+
 const PersonalDetail = () => {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -39,14 +46,14 @@ const PersonalDetail = () => {
     const nuevoEstado = !personal.activo;
     const accion = nuevoEstado ? 'activar' : 'desactivar';
     
-    if (!window.confirm(`¿Estás seguro de ${accion} a ${personal.nombre}?`)) {
+    if (!window.confirm(`¿Estás seguro de ${accion} a ${getNombreCompleto(personal)}?`)) {
       return;
     }
 
     try {
       await personalService.toggleActivo(id, nuevoEstado);
       toast.success(`Personal ${accion}do correctamente`);
-      cargarPersonal(); // Recargar datos
+      cargarPersonal();
     } catch (error) {
       console.error(`Error al ${accion}:`, error);
       toast.error(error.error || `Error al ${accion} personal`);
@@ -54,7 +61,7 @@ const PersonalDetail = () => {
   };
 
   const handleEliminar = async () => {
-    if (!window.confirm(`¿Estás seguro de eliminar a ${personal.nombre}?`)) {
+    if (!window.confirm(`¿Estás seguro de eliminar a ${getNombreCompleto(personal)}?`)) {
       return;
     }
 
@@ -122,7 +129,7 @@ const PersonalDetail = () => {
           <div>
             <h1 className="text-2xl font-bold text-gray-800">Detalle del Personal</h1>
             <p className="text-sm text-gray-500 mt-1">
-              Información completa de {personal.nombre}
+              Información completa de {getNombreCompleto(personal)}
             </p>
           </div>
         </div>
@@ -156,7 +163,7 @@ const PersonalDetail = () => {
               </span>
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-white">{personal.nombre}</h2>
+              <h2 className="text-2xl font-bold text-white">{getNombreCompleto(personal)}</h2>
               <p className="text-blue-100 mt-1">ID: {personal.id}</p>
             </div>
           </div>
@@ -164,8 +171,26 @@ const PersonalDetail = () => {
 
         {/* Contenido */}
         <div className="p-6">
-          {/* Grid de información */}
+          {/* Grid de información - AHORA CON APELLIDOS SEPARADOS */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            {/* NUEVA FILA: Nombre */}
+            <InfoItem 
+              icon={User} 
+              label="Nombre(s)" 
+              value={personal.nombre} 
+            />
+            {/* NUEVA FILA: Apellido paterno */}
+            <InfoItem 
+              icon={User} 
+              label="Apellido paterno" 
+              value={personal.apellido_paterno || 'No registrado'} 
+            />
+            {/* NUEVA FILA: Apellido materno */}
+            <InfoItem 
+              icon={User} 
+              label="Apellido materno" 
+              value={personal.apellido_materno || 'No registrado'} 
+            />
             <InfoItem 
               icon={Mail} 
               label="Correo electrónico" 

@@ -3,7 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import {
   User, Mail, Phone, Shield, Hash, Save, X,
   ChevronLeft, AlertCircle, CheckCircle, Loader,
-  AlertTriangle, Info,Lock 
+  AlertTriangle, Info, Lock, Clock,
+  BadgeCheck, Activity
 } from 'lucide-react';
 import personalService from '../../../services/admin/personal.service';
 import toast from 'react-hot-toast';
@@ -13,14 +14,9 @@ const corregirTexto = (texto) => {
   if (!texto) return '';
   
   const correcciones = {
-    // Minúsculas
     'Ã¡': 'á', 'Ã©': 'é', 'Ã­': 'í', 'Ã³': 'ó', 'Ãº': 'ú',
-    'Ã±': 'ñ', 'Â¿': '¿', 'Â¡': '¡',
-    
-    // Mayúsculas
     'Ã�': 'Á', 'Ã‰': 'É', 'Ã“': 'Ó', 'Ãš': 'Ú', 'Ã‘': 'Ñ',
-    
-    // Caracteres especiales comunes
+    'Ã±': 'ñ', 'Â¿': '¿', 'Â¡': '¡',
     '£': 'ú', '¤': 'ñ', '€': 'é', '‚': 'é', '¢': 'ó'
   };
   
@@ -32,25 +28,67 @@ const corregirTexto = (texto) => {
   return textoCorregido;
 };
 
+// Componente de barra de progreso - VERSIÓN SOBRIA
+const ProgressBar = ({ completed, total }) => {
+  const percentage = Math.min(100, Math.round((completed / total) * 100));
+  
+  return (
+    <div className="mb-6 bg-white rounded-xl p-4 shadow-sm border border-gray-200">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <Clock size={16} className="text-blue-600" />
+          <span className="text-xs font-medium text-gray-600">Progreso del formulario</span>
+        </div>
+        <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-1 rounded-full">
+          {percentage}%
+        </span>
+      </div>
+      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+        <div 
+          className="h-full bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full transition-all duration-500"
+          style={{ width: `${percentage}%` }}
+        />
+      </div>
+    </div>
+  );
+};
+
 const PersonalForm = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEditing = !!id;
+  const storageKey = isEditing ? `personal_form_edit_${id}` : 'personal_form_new';
 
   const [loading, setLoading] = useState(false);
   const [cargandoDatos, setCargandoDatos] = useState(isEditing);
-  const [formData, setFormData] = useState({
-    nombre: '',
-    email: '',
-    telefono: '',
-    placa: '',
-    rol: 'policia',
-    disponible: true,
-    activo: true
+  
+  // RECUPERAR DATOS GUARDADOS
+  const [formData, setFormData] = useState(() => {
+    const savedData = sessionStorage.getItem(storageKey);
+    if (savedData && !isEditing) {
+      try {
+        return JSON.parse(savedData);
+      } catch (e) {
+        console.error('Error parsing saved data:', e);
+      }
+    }
+    
+    return {
+      nombre: '',
+      apellido_paterno: '',
+      apellido_materno: '',
+      email: '',
+      telefono: '',
+      placa: '',
+      rol: 'policia',
+      disponible: true,
+      activo: true
+    };
   });
   
   const [errors, setErrors] = useState({
     nombre: '',
+    apellido_paterno: '',
     email: '',
     telefono: '',
     placa: '',
@@ -64,21 +102,35 @@ const PersonalForm = () => {
   });
   
   const [todosPersonales, setTodosPersonales] = useState([]);
+  const [touched, setTouched] = useState({});
   
   // Estados para control de clics en teléfono (solo en edición)
   const [telefonoClicks, setTelefonoClicks] = useState(0);
   const [telefonoBloqueado, setTelefonoBloqueado] = useState(isEditing);
   const [ultimoClickTelefono, setUltimoClickTelefono] = useState(0);
   
-  // Refs para enfocar campos con error
+  // Refs para enfoque
   const nombreRef = useRef(null);
+  const apellidoPaternoRef = useRef(null);
+  const apellidoMaternoRef = useRef(null);
   const emailRef = useRef(null);
   const telefonoRef = useRef(null);
   const placaRef = useRef(null);
   const rolRef = useRef(null);
 
-  // Timeout para resetear contador de clics
   const clickTimeoutRef = useRef(null);
+
+  // GUARDAR DATOS AUTOMÁTICAMENTE
+  useEffect(() => {
+    if (!isEditing && !cargandoDatos) {
+      sessionStorage.setItem(storageKey, JSON.stringify(formData));
+    }
+  }, [formData, isEditing, cargandoDatos]);
+
+  // Limpiar storage al enviar
+  const limpiarStorage = () => {
+    sessionStorage.removeItem(storageKey);
+  };
 
   // Cargar todos los personales al inicio
   useEffect(() => {
@@ -103,7 +155,9 @@ const PersonalForm = () => {
       const response = await personalService.listarPersonal({ limite: 1000 });
       const personalesCorregidos = (response.data || []).map(p => ({
         ...p,
-        nombre: corregirTexto(p.nombre)
+        nombre: corregirTexto(p.nombre),
+        apellido_paterno: corregirTexto(p.apellido_paterno),
+        apellido_materno: corregirTexto(p.apellido_materno)
       }));
       setTodosPersonales(personalesCorregidos);
     } catch (error) {
@@ -118,6 +172,8 @@ const PersonalForm = () => {
       
       setFormData({
         nombre: corregirTexto(response.data.nombre || ''),
+        apellido_paterno: corregirTexto(response.data.apellido_paterno || ''),
+        apellido_materno: corregirTexto(response.data.apellido_materno || ''),
         email: response.data.email || '',
         telefono: response.data.telefono || '',
         placa: response.data.placa || '',
@@ -134,19 +190,16 @@ const PersonalForm = () => {
     }
   };
 
-  // Manejador de clics para teléfono (solo en edición) - SIN TOASTS
+  // Manejador de clics para teléfono (solo en edición)
   const handleTelefonoClick = (e) => {
     if (!isEditing) return;
     
-    // Prevenir comportamiento por defecto
     e.preventDefault();
     
-    // Si ya está desbloqueado, no hacer nada
     if (!telefonoBloqueado) return;
     
     const ahora = Date.now();
     
-    // Resetear contador si pasaron más de 2 segundos
     if (ahora - ultimoClickTelefono > 2000) {
       setTelefonoClicks(1);
     } else {
@@ -154,24 +207,20 @@ const PersonalForm = () => {
     }
     setUltimoClickTelefono(ahora);
     
-    // Limpiar timeout anterior
     if (clickTimeoutRef.current) {
       clearTimeout(clickTimeoutRef.current);
     }
     
-    // Nuevo timeout para resetear contador después de 2 segundos
     clickTimeoutRef.current = setTimeout(() => {
       setTelefonoClicks(0);
     }, 2000);
     
-    // Si llega a 3 clics, desbloquear
     const nuevosClicks = (ahora - ultimoClickTelefono > 2000) ? 1 : telefonoClicks + 1;
     
     if (nuevosClicks >= 3) {
       setTelefonoBloqueado(false);
       setTelefonoClicks(0);
       
-      // Quitar readonly y enfocar
       setTimeout(() => {
         if (telefonoRef.current) {
           telefonoRef.current.removeAttribute('readOnly');
@@ -189,8 +238,16 @@ const PersonalForm = () => {
       case 'nombre':
         if (!value.trim()) {
           error = 'El nombre es obligatorio';
-        } else if (value.length < 3) {
-          error = 'El nombre debe tener al menos 3 caracteres';
+        } else if (value.length < 2) {
+          error = 'El nombre debe tener al menos 2 caracteres';
+        }
+        break;
+        
+      case 'apellido_paterno':
+        if (!value.trim()) {
+          error = 'El apellido paterno es obligatorio';
+        } else if (value.length < 2) {
+          error = 'El apellido paterno debe tener al menos 2 caracteres';
         }
         break;
         
@@ -261,39 +318,37 @@ const PersonalForm = () => {
     }));
   };
 
+  const handleBlur = (field) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
+  };
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     
-    // En modo edición, verificar si los campos están bloqueados
     if (isEditing) {
-      // Teléfono bloqueado?
       if (name === 'telefono' && telefonoBloqueado) {
-        return; // Simplemente no hacer nada
+        return;
       }
       
-      // Placa y email NO se pueden modificar en edición
-     if (name === 'placa' || name === 'email') {
-  toast.error('Este campo no se puede modificar', {
-    duration: 2000,
-    icon: <Lock size={18} className="text-yellow-500" /> 
-  });
-  return;
-}
+      if (name === 'placa' || name === 'email') {
+        toast.error('Este campo no se puede modificar', {
+          duration: 2000,
+          icon: <Lock size={18} className="text-yellow-600" /> 
+        });
+        return;
+      }
 
-// Rol no se puede modificar en edición
-if (name === 'rol') {
-  toast.error('El rol no se puede modificar', {
-    duration: 2000,
-    icon: <Lock size={18} className="text-yellow-500" /> 
-  });
-  return;
-}
+      if (name === 'rol') {
+        toast.error('El rol no se puede modificar', {
+          duration: 2000,
+          icon: <Lock size={18} className="text-yellow-600" /> 
+        });
+        return;
+      }
     }
     
-    // Limpiar errores del campo
     setErrors(prev => ({ ...prev, [name]: '' }));
     
-    // Procesar según el tipo de campo
     if (name === 'telefono') {
       const soloNumeros = value.replace(/\D/g, '');
       if (soloNumeros.length <= 10) {
@@ -304,14 +359,14 @@ if (name === 'rol') {
         verificarDuplicado(name, soloNumeros);
       }
     }
-    else if (name === 'nombre') {
+    else if (name === 'nombre' || name === 'apellido_paterno' || name === 'apellido_materno') {
       const valorLimpio = value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '');
-      setFormData(prev => ({ ...prev, nombre: valorLimpio }));
+      setFormData(prev => ({ ...prev, [name]: valorLimpio }));
       
       const error = validarCampo(name, valorLimpio);
       setErrors(prev => ({ ...prev, [name]: error }));
     }
-    else if (name === 'placa' && !isEditing) { // Solo en creación
+    else if (name === 'placa' && !isEditing) {
       const valorLimpio = value.replace(/[^a-zA-Z0-9\-]/g, '').toUpperCase();
       if (valorLimpio.length <= 10) {
         setFormData(prev => ({ ...prev, placa: valorLimpio }));
@@ -356,12 +411,21 @@ if (name === 'rol') {
     }
   };
 
+  // Calcular progreso del formulario
+  const calcularProgreso = () => {
+    const camposRequeridos = ['nombre', 'apellido_paterno', 'email', 'placa'];
+    const completados = camposRequeridos.filter(campo => 
+      formData[campo] && formData[campo].trim() !== ''
+    ).length;
+    return completados;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Validar todos los campos
     const newErrors = {
       nombre: validarCampo('nombre', formData.nombre),
+      apellido_paterno: validarCampo('apellido_paterno', formData.apellido_paterno),
       email: validarCampo('email', formData.email),
       telefono: validarCampo('telefono', formData.telefono),
       placa: validarCampo('placa', formData.placa),
@@ -370,11 +434,12 @@ if (name === 'rol') {
     
     setErrors(newErrors);
     
-    // Verificar si hay errores
     const hasErrors = Object.values(newErrors).some(error => error !== '');
     if (hasErrors) {
       if (newErrors.nombre) {
         nombreRef.current?.focus();
+      } else if (newErrors.apellido_paterno) {
+        apellidoPaternoRef.current?.focus();
       } else if (newErrors.email) {
         emailRef.current?.focus();
       } else if (newErrors.telefono) {
@@ -387,7 +452,6 @@ if (name === 'rol') {
       return;
     }
     
-    // Verificar duplicados
     if (duplicados.email?.existe && !isEditing) {
       toast.error(`El email ${formData.email} ya está registrado por ${duplicados.email.usuario}`);
       setErrors(prev => ({ ...prev, email: 'Email ya registrado' }));
@@ -414,6 +478,8 @@ if (name === 'rol') {
     try {
       const datosAEnviar = {
         nombre: formData.nombre,
+        apellido_paterno: formData.apellido_paterno,
+        apellido_materno: formData.apellido_materno || null,
         email: formData.email,
         telefono: formData.telefono,
         placa: formData.placa,
@@ -422,12 +488,15 @@ if (name === 'rol') {
         disponible: formData.disponible
       };
       
+      console.log("Enviando datos al back:", datosAEnviar);
+      
       if (isEditing) {
         await personalService.actualizarPersonal(id, datosAEnviar);
         toast.success('Personal actualizado correctamente');
       } else {
         await personalService.crearPersonal(datosAEnviar);
         toast.success('Personal creado correctamente');
+        limpiarStorage();
       }
       
       navigate('/admin/personal');
@@ -439,14 +508,13 @@ if (name === 'rol') {
     }
   };
 
-  // Función para obtener el color del borde
   const getBorderColor = (campo) => {
     if (errors[campo]) return 'border-red-300 bg-red-50';
     if (duplicados[campo]?.existe) return 'border-yellow-300 bg-yellow-50';
+    if (touched[campo] && formData[campo] && !errors[campo]) return 'border-green-300 bg-green-50';
     return 'border-gray-200';
   };
 
-  // Función para determinar si un campo está deshabilitado
   const isFieldDisabled = (campo) => {
     if (!isEditing) return false;
     
@@ -462,7 +530,6 @@ if (name === 'rol') {
     }
   };
 
-  // Mostrar indicador de clics restantes
   const getClicksRestantes = () => {
     if (!isEditing || !telefonoBloqueado) return null;
     const restantes = 3 - telefonoClicks;
@@ -489,7 +556,10 @@ if (name === 'rol') {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => navigate('/admin/personal')}
+              onClick={() => {
+                if (!isEditing) limpiarStorage();
+                navigate('/admin/personal');
+              }}
               className="p-2 hover:bg-white rounded-xl transition-colors"
             >
               <ChevronLeft size={20} className="text-gray-500" />
@@ -500,269 +570,378 @@ if (name === 'rol') {
               </h1>
               <p className="text-sm text-gray-500 mt-1">
                 {isEditing
-                  ? `Editando ID: ${id} - ${formData.nombre || '...'}`
+                  ? `Editando ID: ${id}`
                   : 'Ingresa los datos del nuevo miembro del equipo'}
               </p>
             </div>
           </div>
         </div>
 
+        {/* Barra de progreso */}
+        {!isEditing && (
+          <ProgressBar 
+            completed={calcularProgreso()} 
+            total={4} 
+          />
+        )}
+
         {/* Formulario */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Nombre */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Nombre completo <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <User size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                <input
-                  ref={nombreRef}
-                  type="text"
-                  name="nombre"
-                  value={formData.nombre}
-                  onChange={handleChange}
-                  className={`w-full pl-10 pr-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 transition-all ${getBorderColor('nombre')} focus:ring-blue-500 focus:border-blue-500`}
-                  placeholder="Ej: José Martínez"
-                  maxLength={100}
-                />
-              </div>
-              {errors.nombre && (
-                <p className="text-xs text-red-600 mt-2 flex items-center gap-1">
-                  <AlertCircle size={12} />
-                  {errors.nombre}
-                </p>
-              )}
-            </div>
-
-            {/* Email */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Correo electrónico <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <Mail size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                <input
-                  ref={emailRef}
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  disabled={isFieldDisabled('email')}
-                  className={`w-full pl-10 pr-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 transition-all ${getBorderColor('email')} ${isFieldDisabled('email') ? 'bg-gray-100 cursor-not-allowed' : ''} focus:ring-blue-500 focus:border-blue-500`}
-                  placeholder="ejemplo@correo.com"
-                />
-              </div>
-              {errors.email && (
-                <p className="text-xs text-red-600 mt-2 flex items-center gap-1">
-                  <AlertCircle size={12} />
-                  {errors.email}
-                </p>
-              )}
-              {duplicados.email?.existe && !errors.email && (
-                <p className="text-xs text-yellow-600 mt-2 flex items-center gap-1">
-                  <AlertTriangle size={12} />
-                   Este email ya está registrado por {duplicados.email.usuario}
-                </p>
-              )}
-              {isEditing && (
-                <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
-                  <Info size={12} />
-                  El email no se puede modificar
-                </p>
-              )}
-            </div>
-
-            {/* Teléfono */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Teléfono
-                {isEditing && telefonoBloqueado && (
-                  <span className="ml-2 text-xs text-amber-600 font-normal">
-                    ( {getClicksRestantes()})
+        <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-200">
+          {/* Cabecera decorativa - SOBRIA */}
+          <div className="h-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-600"></div>
+          
+          <form onSubmit={handleSubmit} className="p-6 md:p-8">
+            <div className="space-y-8">
+              {/* SECCIÓN 1: Información personal */}
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="p-2 bg-gray-100 rounded-lg">
+                    <User size={18} className="text-gray-700" />
+                  </div>
+                  <h2 className="text-sm font-semibold text-gray-700">Información personal</h2>
+                  <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full ml-auto">
+                    Datos básicos
                   </span>
-                )}
-              </label>
-              <div className="relative">
-                <Phone size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                <input
-                  ref={telefonoRef}
-                  type="tel"
-                  name="telefono"
-                  value={formData.telefono}
-                  onClick={handleTelefonoClick}
-                  onChange={handleChange}
-                  readOnly={isFieldDisabled('telefono')}
-                  className={`w-full pl-10 pr-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 transition-all ${getBorderColor('telefono')} ${isFieldDisabled('telefono') ? 'bg-gray-50 cursor-pointer select-none' : ''} focus:ring-blue-500 focus:border-blue-500`}
-                  placeholder="2384587196"
-                  maxLength={10}
-                />
-              </div>
-              {errors.telefono && (
-                <p className="text-xs text-red-600 mt-2 flex items-center gap-1">
-                  <AlertCircle size={12} />
-                  {errors.telefono}
-                </p>
-              )}
-              {duplicados.telefono?.existe && !errors.telefono && formData.telefono.length === 10 && (
-                <p className="text-xs text-yellow-600 mt-2 flex items-center gap-1">
-                  <AlertTriangle size={12} />
-                  Este teléfono ya está registrado por {duplicados.telefono.usuario}
-                </p>
-              )}
-              {formData.telefono && formData.telefono.length < 10 && (
-                <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
-                  <AlertCircle size={12} />
-                  Faltan {10 - formData.telefono.length} dígitos
-                </p>
-              )}
-              {isEditing && telefonoBloqueado && (
-                <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
-                  <Info size={12} />
-                  Haz 3 clics rápidos para desbloquear ({3 - telefonoClicks} restantes)
-                </p>
-              )}
-            </div>
-
-            {/* Placa */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Placa <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <Hash size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                <input
-                  ref={placaRef}
-                  type="text"
-                  name="placa"
-                  value={formData.placa}
-                  onChange={handleChange}
-                  disabled={isFieldDisabled('placa')}
-                  className={`w-full pl-10 pr-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 transition-all uppercase ${getBorderColor('placa')} ${isFieldDisabled('placa') ? 'bg-gray-100 cursor-not-allowed' : ''} focus:ring-blue-500 focus:border-blue-500`}
-                  placeholder="P-001"
-                  maxLength={10}
-                />
-              </div>
-              {errors.placa && (
-                <p className="text-xs text-red-600 mt-2 flex items-center gap-1">
-                  <AlertCircle size={12} />
-                  {errors.placa}
-                </p>
-              )}
-              {duplicados.placa?.existe && !errors.placa && (
-                <p className="text-xs text-yellow-600 mt-2 flex items-center gap-1">
-                  <AlertTriangle size={12} />
-                  Esta placa ya está registrada por {duplicados.placa.usuario}
-                </p>
-              )}
-              {isEditing && (
-                <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
-                  <Info size={12} />
-                  La placa no se puede modificar
-                </p>
-              )}
-            </div>
-
-            {/* Rol*/}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Rol <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <Shield size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                <select
-                  ref={rolRef}
-                  name="rol"
-                  value={formData.rol}
-                  onChange={handleChange}
-                  disabled={isEditing}
-                  className={`w-full pl-10 pr-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 transition-all appearance-none ${getBorderColor('rol')} ${isEditing ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'} focus:ring-blue-500 focus:border-blue-500`}
-                >
-                  <option value="policia">Policía</option>
-                  <option value="ambulancia">Ambulancia</option>
-                  <option value="admin">Administrador</option>
-                  <option value="superadmin">Super Admin</option>
-                </select>
-              </div>
-              {isEditing && (
-                <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
-                  <Info size={12} />
-                  El rol no se puede modificar en edición
-                </p>
-              )}
-            </div>
-
-            {/* Checkboxes */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
-              <label className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all cursor-pointer ${
-                formData.activo
-                  ? 'border-blue-200 bg-blue-50 hover:bg-blue-100'
-                  : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
-              }`}>
-                <input
-                  type="checkbox"
-                  name="activo"
-                  checked={formData.activo}
-                  onChange={handleChange}
-                  className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
-                />
-                <div>
-                  <p className="text-sm font-semibold text-gray-700">Usuario activo</p>
-                  <p className="text-xs text-gray-500">
-                    {formData.activo ? 'Puede iniciar sesión' : 'No puede iniciar sesión'}
-                  </p>
                 </div>
-              </label>
 
-              <label className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all cursor-pointer ${
-                !formData.activo
-                  ? 'border-gray-200 bg-gray-100 opacity-50 cursor-not-allowed'
-                  : formData.disponible
-                    ? 'border-green-200 bg-green-50 hover:bg-green-100'
-                    : 'border-yellow-200 bg-yellow-50 hover:bg-yellow-100'
-              }`}>
-                <input
-                  type="checkbox"
-                  name="disponible"
-                  checked={formData.disponible}
-                  onChange={handleChange}
-                  disabled={!formData.activo}
-                  className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
-                />
-                <div>
-                  <p className="text-sm font-semibold text-gray-700">Disponible</p>
-                  <p className="text-xs text-gray-500">
-                    {!formData.activo 
-                      ? 'No disponible (usuario inactivo)'
-                      : formData.disponible 
-                        ? 'Puede recibir alertas' 
-                        : 'Ocupado - No recibe alertas'}
-                  </p>
-                </div>
-              </label>
-            </div>
-            
-            {/* Mensaje informativo */}
-            {!formData.activo && (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                <div className="flex items-start gap-3">
-                  <AlertCircle size={20} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Nombre */}
                   <div>
-                    <p className="text-sm font-semibold text-amber-800">Usuario inactivo</p>
-                    <p className="text-xs text-amber-600 mt-1">
-                      Un usuario inactivo no puede estar disponible ni recibir alertas
-                    </p>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                      Nombre(s) <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <User size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                      <input
+                        ref={nombreRef}
+                        type="text"
+                        name="nombre"
+                        value={formData.nombre}
+                        onChange={handleChange}
+                        onBlur={() => handleBlur('nombre')}
+                        className={`w-full pl-10 pr-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 transition-all ${getBorderColor('nombre')} focus:ring-blue-500 focus:border-blue-500`}
+                        placeholder="Ej: José"
+                        maxLength={50}
+                      />
+                    </div>
+                    {errors.nombre && (
+                      <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                        <AlertCircle size={12} />
+                        {errors.nombre}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Apellido Paterno */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                      Apellido paterno <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <User size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                      <input
+                        ref={apellidoPaternoRef}
+                        type="text"
+                        name="apellido_paterno"
+                        value={formData.apellido_paterno}
+                        onChange={handleChange}
+                        onBlur={() => handleBlur('apellido_paterno')}
+                        className={`w-full pl-10 pr-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 transition-all ${getBorderColor('apellido_paterno')} focus:ring-blue-500 focus:border-blue-500`}
+                        placeholder="Ej: Martínez"
+                        maxLength={50}
+                      />
+                    </div>
+                    {errors.apellido_paterno && (
+                      <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                        <AlertCircle size={12} />
+                        {errors.apellido_paterno}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Apellido Materno */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                      Apellido materno
+                    </label>
+                    <div className="relative">
+                      <User size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                      <input
+                        ref={apellidoMaternoRef}
+                        type="text"
+                        name="apellido_materno"
+                        value={formData.apellido_materno}
+                        onChange={handleChange}
+                        className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                        placeholder="Ej: García (opcional)"
+                        maxLength={50}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
-            )}
+
+              {/* SECCIÓN 2: Contacto */}
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="p-2 bg-gray-100 rounded-lg">
+                    <Mail size={18} className="text-gray-700" />
+                  </div>
+                  <h2 className="text-sm font-semibold text-gray-700">Contacto</h2>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Email */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                      Correo electrónico <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Mail size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                      <input
+                        ref={emailRef}
+                        type="email"
+                        name="email"
+                        value={formData.email}
+                        onChange={handleChange}
+                        onBlur={() => handleBlur('email')}
+                        disabled={isFieldDisabled('email')}
+                        className={`w-full pl-10 pr-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 transition-all ${getBorderColor('email')} ${isFieldDisabled('email') ? 'bg-gray-100 cursor-not-allowed' : ''} focus:ring-blue-500 focus:border-blue-500`}
+                        placeholder="ejemplo@correo.com"
+                      />
+                    </div>
+                    {errors.email && (
+                      <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                        <AlertCircle size={12} />
+                        {errors.email}
+                      </p>
+                    )}
+                    {duplicados.email?.existe && !errors.email && (
+                      <p className="text-xs text-yellow-600 mt-1 flex items-center gap-1">
+                        <AlertTriangle size={12} />
+                        Registrado por {duplicados.email.usuario}
+                      </p>
+                    )}
+                    {isEditing && (
+                      <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                        <Info size={12} />
+                        No se puede modificar
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Teléfono */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                      Teléfono
+                      {isEditing && telefonoBloqueado && (
+                        <span className="ml-2 text-amber-600 font-normal">
+                          ({getClicksRestantes()})
+                        </span>
+                      )}
+                    </label>
+                    <div className="relative">
+                      <Phone size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                      <input
+                        ref={telefonoRef}
+                        type="tel"
+                        name="telefono"
+                        value={formData.telefono}
+                        onClick={handleTelefonoClick}
+                        onChange={handleChange}
+                        onBlur={() => handleBlur('telefono')}
+                        readOnly={isFieldDisabled('telefono')}
+                        className={`w-full pl-10 pr-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 transition-all ${getBorderColor('telefono')} ${isFieldDisabled('telefono') ? 'bg-gray-50 cursor-pointer select-none' : ''} focus:ring-blue-500 focus:border-blue-500`}
+                        placeholder="2384587196"
+                        maxLength={10}
+                      />
+                    </div>
+                    {errors.telefono && (
+                      <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                        <AlertCircle size={12} />
+                        {errors.telefono}
+                      </p>
+                    )}
+                    {duplicados.telefono?.existe && !errors.telefono && formData.telefono.length === 10 && (
+                      <p className="text-xs text-yellow-600 mt-1 flex items-center gap-1">
+                        <AlertTriangle size={12} />
+                        Registrado por {duplicados.telefono.usuario}
+                      </p>
+                    )}
+                    {formData.telefono && formData.telefono.length < 10 && (
+                      <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                        <AlertCircle size={12} />
+                        Faltan {10 - formData.telefono.length} dígitos
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* SECCIÓN 3: Identificación */}
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="p-2 bg-gray-100 rounded-lg">
+                    <BadgeCheck size={18} className="text-gray-700" />
+                  </div>
+                  <h2 className="text-sm font-semibold text-gray-700">Identificación</h2>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Placa */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                      Placa <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Hash size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                      <input
+                        ref={placaRef}
+                        type="text"
+                        name="placa"
+                        value={formData.placa}
+                        onChange={handleChange}
+                        onBlur={() => handleBlur('placa')}
+                        disabled={isFieldDisabled('placa')}
+                        className={`w-full pl-10 pr-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 transition-all uppercase ${getBorderColor('placa')} ${isFieldDisabled('placa') ? 'bg-gray-100 cursor-not-allowed' : ''} focus:ring-blue-500 focus:border-blue-500`}
+                        placeholder="P-001"
+                        maxLength={10}
+                      />
+                    </div>
+                    {errors.placa && (
+                      <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                        <AlertCircle size={12} />
+                        {errors.placa}
+                      </p>
+                    )}
+                    {duplicados.placa?.existe && !errors.placa && (
+                      <p className="text-xs text-yellow-600 mt-1 flex items-center gap-1">
+                        <AlertTriangle size={12} />
+                        Registrada por {duplicados.placa.usuario}
+                      </p>
+                    )}
+                    {isEditing && (
+                      <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                        <Info size={12} />
+                        No se puede modificar
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Rol */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                      Rol <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Shield size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                      <select
+                        ref={rolRef}
+                        name="rol"
+                        value={formData.rol}
+                        onChange={handleChange}
+                        disabled={isEditing}
+                        className={`w-full pl-10 pr-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 transition-all appearance-none ${getBorderColor('rol')} ${isEditing ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'} focus:ring-blue-500 focus:border-blue-500`}
+                      >
+                        <option value="policia">Policía</option>
+                        <option value="ambulancia">Ambulancia</option>
+                        <option value="admin">Administrador</option>
+                        <option value="superadmin">Super Admin</option>
+                      </select>
+                    </div>
+                    {isEditing && (
+                      <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                        <Info size={12} />
+                        No se puede modificar
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* SECCIÓN 4: Estado */}
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="p-2 bg-gray-100 rounded-lg">
+                    <Activity size={18} className="text-gray-700" />
+                  </div>
+                  <h2 className="text-sm font-semibold text-gray-700">Estado</h2>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <label className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all cursor-pointer ${
+                    formData.activo
+                      ? 'border-blue-200 bg-blue-50 hover:bg-blue-100'
+                      : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
+                  }`}>
+                    <input
+                      type="checkbox"
+                      name="activo"
+                      checked={formData.activo}
+                      onChange={handleChange}
+                      className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+                    />
+                    <div>
+                      <p className="text-sm font-semibold text-gray-700">Usuario activo</p>
+                      <p className="text-xs text-gray-500">
+                        {formData.activo ? 'Puede iniciar sesión' : 'No puede iniciar sesión'}
+                      </p>
+                    </div>
+                  </label>
+
+                  <label className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all cursor-pointer ${
+                    !formData.activo
+                      ? 'border-gray-200 bg-gray-100 opacity-50 cursor-not-allowed'
+                      : formData.disponible
+                        ? 'border-blue-200 bg-blue-50 hover:bg-blue-100'
+                        : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
+                  }`}>
+                    <input
+                      type="checkbox"
+                      name="disponible"
+                      checked={formData.disponible}
+                      onChange={handleChange}
+                      disabled={!formData.activo}
+                      className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+                    />
+                    <div>
+                      <p className="text-sm font-semibold text-gray-700">Disponible</p>
+                      <p className="text-xs text-gray-500">
+                        {!formData.activo 
+                          ? 'No disponible'
+                          : formData.disponible 
+                            ? 'Puede recibir alertas' 
+                            : 'Ocupado'}
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Mensaje informativo */}
+              {!formData.activo && (
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                  <div className="flex items-start gap-3">
+                    <Info size={20} className="text-blue-600 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-semibold text-gray-700">Usuario inactivo</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Los usuarios inactivos no pueden estar disponibles ni recibir alertas.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Botones */}
-            <div className="flex justify-end gap-3 pt-6 border-t border-gray-200">
+            <div className="flex justify-end gap-3 pt-8 mt-8 border-t border-gray-200">
               <button
                 type="button"
-                onClick={() => navigate('/admin/personal')}
+                onClick={() => {
+                  if (!isEditing) limpiarStorage();
+                  navigate('/admin/personal');
+                }}
                 className="px-6 py-3 border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-all flex items-center gap-2 text-sm font-medium"
               >
                 <X size={18} />
@@ -771,7 +950,7 @@ if (name === 'rol') {
               <button
                 type="submit"
                 disabled={loading}
-                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all flex items-center gap-2 text-sm font-medium disabled:opacity-50 shadow-lg shadow-blue-200"
+                className="px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all disabled:opacity-50 flex items-center gap-2 text-sm font-medium shadow-lg shadow-blue-200"
               >
                 {loading ? (
                   <Loader size={18} className="animate-spin" />
@@ -783,6 +962,14 @@ if (name === 'rol') {
             </div>
           </form>
         </div>
+
+        {/* Indicador de guardado automático */}
+        {!isEditing && formData.nombre && (
+          <div className="mt-4 flex items-center justify-end gap-2 text-xs text-gray-400">
+            <Clock size={12} className="animate-pulse" />
+            <span>Guardado automático • Los datos se conservan si cierras la página</span>
+          </div>
+        )}
       </div>
     </div>
   );

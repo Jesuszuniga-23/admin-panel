@@ -1,17 +1,45 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  Truck, MapPin, Save, X, ChevronLeft,
+  Truck, Save, X, ChevronLeft,
   Loader, Shield, Ambulance, Hash, FileText, Info,
-  AlertCircle, CheckCircle
+  AlertCircle, CheckCircle, XCircle, Clock,
+  Power, MapPin, BookOpen, Wrench,
+  Layers, Activity
 } from 'lucide-react';
 import unidadService from '../../../services/admin/unidad.service';
 import toast from 'react-hot-toast';
+
+// Componente de barra de progreso - VERSIÓN SOBRIA
+const ProgressBar = ({ completed, total }) => {
+  const percentage = Math.min(100, Math.round((completed / total) * 100));
+  
+  return (
+    <div className="mb-6 bg-white rounded-xl p-4 shadow-sm border border-gray-200">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <Clock size={16} className="text-blue-600" />
+          <span className="text-xs font-medium text-gray-600">Progreso del formulario</span>
+        </div>
+        <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-1 rounded-full">
+          {percentage}%
+        </span>
+      </div>
+      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+        <div 
+          className="h-full bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full transition-all duration-500"
+          style={{ width: `${percentage}%` }}
+        />
+      </div>
+    </div>
+  );
+};
 
 const UnidadForm = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEditing = !!id;
+  const storageKey = isEditing ? `unidad_form_edit_${id}` : 'unidad_form_new';
 
   const [loading, setLoading] = useState(false);
   const [cargandoDatos, setCargandoDatos] = useState(isEditing);
@@ -19,25 +47,47 @@ const UnidadForm = () => {
   const [verificandoCodigo, setVerificandoCodigo] = useState(false);
   const [codigoValido, setCodigoValido] = useState(true);
   const [codigoMensaje, setCodigoMensaje] = useState('');
+  const [touched, setTouched] = useState({});
 
-  const [formData, setFormData] = useState({
-    codigo: '',
-    tipo: 'policia',
-    descripcion: '',
-    lat: '',
-    lng: '',
-    estado: 'disponible',
-    activa: true
+  // RECUPERAR DATOS GUARDADOS
+  const [formData, setFormData] = useState(() => {
+    const savedData = sessionStorage.getItem(storageKey);
+    if (savedData && !isEditing) {
+      try {
+        return JSON.parse(savedData);
+      } catch (e) {
+        console.error('Error parsing saved data:', e);
+      }
+    }
+    
+    return {
+      codigo: '',
+      tipo: 'policia',
+      descripcion: '',
+      estado: 'disponible',
+      activa: true
+    };
   });
 
   // Refs para enfoque
   const codigoRef = useRef();
   const tipoRef = useRef();
-  const latRef = useRef();
-  const lngRef = useRef();
+  const descripcionRef = useRef();
 
   // Timeout para debounce de validación
   const debounceTimeout = useRef(null);
+
+  // GUARDAR DATOS AUTOMÁTICAMENTE
+  useEffect(() => {
+    if (!isEditing && !cargandoDatos) {
+      sessionStorage.setItem(storageKey, JSON.stringify(formData));
+    }
+  }, [formData, isEditing, cargandoDatos]);
+
+  // Limpiar storage al enviar
+  const limpiarStorage = () => {
+    sessionStorage.removeItem(storageKey);
+  };
 
   // Cargar datos si es edición
   useEffect(() => {
@@ -57,8 +107,6 @@ const UnidadForm = () => {
         codigo: response.data.codigo || '',
         tipo: response.data.tipo || 'policia',
         descripcion: response.data.descripcion || '',
-        lat: response.data.lat || '',
-        lng: response.data.lng || '',
         estado: response.data.estado || 'disponible',
         activa: response.data.activa ?? true
       });
@@ -71,8 +119,7 @@ const UnidadForm = () => {
     }
   };
 
-  // VALIDAR CÓDIGO ÚNICO EN TIEMPO REAL 
-
+  // VALIDAR CÓDIGO ÚNICO EN TIEMPO REAL
   const validarCodigoUnico = async (codigo) => {
     if (!codigo || codigo.length < 3) {
       setCodigoValido(false);
@@ -82,11 +129,17 @@ const UnidadForm = () => {
 
     try {
       setVerificandoCodigo(true);
-      // Llamar al backend para verificar si el código existe
-      const response = await unidadService.listarUnidades({ search: codigo, limite: 1 });
+      
+      const response = await unidadService.listarUnidades({ 
+        search: codigo,
+        limite: 1000
+      });
 
-      const existe = response.data?.some(u =>
-        u.codigo.toLowerCase() === codigo.toLowerCase()
+      console.log('Respuesta validación código:', response);
+
+      const existe = response.data?.some(u => 
+        u.codigo?.toLowerCase() === codigo.toLowerCase() && 
+        (isEditing ? u.id !== parseInt(id) : true)
       );
 
       if (existe) {
@@ -110,31 +163,41 @@ const UnidadForm = () => {
       console.error('Error verificando código:', error);
       setCodigoValido(false);
       setCodigoMensaje('Error al verificar código');
+      
+      if (error.response?.status === 500) {
+        toast.error('Error en el servidor al verificar código');
+      } else {
+        toast.error(error.error || 'Error al verificar código');
+      }
     } finally {
       setVerificandoCodigo(false);
     }
   };
 
+  const handleBlur = (field) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
+  };
+
+  const calcularProgreso = () => {
+    let completados = 0;
+    if (formData.codigo && formData.codigo.length >= 3) completados++;
+    if (formData.tipo) completados++;
+    if (formData.estado) completados++;
+    return completados;
+  };
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
 
-    // Para coordenadas, solo permitir números y punto
-    if (name === 'lat' || name === 'lng') {
-      const valorLimpio = value.replace(/[^0-9.-]/g, '');
-      setFormData(prev => ({ ...prev, [name]: valorLimpio }));
-    }
-    // Para código - validar en tiempo real (solo en creación)
-    else if (name === 'codigo') {
+    if (name === 'codigo') {
       const valorLimpio = value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
       setFormData(prev => ({ ...prev, codigo: valorLimpio }));
 
       if (!isEditing) {
-        // Limpiar timeout anterior
         if (debounceTimeout.current) {
           clearTimeout(debounceTimeout.current);
         }
 
-        // Nuevo timeout para validar después de 500ms
         debounceTimeout.current = setTimeout(() => {
           if (valorLimpio.length >= 3) {
             validarCodigoUnico(valorLimpio);
@@ -145,23 +208,18 @@ const UnidadForm = () => {
         }, 500);
       }
     }
-    // Si cambia el estado
     else if (name === 'estado') {
-      // Estado disponible → activa true
-      // Estado inactiva → activa false
-      // Estado ocupada NO está disponible en el formulario
       setFormData(prev => ({
         ...prev,
         estado: value,
-        activa: value !== 'inactiva' // disponible = true, inactiva = false
+        activa: value !== 'inactiva'
       }));
     }
-    // Si cambia activa (checkbox)
     else if (name === 'activa') {
       setFormData(prev => ({
         ...prev,
         activa: checked,
-        estado: checked ? 'disponible' : 'inactiva' // Si activa, poner disponible
+        estado: checked ? 'disponible' : 'inactiva'
       }));
     }
     else {
@@ -177,11 +235,6 @@ const UnidadForm = () => {
     setLoading(true);
 
     try {
-      
-      // VALIDACIONES ANTES DE ENVIAR
-      
-
-      // Validar código único (solo en creación)
       if (!isEditing && !codigoValido) {
         toast.error('El código no está disponible o es inválido');
         setCampoError('codigo');
@@ -190,9 +243,8 @@ const UnidadForm = () => {
         return;
       }
 
-      // Validar que el estado no sea ocupada
       if (formData.estado === 'ocupada') {
-        toast.error('No se puede crear/editar una unidad con estado OCUPADA. Este estado es solo para alertas activas.');
+        toast.error('No se puede crear/editar una unidad con estado OCUPADA');
         setCampoError('estado');
         setLoading(false);
         return;
@@ -202,13 +254,11 @@ const UnidadForm = () => {
         codigo: formData.codigo,
         tipo: formData.tipo,
         descripcion: formData.descripcion || '',
-        lat: formData.lat ? parseFloat(formData.lat) : null,
-        lng: formData.lng ? parseFloat(formData.lng) : null,
         estado: formData.estado,
         activa: formData.activa
       };
 
-      console.log(" Enviando datos:", datosAEnviar);
+      console.log("Enviando datos:", datosAEnviar);
 
       if (isEditing) {
         await unidadService.actualizarUnidad(id, datosAEnviar);
@@ -216,301 +266,337 @@ const UnidadForm = () => {
       } else {
         await unidadService.crearUnidad(datosAEnviar);
         toast.success('Unidad creada correctamente');
+        limpiarStorage();
       }
 
       navigate('/admin/unidades');
     } catch (error) {
       console.error('Error guardando unidad:', error);
-
-      const mensajeError = error.error || error.message || '';
-      toast.error(mensajeError || 'Error al guardar');
-
-      // Enfocar según el error
-      if (mensajeError.includes('código') || mensajeError.includes('codigo')) {
+      toast.error(error.error || error.message || 'Error al guardar');
+      
+      if (error.message?.includes('código') || error.error?.includes('código')) {
         setCampoError('codigo');
         codigoRef.current?.focus();
-      } else if (mensajeError.includes('tipo')) {
+      } else if (error.message?.includes('tipo') || error.error?.includes('tipo')) {
         setCampoError('tipo');
         tipoRef.current?.focus();
-      } else if (mensajeError.includes('lat')) {
-        setCampoError('lat');
-        latRef.current?.focus();
-      } else if (mensajeError.includes('lng')) {
-        setCampoError('lng');
-        lngRef.current?.focus();
       }
-
+      
       setTimeout(() => setCampoError(''), 3000);
     } finally {
       setLoading(false);
     }
   };
 
+  const getBorderColor = (campo) => {
+    if (campoError === campo) return 'border-red-300 bg-red-50';
+    if (campo === 'codigo' && !isEditing && touched.codigo && formData.codigo && formData.codigo.length >= 3) {
+      return codigoValido ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50';
+    }
+    return 'border-gray-200';
+  };
+
   if (cargandoDatos) {
     return (
-      <div className="p-6 max-w-3xl mx-auto">
-        <div className="bg-white rounded-xl shadow p-8 text-center">
-          <Loader size={32} className="animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-500">Cargando datos de la unidad...</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 sm:p-6 md:p-8">
+        <div className="max-w-3xl mx-auto">
+          <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
+            <Loader size={40} className="animate-spin text-blue-600 mx-auto mb-4" />
+            <p className="text-gray-500">Cargando datos de la unidad...</p>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => navigate('/admin/unidades')}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <ChevronLeft size={20} className="text-gray-500" />
-          </button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800">
-              {isEditing ? 'Editar Unidad' : 'Nueva Unidad'}
-            </h1>
-            <p className="text-sm text-gray-500 mt-1">
-              {isEditing
-                ? `Editando unidad: ${formData.codigo}`
-                : 'Ingresa los datos de la nueva unidad'}
-            </p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 sm:p-6 md:p-8">
+      <div className="max-w-3xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => {
+                if (!isEditing) limpiarStorage();
+                navigate('/admin/unidades');
+              }}
+              className="p-2 hover:bg-white rounded-xl transition-colors"
+            >
+              <ChevronLeft size={20} className="text-gray-500" />
+            </button>
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
+                {isEditing ? 'Editar Unidad' : 'Nueva Unidad'}
+              </h1>
+              <p className="text-sm text-gray-500 mt-1">
+                {isEditing
+                  ? `Editando unidad: ${formData.codigo}`
+                  : 'Ingresa los datos de la nueva unidad'}
+              </p>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Formulario */}
-      <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow p-6">
-        <div className="space-y-6">
-          {/* Código - SOLO LECTURA EN EDICIÓN */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Código de unidad <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <Hash size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-              <input
-                ref={codigoRef}
-                type="text"
-                name="codigo"
-                value={formData.codigo}
-                onChange={handleChange}
-                readOnly={isEditing} // ← BLOQUEADO EN EDICIÓN
-                required
-                className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${campoError === 'codigo'
-                    ? 'border-red-500 bg-red-50 focus:ring-red-500'
-                    : isEditing
-                      ? 'bg-gray-100 border-gray-200 cursor-not-allowed'
-                      : 'border-gray-200 focus:ring-blue-500'
-                  }`}
-                placeholder="Ej: UNI-001"
-              />
-            </div>
+        {/* Barra de progreso (solo para creación) */}
+        {!isEditing && (
+          <ProgressBar 
+            completed={calcularProgreso()} 
+            total={3} 
+          />
+        )}
 
-            {/* Indicador de validación de código (solo en creación) */}
-            {!isEditing && formData.codigo && formData.codigo.length >= 3 && (
-              <div className="mt-2 flex items-center gap-1 text-xs">
-                {verificandoCodigo ? (
-                  <>
-                    <Loader size={12} className="animate-spin text-blue-600" />
-                    <span className="text-gray-500">Verificando disponibilidad...</span>
-                  </>
-                ) : (
-                  <>
-                    {codigoValido ? (
-                      <CheckCircle size={12} className="text-green-600" />
-                    ) : (
-                      <AlertCircle size={12} className="text-red-600" />
+        {/* Formulario */}
+        <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-200">
+          {/* Cabecera decorativa - COLORES SOBRIOS */}
+          <div className="h-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-600"></div>
+          
+          <form onSubmit={handleSubmit} className="p-6 md:p-8">
+            <div className="space-y-8">
+              {/* SECCIÓN 1: Identificación */}
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="p-2 bg-gray-100 rounded-lg">
+                    <Truck size={18} className="text-gray-700" />
+                  </div>
+                  <h2 className="text-sm font-semibold text-gray-700">Identificación de la unidad</h2>
+                  <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full ml-auto">
+                    Datos principales
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Código */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                      Código de unidad <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Hash size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                      <input
+                        ref={codigoRef}
+                        type="text"
+                        name="codigo"
+                        value={formData.codigo}
+                        onChange={handleChange}
+                        onBlur={() => handleBlur('codigo')}
+                        readOnly={isEditing}
+                        required
+                        className={`w-full pl-10 pr-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 transition-all ${
+                          getBorderColor('codigo')
+                        } ${
+                          isEditing
+                            ? 'bg-gray-100 cursor-not-allowed'
+                            : 'focus:ring-blue-500 focus:border-blue-500'
+                        }`}
+                        placeholder="Ej: UNI-001"
+                      />
+                    </div>
+
+                    {/* Indicador de validación de código */}
+                    {!isEditing && formData.codigo && formData.codigo.length >= 3 && (
+                      <div className="mt-2 flex items-center gap-1 text-xs">
+                        {verificandoCodigo ? (
+                          <>
+                            <Loader size={12} className="animate-spin text-blue-600" />
+                            <span className="text-gray-500">Verificando disponibilidad...</span>
+                          </>
+                        ) : (
+                          <>
+                            {codigoValido ? (
+                              <CheckCircle size={12} className="text-green-600" />
+                            ) : (
+                              <AlertCircle size={12} className="text-red-600" />
+                            )}
+                            <span className={codigoValido ? 'text-green-600' : 'text-red-600'}>
+                              {codigoMensaje}
+                            </span>
+                          </>
+                        )}
+                      </div>
                     )}
-                    <span className={codigoValido ? 'text-green-600' : 'text-red-600'}>
-                      {codigoMensaje}
-                    </span>
-                  </>
+
+                    {isEditing && (
+                      <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
+                        <Info size={12} />
+                        El código no se puede modificar
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Tipo */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                      Tipo de unidad <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      {formData.tipo === 'policia' ? (
+                        <Shield size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                      ) : (
+                        <Ambulance size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                      )}
+                      <select
+                        ref={tipoRef}
+                        name="tipo"
+                        value={formData.tipo}
+                        onChange={handleChange}
+                        disabled={isEditing}
+                        required
+                        className={`w-full pl-10 pr-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 transition-all appearance-none ${
+                          campoError === 'tipo'
+                            ? 'border-red-300 bg-red-50 focus:ring-red-500'
+                            : isEditing
+                              ? 'bg-gray-100 border-gray-200 cursor-not-allowed'
+                              : 'border-gray-200 focus:ring-blue-500 focus:border-blue-500 bg-white'
+                        }`}
+                      >
+                        <option value="policia">Policía</option>
+                        <option value="ambulancia">Ambulancia</option>
+                      </select>
+                    </div>
+                    {isEditing && (
+                      <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
+                        <Info size={12} />
+                        El tipo no se puede modificar
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* SECCIÓN 2: Descripción */}
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="p-2 bg-gray-100 rounded-lg">
+                    <FileText size={18} className="text-gray-700" />
+                  </div>
+                  <h2 className="text-sm font-semibold text-gray-700">Descripción</h2>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">
+                    Descripción adicional
+                  </label>
+                  <div className="relative">
+                    <BookOpen size={16} className="absolute left-3 top-3 text-gray-400" />
+                    <textarea
+                      ref={descripcionRef}
+                      name="descripcion"
+                      value={formData.descripcion}
+                      onChange={handleChange}
+                      rows="3"
+                      className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                      placeholder="Descripción adicional de la unidad (opcional)"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* SECCIÓN 3: Estado operativo */}
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="p-2 bg-gray-100 rounded-lg">
+                    <Activity size={18} className="text-gray-700" />
+                  </div>
+                  <h2 className="text-sm font-semibold text-gray-700">Estado operativo</h2>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Estado inicial */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                      Estado inicial
+                    </label>
+                    <select
+                      name="estado"
+                      value={formData.estado}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white"
+                    >
+                      <option value="disponible">Disponible</option>
+                      <option value="inactiva">Inactiva</option>
+                    </select>
+                    <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
+                      <Info size={12} />
+                      "Ocupada" se asigna automáticamente durante una alerta
+                    </p>
+                  </div>
+
+                  {/* Checkbox activa */}
+                  <div className="flex items-center pt-8">
+                    <label className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all cursor-pointer w-full ${
+                      formData.activa
+                        ? 'border-blue-200 bg-blue-50 hover:bg-blue-100'
+                        : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
+                    }`}>
+                      <input
+                        type="checkbox"
+                        name="activa"
+                        checked={formData.activa}
+                        onChange={handleChange}
+                        className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+                      />
+                      <div>
+                        <p className="text-sm font-semibold text-gray-700">Unidad activa</p>
+                        <p className="text-xs text-gray-500">
+                          {formData.activa ? 'Puede recibir alertas' : 'No operativa'}
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Relación Estado-Activa - VERSIÓN SOBRIA */}
+                <div className="mt-4 bg-gray-50 border border-gray-200 rounded-xl p-4">
+                  <div className="flex items-start gap-3">
+                    <Info size={18} className="text-blue-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-xs font-semibold text-gray-700">Relación Estado-Activa</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Si seleccionas "Disponible", la unidad estará activa. Si seleccionas "Inactiva", se desmarcará automáticamente.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Botones */}
+            <div className="flex justify-end gap-3 pt-8 mt-8 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!isEditing) limpiarStorage();
+                  navigate('/admin/unidades');
+                }}
+                className="group px-6 py-3 border-2 border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all flex items-center gap-2 text-sm font-medium"
+              >
+                <X size={18} className="text-gray-500 group-hover:text-gray-700" />
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={loading || (!isEditing && !codigoValido)}
+                className="group px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all disabled:opacity-50 flex items-center gap-2 text-sm font-medium shadow-lg shadow-blue-200"
+              >
+                {loading ? (
+                  <Loader size={18} className="animate-spin" />
+                ) : (
+                  <Save size={18} />
                 )}
-              </div>
-            )}
-
-            {isEditing && (
-              <p className="text-xs text-gray-400 mt-2">
-                El código no se puede modificar después de crear la unidad
-              </p>
-            )}
-          </div>
-
-          {/* Tipo - SOLO LECTURA EN EDICIÓN */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Tipo de unidad <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <Truck size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-              <select
-                ref={tipoRef}
-                name="tipo"
-                value={formData.tipo}
-                onChange={handleChange}
-                disabled={isEditing} // ← BLOQUEADO EN EDICIÓN
-                required
-                className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 appearance-none ${campoError === 'tipo'
-                    ? 'border-red-500 bg-red-50 focus:ring-red-500'
-                    : isEditing
-                      ? 'bg-gray-100 border-gray-200 cursor-not-allowed'
-                      : 'border-gray-200 focus:ring-blue-500 bg-white'
-                  }`}
-              >
-                <option value="policia">Policía</option>
-                <option value="ambulancia">Ambulancia</option>
-              </select>
+                {loading ? 'Guardando...' : (isEditing ? 'Actualizar' : 'Guardar')}
+              </button>
             </div>
-            {isEditing && (
-              <p className="text-xs text-gray-400 mt-2">
-                El tipo no se puede modificar después de crear la unidad
-              </p>
-            )}
-          </div>
-
-          {/* Descripción */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Descripción
-            </label>
-            <div className="relative">
-              <FileText size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-              <textarea
-                name="descripcion"
-                value={formData.descripcion}
-                onChange={handleChange}
-                rows="3"
-                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Descripción adicional de la unidad"
-              />
-            </div>
-          </div>
-
-          {/* Coordenadas - AHORA OPCIONALES */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Latitud <span className="text-gray-400">(opcional)</span>
-              </label>
-              <div className="relative">
-                <MapPin size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                <input
-                  ref={latRef}
-                  type="text"
-                  name="lat"
-                  value={formData.lat}
-                  onChange={handleChange}
-                  className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${campoError === 'lat'
-                      ? 'border-red-500 bg-red-50 focus:ring-red-500'
-                      : 'border-gray-200 focus:ring-blue-500'
-                    }`}
-                  placeholder="Ej: 18.8667 (opcional)"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Longitud <span className="text-gray-400">(opcional)</span>
-              </label>
-              <div className="relative">
-                <MapPin size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                <input
-                  ref={lngRef}
-                  type="text"
-                  name="lng"
-                  value={formData.lng}
-                  onChange={handleChange}
-                  className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${campoError === 'lng'
-                      ? 'border-red-500 bg-red-50 focus:ring-red-500'
-                      : 'border-gray-200 focus:ring-blue-500'
-                    }`}
-                  placeholder="Ej: -97.1533 (opcional)"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Mensaje informativo */}
-          {!formData.lat && !formData.lng && (
-            <p className="text-xs text-blue-600 -mt-2 flex items-center gap-1">
-              <Info size={14} />
-              Si no proporcionas coordenadas, se usará la ubicación por defecto
-            </p>
-          )}
-
-          {/* Estado y Activa */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Estado inicial
-              </label>
-              <select
-                name="estado"
-                value={formData.estado}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="disponible">Disponible</option>
-                <option value="inactiva">Inactiva</option>
-                {/* OCUPADA NO ESTÁ DISPONIBLE EN EL FORMULARIO */}
-              </select>
-              <p className="text-xs text-gray-400 mt-1">
-                Nota: El estado "Ocupada" solo se asigna automáticamente durante una alerta activa
-              </p>
-            </div>
-
-            <div className="flex items-center pt-8">
-              <label className={`flex items-center gap-2 p-3 rounded-lg cursor-pointer ${formData.activa ? 'bg-blue-50' : 'bg-gray-50'
-                }`}>
-                <input
-                  type="checkbox"
-                  name="activa"
-                  checked={formData.activa}
-                  onChange={handleChange}
-                  className="rounded text-blue-600 focus:ring-blue-500"
-                />
-                <span className="text-sm text-gray-700">Unidad activa</span>
-              </label>
-            </div>
-          </div>
-
-          {/* Relación Estado-Activa */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <p className="text-xs text-blue-700 flex items-center gap-1">
-              <Info size={14} />
-              <strong>Relación Estado-Activa:</strong> Si seleccionas "Disponible", la unidad estará activa.
-              Si seleccionas "Inactiva", se desmarcará automáticamente.
-            </p>
-          </div>
-
-          {/* Botones */}
-          <div className="flex justify-end gap-3 pt-4 border-t">
-            <button
-              type="button"
-              onClick={() => navigate('/admin/unidades')}
-              className="px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
-            >
-              <X size={18} />
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={loading || (!isEditing && !codigoValido)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50"
-            >
-              {loading ? (
-                <Loader size={18} className="animate-spin" />
-              ) : (
-                <Save size={18} />
-              )}
-              {loading ? 'Guardando...' : (isEditing ? 'Actualizar' : 'Guardar')}
-            </button>
-          </div>
+          </form>
         </div>
-      </form>
+
+        {/* Indicador de guardado automático (solo para creación) */}
+        {!isEditing && formData.codigo && (
+          <div className="mt-4 flex items-center justify-end gap-2 text-xs text-gray-400">
+            <Clock size={12} className="animate-pulse" />
+            <span>Guardado automático • Los datos se conservan si cambias de página</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

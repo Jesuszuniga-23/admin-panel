@@ -4,7 +4,8 @@ import {
   Truck, MapPin, Hash, Edit, Trash2, Power,
   ChevronLeft, Loader, AlertCircle, Users,
   Shield, Ambulance, Calendar, User, Mail, Phone,
-  X, Check, Plus, FileText,UserMinus,UserPlus 
+  X, Check, Plus, FileText, UserMinus, UserPlus,
+  Clock, AlertTriangle, CheckCircle, XCircle
 } from 'lucide-react';
 import unidadService from '../../../services/admin/unidad.service';
 import personalService from '../../../services/admin/personal.service';
@@ -36,8 +37,8 @@ const ModalAccionNoPermitida = ({ isOpen, onClose, mensaje }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full animate-fadeIn">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full animate-fadeIn">
         <div className="p-6">
           <div className="flex items-center gap-4 mb-4">
             <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
@@ -62,6 +63,105 @@ const ModalAccionNoPermitida = ({ isOpen, onClose, mensaje }) => {
   );
 };
 
+// MODAL DE CONFIRMACIÓN PERSONALIZADO
+const ModalConfirmacion = ({ 
+  isOpen, 
+  onClose, 
+  onConfirm, 
+  titulo, 
+  mensaje, 
+  itemNombre,
+  tipoAccion = 'eliminar' 
+}) => {
+  if (!isOpen) return null;
+
+  const config = {
+    eliminar: {
+      icon: <Trash2 size={24} className="text-red-600" />,
+      bgColor: 'bg-red-100',
+      buttonColor: 'bg-red-600 hover:bg-red-700',
+      buttonText: 'Eliminar',
+      mensajeAdicional: 'Esta acción no se puede deshacer.'
+    },
+    desactivar: {
+      icon: <Power size={24} className="text-yellow-600" />,
+      bgColor: 'bg-yellow-100',
+      buttonColor: 'bg-yellow-600 hover:bg-yellow-700',
+      buttonText: 'Desactivar',
+      mensajeAdicional: 'La unidad dejará de estar operativa.'
+    },
+    activar: {
+      icon: <Power size={24} className="text-green-600" />,
+      bgColor: 'bg-green-100',
+      buttonColor: 'bg-green-600 hover:bg-green-700',
+      buttonText: 'Activar',
+      mensajeAdicional: 'La unidad volverá a estar operativa.'
+    },
+    remover: {
+      icon: <UserMinus size={24} className="text-orange-600" />,
+      bgColor: 'bg-orange-100',
+      buttonColor: 'bg-orange-600 hover:bg-orange-700',
+      buttonText: 'Remover',
+      mensajeAdicional: 'El personal será removido de esta unidad.'
+    }
+  };
+
+  const conf = config[tipoAccion] || config.eliminar;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full animate-fadeIn">
+        <div className="p-6">
+          <div className="flex items-center gap-4 mb-4">
+            <div className={`w-12 h-12 ${conf.bgColor} rounded-full flex items-center justify-center`}>
+              {conf.icon}
+            </div>
+            <h3 className="text-lg font-semibold text-gray-800">{titulo}</h3>
+          </div>
+          
+          <p className="text-sm text-gray-600 mb-2">
+            {mensaje}
+          </p>
+          {itemNombre && (
+            <p className="text-base font-semibold text-center p-3 rounded-lg mb-4" style={{
+              color: tipoAccion === 'eliminar' ? '#dc2626' : 
+                     tipoAccion === 'desactivar' ? '#d97706' : 
+                     tipoAccion === 'activar' ? '#059669' : 
+                     '#ea580c',
+              backgroundColor: tipoAccion === 'eliminar' ? '#fee2e2' : 
+                             tipoAccion === 'desactivar' ? '#fef3c7' : 
+                             tipoAccion === 'activar' ? '#d1fae5' : 
+                             '#ffedd5'
+            }}>
+              "{itemNombre}"
+            </p>
+          )}
+          <p className="text-xs text-gray-400 mb-6">{conf.mensajeAdicional}</p>
+          
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={() => {
+                onConfirm();
+                onClose();
+              }}
+              className={`px-4 py-2 ${conf.buttonColor} text-white rounded-lg transition-colors text-sm font-medium flex items-center gap-2`}
+            >
+              {conf.icon}
+              {conf.buttonText}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const UnidadDetail = () => {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -72,9 +172,20 @@ const UnidadDetail = () => {
   const [mostrarAsignacion, setMostrarAsignacion] = useState(false);
   const [personalSeleccionado, setPersonalSeleccionado] = useState('');
   const [cargandoPersonal, setCargandoPersonal] = useState(false);
+  
+  // Estados para modales
   const [modalInfo, setModalInfo] = useState({
     show: false,
     mensaje: ''
+  });
+  
+  const [modalConfirmacion, setModalConfirmacion] = useState({
+    show: false,
+    tipo: '',
+    titulo: '',
+    mensaje: '',
+    itemNombre: '',
+    onConfirm: null
   });
 
   useEffect(() => {
@@ -82,13 +193,11 @@ const UnidadDetail = () => {
   }, [id]);
 
   // CARGA UNIDAD Y CORRIGE TEXTOS
-
   const cargarUnidad = async () => {
     try {
       setLoading(true);
       const response = await unidadService.obtenerUnidad(id);
 
-      // Corregir textos de la unidad y relacionados
       const dataCorregida = {
         ...response.data,
         creador: response.data.creador ? {
@@ -127,7 +236,6 @@ const UnidadDetail = () => {
       setCargandoPersonal(true);
       const response = await unidadService.personalDisponible(id, unidad?.tipo);
 
-      // Corregir nombres del personal disponible
       const personalCorregido = (response.data || []).map(p => ({
         ...p,
         nombre: corregirTexto(p.nombre)
@@ -187,26 +295,34 @@ const UnidadDetail = () => {
     }
 
     const nombreCorregido = corregirTexto(nombre);
-    if (!window.confirm(`¿Remover a ${nombreCorregido} de esta unidad?`)) return;
-
-    try {
-      await unidadService.removerPersonal(id, personalId);
-      toast.success('Personal removido correctamente', {
-        icon: <UserMinus size={18} className="text-green-500" />
-      }); await cargarUnidad();
-    } catch (error) {
-      console.error("Error removiendo personal:", error);
-
-      if (error.response?.status === 429) {
-        toast.error('Demasiadas peticiones. Espera unos segundos...', {
-          icon: <Clock size={18} className="text-yellow-500" />
-        });
-      } else {
-        toast.error(error.error || 'Error al remover personal');
+    
+    // Abrir modal de confirmación para remover
+    setModalConfirmacion({
+      show: true,
+      tipo: 'remover',
+      titulo: 'Confirmar remoción',
+      mensaje: `¿Estás seguro de remover a ${nombreCorregido} de esta unidad?`,
+      itemNombre: nombreCorregido,
+      onConfirm: async () => {
+        try {
+          await unidadService.removerPersonal(id, personalId);
+          toast.success('Personal removido correctamente', {
+            icon: <UserMinus size={18} className="text-green-500" />
+          });
+          await cargarUnidad();
+        } catch (error) {
+          console.error("Error removiendo personal:", error);
+          if (error.response?.status === 429) {
+            toast.error('Demasiadas peticiones. Espera unos segundos...', {
+              icon: <Clock size={18} className="text-yellow-500" />
+            });
+          } else {
+            toast.error(error.error || 'Error al remover personal');
+          }
+        }
       }
-    }
+    });
   };
-
 
   // TOGGLE ACTIVA CON VALIDACIÓN DE UNIDAD OCUPADA
   const handleToggleActiva = async () => {
@@ -220,28 +336,41 @@ const UnidadDetail = () => {
     }
 
     const accion = unidad.activa ? 'desactivar' : 'activar';
-    if (!window.confirm(`¿Estás seguro de ${accion} esta unidad?`)) return;
+    const titulo = unidad.activa ? 'Confirmar desactivación' : 'Confirmar activación';
+    const mensaje = unidad.activa 
+      ? `¿Estás seguro de desactivar la unidad ${unidad.codigo}?`
+      : `¿Estás seguro de activar la unidad ${unidad.codigo}?`;
 
-    const estadoAnterior = unidad.activa;
-    setUnidad(prev => ({ ...prev, activa: !prev.activa }));
+    setModalConfirmacion({
+      show: true,
+      tipo: unidad.activa ? 'desactivar' : 'activar',
+      titulo,
+      mensaje,
+      itemNombre: unidad.codigo,
+      onConfirm: async () => {
+        const estadoAnterior = unidad.activa;
+        setUnidad(prev => ({ ...prev, activa: !prev.activa }));
 
-    try {
-      await unidadService.toggleActiva(id, !unidad.activa);
-      toast.success(`Unidad ${!unidad.activa ? 'activada' : 'desactivada'} correctamente`, {
-        icon: <Power size={18} className={`${!unidad.activa ? 'text-green-500' : 'text-yellow-500'}`} />
-      }); await cargarUnidad();
-    } catch (error) {
-      setUnidad(prev => ({ ...prev, activa: estadoAnterior }));
+        try {
+          await unidadService.toggleActiva(id, !unidad.activa);
+          toast.success(`Unidad ${!unidad.activa ? 'activada' : 'desactivada'} correctamente`, {
+            icon: <Power size={18} className={`${!unidad.activa ? 'text-green-500' : 'text-yellow-500'}`} />
+          });
+          await cargarUnidad();
+        } catch (error) {
+          setUnidad(prev => ({ ...prev, activa: estadoAnterior }));
 
-      console.error("Error cambiando estado:", error);
-      if (error.response?.status === 429) {
-        toast.error('Demasiadas peticiones. Espera unos segundos...', {
-          icon: <Clock size={18} className="text-yellow-500" />
-        });
-      } else {
-        toast.error(error.error || 'Error al cambiar estado');
+          console.error("Error cambiando estado:", error);
+          if (error.response?.status === 429) {
+            toast.error('Demasiadas peticiones. Espera unos segundos...', {
+              icon: <Clock size={18} className="text-yellow-500" />
+            });
+          } else {
+            toast.error(error.error || 'Error al cambiar estado');
+          }
+        }
       }
-    }
+    });
   };
 
   // ELIMINAR CON VALIDACIÓN DE UNIDAD OCUPADA
@@ -255,26 +384,32 @@ const UnidadDetail = () => {
       return;
     }
 
-    if (!window.confirm(`¿Estás seguro de eliminar la unidad ${unidad.codigo}?`)) return;
-
-    try {
-      await unidadService.eliminarUnidad(id);
-      toast.success('Unidad eliminada correctamente', {
-        icon: <Trash2 size={18} className="text-red-500" />
-      });
-      navigate('/admin/unidades');
-    } catch (error) {
-      console.error("Error eliminando unidad:", error);
-      if (error.response?.status === 429) {
-        toast.error('Demasiadas peticiones. Espera unos segundos...', {
-          icon: <Clock size={18} className="text-yellow-500" />
-        });
-      } else {
-        toast.error(error.error || 'Error al eliminar unidad');
+    setModalConfirmacion({
+      show: true,
+      tipo: 'eliminar',
+      titulo: 'Confirmar eliminación',
+      mensaje: `¿Estás seguro de eliminar la unidad ${unidad.codigo}?`,
+      itemNombre: unidad.codigo,
+      onConfirm: async () => {
+        try {
+          await unidadService.eliminarUnidad(id);
+          toast.success('Unidad eliminada correctamente', {
+            icon: <Trash2 size={18} className="text-red-500" />
+          });
+          navigate('/admin/unidades');
+        } catch (error) {
+          console.error("Error eliminando unidad:", error);
+          if (error.response?.status === 429) {
+            toast.error('Demasiadas peticiones. Espera unos segundos...', {
+              icon: <Clock size={18} className="text-yellow-500" />
+            });
+          } else {
+            toast.error(error.error || 'Error al eliminar unidad');
+          }
+        }
       }
-    }
+    });
   };
-
 
   // EDITAR CON VALIDACIÓN DE UNIDAD OCUPADA
   const handleEditar = () => {
@@ -335,6 +470,17 @@ const UnidadDetail = () => {
         isOpen={modalInfo.show}
         onClose={() => setModalInfo({ show: false, mensaje: '' })}
         mensaje={modalInfo.mensaje}
+      />
+
+      {/* Modal de confirmación */}
+      <ModalConfirmacion
+        isOpen={modalConfirmacion.show}
+        onClose={() => setModalConfirmacion({ ...modalConfirmacion, show: false })}
+        onConfirm={modalConfirmacion.onConfirm || (() => {})}
+        titulo={modalConfirmacion.titulo}
+        mensaje={modalConfirmacion.mensaje}
+        itemNombre={modalConfirmacion.itemNombre}
+        tipoAccion={modalConfirmacion.tipo}
       />
 
       {/* Header */}

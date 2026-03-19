@@ -534,7 +534,7 @@ const ContactCard = ({ icon: Icon, label, value, action, actionIcon: ActionIcon 
       <button
         onClick={action}
         className="p-2 hover:bg-white rounded-lg transition-colors"
-        title={`Llamar a ${value}`}
+        title={`Contactar a ${value}`}
       >
         <ActionIcon size={16} className="text-blue-600" />
       </button>

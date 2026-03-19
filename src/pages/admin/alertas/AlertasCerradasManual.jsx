@@ -347,12 +347,7 @@ const AlertasCerradasManual = () => {
             <div className="mt-3 flex items-center gap-2 text-xs">
               <span className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-pulse"></span>
               <span className="text-purple-600">Filtros aplicados - {paginacion.total} resultados</span>
-              <button
-                onClick={limpiarFiltros}
-                className="text-xs text-purple-600 hover:text-purple-800 underline ml-2"
-              >
-                Limpiar todo
-              </button>
+             
             </div>
           )}
         </div>

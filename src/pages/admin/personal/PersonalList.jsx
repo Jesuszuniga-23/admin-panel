@@ -47,11 +47,19 @@ const normalizarTexto = (texto) => {
   return textoNormalizado;
 };
 
-// Función para formatear nombres (primera letra mayúscula, resto minúsculas + acentos)
-const formatearNombre = (nombre) => {
-  if (!nombre) return '';
-  const nombreNormalizado = normalizarTexto(nombre);
-  return nombreNormalizado
+// 🔥 NUEVA FUNCIÓN: Formatear nombre completo con apellidos
+const formatearNombreCompleto = (persona) => {
+  if (!persona) return '';
+  const { nombre, apellido_paterno, apellido_materno } = persona;
+  const nombreNormalizado = normalizarTexto(nombre || '');
+  const paternoNormalizado = normalizarTexto(apellido_paterno || '');
+  const maternoNormalizado = normalizarTexto(apellido_materno || '');
+  
+  const nombreCompleto = [nombreNormalizado, paternoNormalizado, maternoNormalizado]
+    .filter(Boolean)
+    .join(' ');
+    
+  return nombreCompleto
     .toLowerCase()
     .split(' ')
     .map(palabra => palabra.charAt(0).toUpperCase() + palabra.slice(1))
@@ -100,7 +108,7 @@ const PersonalList = () => {
       // Filtro por búsqueda
       if (filtros.search) {
         const termino = filtros.search.toLowerCase().trim();
-        const nombreMatch = item.nombre?.toLowerCase().includes(termino);
+        const nombreMatch = item.nombreCompleto?.toLowerCase().includes(termino);
         const emailMatch = item.email?.toLowerCase().includes(termino);
         const placaMatch = item.placa?.toLowerCase().includes(termino);
         if (!nombreMatch && !emailMatch && !placaMatch) return false;
@@ -134,18 +142,24 @@ const PersonalList = () => {
 
       const response = await personalService.listarPersonal(filtrosActivos);
       
-      // Formatear datos
-      const personalFormateado = (response.data || []).map(p => ({
-        ...p,
-        nombre: formatearNombre(p.nombre),
-        email: p.email,
-        telefono: p.telefono,
-        placa: p.placa?.toUpperCase(),
-        rol: p.rol,
-        disponible: p.activo ? p.disponible : false,
-        estadoTexto: p.activo ? 'Activo' : 'Inactivo',
-        disponibleTexto: p.activo ? (p.disponible ? 'Disponible' : 'Ocupado') : 'No disponible'
-      }));
+      // 🔥 AHORA FORMATEAMOS CON NOMBRE COMPLETO
+      const personalFormateado = (response.data || []).map(p => {
+        const nombreCompleto = formatearNombreCompleto(p);
+        return {
+          ...p,
+          nombreCompleto, // Guardamos el nombre completo para mostrar
+          nombre: p.nombre, // Mantenemos el original para referencia
+          apellido_paterno: p.apellido_paterno,
+          apellido_materno: p.apellido_materno,
+          email: p.email,
+          telefono: p.telefono,
+          placa: p.placa?.toUpperCase(),
+          rol: p.rol,
+          disponible: p.activo ? p.disponible : false,
+          estadoTexto: p.activo ? 'Activo' : 'Inactivo',
+          disponibleTexto: p.activo ? (p.disponible ? 'Disponible' : 'Ocupado') : 'No disponible'
+        };
+      });
       
       setPersonalOriginal(personalFormateado);
       
@@ -213,13 +227,13 @@ const PersonalList = () => {
     }
   }, [filtros.rol, filtros.activo, filtros.disponible, filtros.search, filtros.pagina, personalOriginal]);
 
-  const handleEliminar = async (id, nombre, disponible) => {
+  const handleEliminar = async (id, nombreCompleto, disponible) => {
     if (!disponible) {
       setModalInfo({
         show: true,
         tipo: 'error',
         titulo: 'Acción no permitida',
-        mensaje: `No es posible eliminar a ${nombre} porque se encuentra en servicio activo atendiendo una emergencia.`,
+        mensaje: `No es posible eliminar a ${nombreCompleto} porque se encuentra en servicio activo atendiendo una emergencia.`,
         onConfirm: null
       });
       return;
@@ -229,14 +243,14 @@ const PersonalList = () => {
       show: true,
       tipo: 'confirm',
       titulo: 'Confirmar eliminación',
-      mensaje: `¿Está seguro de eliminar a ${nombre}? Esta acción no se puede deshacer.`,
+      mensaje: `¿Está seguro de eliminar a ${nombreCompleto}? Esta acción no se puede deshacer.`,
       onConfirm: async () => {
         setLoading(true);
         try {
           await personalService.eliminarPersonal(id);
           setModalInfo({ show: false, tipo: '', titulo: '', mensaje: '', onConfirm: null });
           await cargarPersonal();
-          toast.success(`Personal "${nombre}" eliminado correctamente`);
+          toast.success(`Personal "${nombreCompleto}" eliminado correctamente`);
         } catch (error) {
           console.error("Error eliminando:", error);
           toast.error(error.error || 'Error al eliminar personal');
@@ -247,13 +261,13 @@ const PersonalList = () => {
     });
   };
 
-  const handleToggleActivo = async (id, nombre, estadoActual, disponible) => {
+  const handleToggleActivo = async (id, nombreCompleto, estadoActual, disponible) => {
     if (estadoActual && !disponible) {
       setModalInfo({
         show: true,
         tipo: 'error',
         titulo: 'Acción no permitida',
-        mensaje: `No es posible desactivar a ${nombre} mientras se encuentra en servicio activo.`,
+        mensaje: `No es posible desactivar a ${nombreCompleto} mientras se encuentra en servicio activo.`,
         onConfirm: null
       });
       return;
@@ -262,9 +276,9 @@ const PersonalList = () => {
     const nuevoEstado = !estadoActual;
     const accion = nuevoEstado ? 'activar' : 'desactivar';
     
-    let mensajeConfirm = `¿Está seguro de ${accion} a ${nombre}?`;
+    let mensajeConfirm = `¿Está seguro de ${accion} a ${nombreCompleto}?`;
     if (!nuevoEstado) {
-      mensajeConfirm = `¿Está seguro de desactivar a ${nombre}? Al desactivarlo, no podrá recibir nuevas alertas.`;
+      mensajeConfirm = `¿Está seguro de desactivar a ${nombreCompleto}? Al desactivarlo, no podrá recibir nuevas alertas.`;
     }
 
     setModalInfo({
@@ -278,7 +292,7 @@ const PersonalList = () => {
           await personalService.toggleActivo(id, nuevoEstado);
           setModalInfo({ show: false, tipo: '', titulo: '', mensaje: '', onConfirm: null });
           await cargarPersonal();
-          toast.success(`Personal "${nombre}" ${accion}do correctamente`);
+          toast.success(`Personal "${nombreCompleto}" ${accion}do correctamente`);
         } catch (error) {
           console.error(`Error al ${accion}:`, error);
           toast.error(error.error || `Error al ${accion} personal`);
@@ -298,16 +312,16 @@ const PersonalList = () => {
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <div className="flex items-center gap-2 sm:gap-3">
-  <div className="bg-gradient-to-br from-blue-500 to-indigo-600 p-2 sm:p-2.5 md:p-3 rounded-lg sm:rounded-xl shadow-lg shadow-blue-200">
-    <Users size={20} className="sm:w-5 sm:h-5 md:w-6 md:h-6 text-white" />
-  </div>
-  <div>
-    <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Personal</h1>
-    <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
-      Gestión de personal operativo y administrativo
-    </p>
-  </div>
-</div>
+            <div className="bg-gradient-to-br from-blue-500 to-indigo-600 p-2 sm:p-2.5 md:p-3 rounded-lg sm:rounded-xl shadow-lg shadow-blue-200">
+              <Users size={20} className="sm:w-5 sm:h-5 md:w-6 md:h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Personal</h1>
+              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
+                Gestión de personal operativo y administrativo
+              </p>
+            </div>
+          </div>
           <button
             onClick={() => navigate('/admin/personal/crear')}
             className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap"
@@ -394,12 +408,7 @@ const PersonalList = () => {
             <div className="mt-3 flex items-center gap-2 text-xs">
               <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></span>
               <span className="text-blue-600 font-medium">Filtros aplicados - {paginacion.total} resultados</span>
-              <button
-                onClick={limpiarFiltros}
-                className="text-xs text-blue-600 hover:text-blue-800 underline ml-2"
-              >
-                Limpiar todo
-              </button>
+              
             </div>
           )}
         </div>
@@ -446,11 +455,11 @@ const PersonalList = () => {
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
                               <span className="text-blue-600 font-medium">
-                                {persona.nombre?.charAt(0).toUpperCase()}
+                                {persona.nombreCompleto?.charAt(0).toUpperCase()}
                               </span>
                             </div>
                             <span className="text-sm font-medium text-gray-800 truncate max-w-[150px]">
-                              {persona.nombre}
+                              {persona.nombreCompleto}
                             </span>
                           </div>
                         </td>
@@ -502,7 +511,7 @@ const PersonalList = () => {
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-2">
                             <button
-                              onClick={() => handleToggleActivo(persona.id, persona.nombre, persona.activo, persona.disponible)}
+                              onClick={() => handleToggleActivo(persona.id, persona.nombreCompleto, persona.activo, persona.disponible)}
                               className={`p-1.5 rounded-lg transition-colors ${
                                 persona.activo ? 'hover:bg-yellow-50 text-yellow-600' : 'hover:bg-green-50 text-green-600'
                               }`}
@@ -525,7 +534,7 @@ const PersonalList = () => {
                               <Edit size={16} className="text-gray-500" />
                             </button>
                             <button
-                              onClick={() => handleEliminar(persona.id, persona.nombre, persona.disponible)}
+                              onClick={() => handleEliminar(persona.id, persona.nombreCompleto, persona.disponible)}
                               className="p-1.5 hover:bg-red-50 rounded-lg"
                               title="Eliminar"
                             >
