@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, UserCog, Bell, Users, BarChart3, FileText,
@@ -12,12 +12,20 @@ import {
 import useAuthStore from '../../store/authStore';
 import dashboardService from '../../services/admin/dashboard.service';
 import { LineChart, Line, AreaChart, Area, PieChart as RePieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import IconoEntidad, { BadgeIcono } from '../../components/ui/IconoEntidad';
 
-// Función para formatear nombres (acentos y mayúsculas)
+// Mapeo de roles a entidades para badges
+const rolToEntidad = {
+  admin: 'ADMIN',
+  superadmin: 'SUPERADMIN',
+  policia: 'POLICIA',
+  ambulancia: 'PERSONAL_AMBULANCIA'
+};
+
+// Función para formatear nombres
 const formatearNombre = (nombre) => {
   if (!nombre) return '';
   
-  // Mapa de caracteres mal codificados
   const reemplazos = [
     { de: 'Ã¡', para: 'á' }, { de: 'Ã©', para: 'é' }, { de: 'Ã­', para: 'í' },
     { de: 'Ã³', para: 'ó' }, { de: 'Ãº', para: 'ú' }, { de: 'Ã�', para: 'Á' },
@@ -31,7 +39,6 @@ const formatearNombre = (nombre) => {
     nombreNormalizado = nombreNormalizado.split(de).join(para);
   });
   
-  // Capitalizar primera letra de cada palabra
   return nombreNormalizado
     .toLowerCase()
     .split(' ')
@@ -47,7 +54,6 @@ const Dashboard = () => {
   const [actividadReciente, setActividadReciente] = useState({ personal: [], unidades: [], alertas: [] });
   const navigate = useNavigate();
 
-  // Cargar datos del dashboard
   useEffect(() => {
     const cargarDatosDashboard = async () => {
       setCargando(true);
@@ -87,7 +93,6 @@ const Dashboard = () => {
     }
   };
 
-  // Colores para gráficas
   const COLORS = ['#3b82f6', '#ef4444', '#f59e0b', '#10b981', '#8b5cf6'];
 
   if (cargando) {
@@ -109,10 +114,11 @@ const Dashboard = () => {
           {stats?.kpis && Object.entries(stats.kpis).map(([key, data]) => (
             <div key={key} className="bg-white rounded-xl md:rounded-2xl shadow-lg shadow-slate-200/50 p-4 md:p-6 hover:shadow-xl transition-all">
               <div className="flex items-center justify-between mb-2 md:mb-4">
-                <div className={`p-2 md:p-3 rounded-xl ${key === 'personal' ? 'bg-blue-50 text-blue-600' :
-                  key === 'unidades' ? 'bg-purple-50 text-purple-600' :
-                    'bg-amber-50 text-amber-600'
-                  }`}>
+                <div className={`p-2 md:p-3 rounded-xl ${
+                  key === 'personal' ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-200' :
+                  key === 'unidades' ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-200' :
+                  'bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-lg shadow-amber-200'
+                }`}>
                   {key === 'personal' && <Users size={20} className="md:w-6 md:h-6" />}
                   {key === 'unidades' && <Truck size={20} className="md:w-6 md:h-6" />}
                   {key === 'alertas' && <Bell size={20} className="md:w-6 md:h-6" />}
@@ -223,31 +229,31 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Stats Cards - GRID RESPONSIVE */}
+        {/* Stats Cards - con iconos mejorados */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8">
           <StatCard
-            icon={<Users className="text-blue-600" size={20} />}
+            icon={<IconoEntidad entidad="POLICIA" size={20} />}
             title="Personal Activo"
             value={stats?.personal?.activos || 0}
             subtitle={`${stats?.personal?.disponibles || 0} disponibles`}
             color="blue"
           />
           <StatCard
-            icon={<Truck className="text-purple-600" size={20} />}
+            icon={<IconoEntidad entidad="PATRULLA" size={20} />}
             title="Unidades Activas"
             value={stats?.unidades?.activas || 0}
             subtitle={`${stats?.unidades?.disponibles || 0} disponibles`}
             color="purple"
           />
           <StatCard
-            icon={<AlertTriangle className="text-amber-600" size={20} />}
+            icon={<IconoEntidad entidad="ALERTA_PANICO" size={20} />}
             title="Alertas Expiradas"
             value={stats?.alertas?.expiradas || 0}
             subtitle="Sin atender"
             color="amber"
           />
           <StatCard
-            icon={<CheckCircle className="text-emerald-600" size={20} />}
+            icon={<IconoEntidad entidad="ALERTA_CERRADA" size={20} />}
             title="Alertas Cerradas Manual"
             value={stats?.alertas?.cerradasManual || 0}
             subtitle="Manualmente"
@@ -255,31 +261,31 @@ const Dashboard = () => {
           />
         </div>
 
-        {/* NUEVAS TARJETAS - GRID RESPONSIVE */}
+        {/* NUEVAS TARJETAS - con iconos mejorados */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8">
           <StatCard
-            icon={<Clock className="text-rose-600" size={20} />}
+            icon={<IconoEntidad entidad="ALERTA_PANICO" size={20} />}
             title="Alertas Activas"
             value={stats?.alertas?.activas || 0}
             subtitle="Sin asignar"
             color="rose"
           />
           <StatCard
-            icon={<Activity className="text-teal-600" size={20} />}
+            icon={<IconoEntidad entidad="ALERTA_EN_PROCESO" size={20} />}
             title="En Proceso"
             value={stats?.alertas?.enProceso || 0}
             subtitle="Siendo atendidas"
             color="teal"
           />
           <StatCard
-            icon={<CheckCircle className="text-violet-600" size={20} />}
+            icon={<IconoEntidad entidad="ALERTA_CERRADA" size={20} />}
             title="Cerradas (Totales)"
             value={stats?.alertas?.cerradasTotales || 0}
             subtitle="Historial completo"
             color="violet"
           />
           <StatCard
-            icon={<Users className="text-orange-600" size={20} />}
+            icon={<IconoEntidad entidad="CIUDADANO" size={20} />}
             title="Personal Total"
             value={stats?.personal?.total || 0}
             subtitle="Registrados"
@@ -287,7 +293,7 @@ const Dashboard = () => {
           />
         </div>
 
-        {/* Actividad Reciente - GRID RESPONSIVE */}
+        {/* Actividad Reciente - con BadgeIcono */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
           {/* Personal Reciente */}
           <div className="bg-white rounded-xl md:rounded-2xl shadow-lg shadow-slate-200/50 p-4 md:p-6">
@@ -303,11 +309,12 @@ const Dashboard = () => {
                     </div>
                     <div className="min-w-0">
                       <p className="text-xs md:text-sm font-medium text-slate-800 truncate">{formatearNombre(p.nombre)}</p>
-                      <p className="text-xs text-slate-400 truncate">{p.rol} • {p.placa}</p>
+                      <BadgeIcono entidad={rolToEntidad[p.rol] || 'ADMIN'} texto={p.rol} size={10} />
                     </div>
                   </div>
-                  <span className={`text-xs px-1.5 md:px-2 py-0.5 md:py-1 rounded-full whitespace-nowrap ${p.disponible ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                    }`}>
+                  <span className={`text-xs px-1.5 md:px-2 py-0.5 md:py-1 rounded-full whitespace-nowrap ${
+                    p.disponible ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                  }`}>
                     {p.disponible ? 'Disponible' : 'Ocupado'}
                   </span>
                 </div>
@@ -325,9 +332,9 @@ const Dashboard = () => {
                     <div className={`w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl flex items-center justify-center flex-shrink-0 ${
                       u.tipo === 'policia' ? 'bg-blue-100' : 'bg-emerald-100'
                     }`}>
-                      <Truck 
+                      <IconoEntidad 
+                        entidad={u.tipo === 'policia' ? 'PATRULLA' : 'AMBULANCIA'} 
                         size={16} 
-                        className={`md:w-5 md:h-5 ${u.tipo === 'policia' ? 'text-blue-600' : 'text-emerald-600'}`} 
                       />
                     </div>
                     <div className="min-w-0">
@@ -349,7 +356,6 @@ const Dashboard = () => {
         </div>
       </main>
 
-      {/* Animación */}
       <style>{`
         @keyframes fadeIn {
           from {
@@ -369,23 +375,23 @@ const Dashboard = () => {
   );
 };
 
-// Componente de tarjetas - RESPONSIVE
+// Componente de tarjetas - con colores consistentes
 const StatCard = ({ icon, title, value, subtitle, color }) => {
   const colors = {
-    blue: 'from-blue-500 to-blue-600',
-    purple: 'from-purple-500 to-purple-600',
-    amber: 'from-amber-500 to-amber-600',
-    emerald: 'from-emerald-500 to-emerald-600',
-    rose: 'from-rose-500 to-rose-600',
-    teal: 'from-teal-500 to-teal-600',
-    violet: 'from-violet-500 to-violet-600',
-    orange: 'from-orange-500 to-orange-600'
+    blue: 'from-blue-500 to-blue-600 shadow-blue-200',
+    purple: 'from-purple-500 to-purple-600 shadow-purple-200',
+    amber: 'from-amber-500 to-amber-600 shadow-amber-200',
+    emerald: 'from-emerald-500 to-emerald-600 shadow-emerald-200',
+    rose: 'from-rose-500 to-rose-600 shadow-rose-200',
+    teal: 'from-teal-500 to-teal-600 shadow-teal-200',
+    violet: 'from-violet-500 to-violet-600 shadow-violet-200',
+    orange: 'from-orange-500 to-orange-600 shadow-orange-200'
   };
 
   return (
     <div className="bg-white rounded-xl md:rounded-2xl shadow-lg shadow-slate-200/50 p-4 md:p-6 hover:shadow-xl transition-all group">
       <div className="flex items-start justify-between mb-2 md:mb-4">
-        <div className={`p-2 md:p-3 bg-gradient-to-br ${colors[color]} rounded-lg md:rounded-xl shadow-lg shadow-${color}-200`}>
+        <div className={`p-2 md:p-3 bg-gradient-to-br ${colors[color]} rounded-lg md:rounded-xl shadow-lg`}>
           {icon}
         </div>
         <div className="text-right">

@@ -1,16 +1,23 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
   Truck, Save, X, ChevronLeft,
   Loader, Shield, Ambulance, Hash, FileText, Info,
   AlertCircle, CheckCircle, XCircle, Clock,
-  Power, MapPin, BookOpen, Wrench,
+  MapPin, BookOpen, Wrench,
   Layers, Activity
 } from 'lucide-react';
 import unidadService from '../../../services/admin/unidad.service';
 import toast from 'react-hot-toast';
+import IconoEntidad, { BadgeIcono } from '../../../components/ui/IconoEntidad';
 
-// Componente de barra de progreso - VERSIÓN SOBRIA
+// Mapeo de tipos a entidades para iconos consistentes
+const tipoToEntidad = {
+  policia: 'PATRULLA',
+  ambulancia: 'AMBULANCIA'
+};
+
+// Componente de barra de progreso
 const ProgressBar = ({ completed, total }) => {
   const percentage = Math.min(100, Math.round((completed / total) * 100));
   
@@ -37,6 +44,7 @@ const ProgressBar = ({ completed, total }) => {
 
 const UnidadForm = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams();
   const isEditing = !!id;
   const storageKey = isEditing ? `unidad_form_edit_${id}` : 'unidad_form_new';
@@ -48,8 +56,10 @@ const UnidadForm = () => {
   const [codigoValido, setCodigoValido] = useState(true);
   const [codigoMensaje, setCodigoMensaje] = useState('');
   const [touched, setTouched] = useState({});
+  
+  // Estado para cambios sin guardar
+  const [originalFormData, setOriginalFormData] = useState(null);
 
-  // RECUPERAR DATOS GUARDADOS
   const [formData, setFormData] = useState(() => {
     const savedData = sessionStorage.getItem(storageKey);
     if (savedData && !isEditing) {
@@ -69,27 +79,119 @@ const UnidadForm = () => {
     };
   });
 
-  // Refs para enfoque
   const codigoRef = useRef();
   const tipoRef = useRef();
   const descripcionRef = useRef();
-
-  // Timeout para debounce de validación
   const debounceTimeout = useRef(null);
 
-  // GUARDAR DATOS AUTOMÁTICAMENTE
+  // Guardar estado original cuando se cargan los datos
+  useEffect(() => {
+    if (formData && !originalFormData && !cargandoDatos) {
+      setOriginalFormData(JSON.parse(JSON.stringify(formData)));
+    }
+  }, [formData, originalFormData, cargandoDatos]);
+
+  // Función para verificar si hay cambios
+  const hasUnsavedChanges = () => {
+    if (!originalFormData || isEditing) return false;
+    
+    const camposImportantes = ['codigo', 'tipo', 'descripcion', 'estado', 'activa'];
+    
+    for (let campo of camposImportantes) {
+      if (formData[campo] !== originalFormData[campo]) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  // Emitir evento de cambios sin guardar
+  useEffect(() => {
+    const emitUnsavedStatus = () => {
+      const hasChanges = hasUnsavedChanges() && !isEditing;
+      const event = new CustomEvent('formUnsavedStatus', { 
+        detail: { 
+          hasUnsaved: hasChanges,
+          isPersonalFormActive: true,
+          formType: 'unidad'
+        }
+      });
+      window.dispatchEvent(event);
+    };
+
+    emitUnsavedStatus();
+    
+    const interval = setInterval(emitUnsavedStatus, 500);
+    return () => clearInterval(interval);
+  }, [formData, originalFormData, isEditing]);
+
+  // Escuchar eventos del sidebar
+  useEffect(() => {
+    const handleSaveProgress = () => {
+      if (!isEditing) {
+        sessionStorage.setItem(storageKey, JSON.stringify(formData));
+        toast.success('Progreso guardado', {
+          icon: <Save size={18} className="text-green-600" />,
+          duration: 2000
+        });
+      }
+    };
+
+    const handleDiscardProgress = () => {
+      if (!isEditing) {
+        sessionStorage.removeItem(storageKey);
+        toast.success('Cambios descartados', {
+          icon: <X size={18} className="text-red-600" />,
+          duration: 1500
+        });
+      }
+    };
+
+    window.addEventListener('saveFormProgress', handleSaveProgress);
+    window.addEventListener('discardFormProgress', handleDiscardProgress);
+    
+    return () => {
+      window.removeEventListener('saveFormProgress', handleSaveProgress);
+      window.removeEventListener('discardFormProgress', handleDiscardProgress);
+    };
+  }, [formData, isEditing, storageKey]);
+
+  // Interceptar navegación con beforeunload para recargar página
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (hasUnsavedChanges() && !isEditing) {
+        e.preventDefault();
+        e.returnValue = '';
+        return '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [formData, originalFormData, isEditing]);
+
+  // Auto-guardado cada 30 segundos
+  useEffect(() => {
+    const autoSaveInterval = setInterval(() => {
+      if (hasUnsavedChanges() && !isEditing) {
+        sessionStorage.setItem(storageKey, JSON.stringify(formData));
+        console.log('Auto-guardado de unidad realizado');
+      }
+    }, 30000);
+
+    return () => clearInterval(autoSaveInterval);
+  }, [formData, isEditing, storageKey]);
+
   useEffect(() => {
     if (!isEditing && !cargandoDatos) {
       sessionStorage.setItem(storageKey, JSON.stringify(formData));
     }
   }, [formData, isEditing, cargandoDatos]);
 
-  // Limpiar storage al enviar
   const limpiarStorage = () => {
     sessionStorage.removeItem(storageKey);
   };
 
-  // Cargar datos si es edición
   useEffect(() => {
     if (isEditing) {
       cargarUnidad();
@@ -103,13 +205,16 @@ const UnidadForm = () => {
       const response = await unidadService.obtenerUnidad(id);
       console.log("Datos recibidos:", response.data);
 
-      setFormData({
+      const loadedData = {
         codigo: response.data.codigo || '',
         tipo: response.data.tipo || 'policia',
         descripcion: response.data.descripcion || '',
         estado: response.data.estado || 'disponible',
         activa: response.data.activa ?? true
-      });
+      };
+      
+      setFormData(loadedData);
+      setOriginalFormData(JSON.parse(JSON.stringify(loadedData)));
     } catch (error) {
       console.error('Error cargando unidad:', error);
       toast.error('Error al cargar los datos');
@@ -119,7 +224,6 @@ const UnidadForm = () => {
     }
   };
 
-  // VALIDAR CÓDIGO ÚNICO EN TIEMPO REAL
   const validarCodigoUnico = async (codigo) => {
     if (!codigo || codigo.length < 3) {
       setCodigoValido(false);
@@ -230,6 +334,29 @@ const UnidadForm = () => {
     }
   };
 
+  const getBorderColor = (campo) => {
+    if (campoError === campo) return 'border-red-300 bg-red-50';
+    if (campo === 'codigo' && !isEditing && touched.codigo && formData.codigo && formData.codigo.length >= 3) {
+      return codigoValido ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50';
+    }
+    return 'border-gray-200';
+  };
+
+  const getTipoPreview = () => {
+    const entidad = tipoToEntidad[formData.tipo] || 'PATRULLA';
+    const texto = formData.tipo === 'policia' ? 'Policía' : 'Ambulancia';
+    return { entidad, texto };
+  };
+
+  const handleCancel = () => {
+    if (hasUnsavedChanges() && !isEditing) {
+      const discardEvent = new CustomEvent('discardFormProgress');
+      window.dispatchEvent(discardEvent);
+    }
+    if (!isEditing) limpiarStorage();
+    navigate('/admin/unidades');
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -288,21 +415,15 @@ const UnidadForm = () => {
     }
   };
 
-  const getBorderColor = (campo) => {
-    if (campoError === campo) return 'border-red-300 bg-red-50';
-    if (campo === 'codigo' && !isEditing && touched.codigo && formData.codigo && formData.codigo.length >= 3) {
-      return codigoValido ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50';
-    }
-    return 'border-gray-200';
-  };
+  const tipoPreview = getTipoPreview();
 
   if (cargandoDatos) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 sm:p-6 md:p-8">
         <div className="max-w-3xl mx-auto">
           <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
-            <Loader size={40} className="animate-spin text-blue-600 mx-auto mb-4" />
-            <p className="text-gray-500">Cargando datos de la unidad...</p>
+            <div className="inline-block animate-spin rounded-full h-10 w-10 border-4 border-gray-200 border-t-blue-600"></div>
+            <p className="mt-4 text-gray-500">Cargando datos de la unidad...</p>
           </div>
         </div>
       </div>
@@ -316,10 +437,7 @@ const UnidadForm = () => {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => {
-                if (!isEditing) limpiarStorage();
-                navigate('/admin/unidades');
-              }}
+              onClick={handleCancel}
               className="p-2 hover:bg-white rounded-xl transition-colors"
             >
               <ChevronLeft size={20} className="text-gray-500" />
@@ -329,25 +447,24 @@ const UnidadForm = () => {
                 {isEditing ? 'Editar Unidad' : 'Nueva Unidad'}
               </h1>
               <p className="text-sm text-gray-500 mt-1">
-                {isEditing
-                  ? `Editando unidad: ${formData.codigo}`
-                  : 'Ingresa los datos de la nueva unidad'}
+                {isEditing ? `Editando unidad: ${formData.codigo}` : 'Ingresa los datos de la nueva unidad'}
               </p>
             </div>
           </div>
+          
+          {/* Indicador de cambios no guardados */}
+          {!isEditing && hasUnsavedChanges() && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+              <AlertCircle size={14} className="text-amber-600" />
+              <span className="text-xs text-amber-700">Cambios sin guardar</span>
+            </div>
+          )}
         </div>
 
-        {/* Barra de progreso (solo para creación) */}
-        {!isEditing && (
-          <ProgressBar 
-            completed={calcularProgreso()} 
-            total={3} 
-          />
-        )}
+        {!isEditing && <ProgressBar completed={calcularProgreso()} total={3} />}
 
         {/* Formulario */}
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-200">
-          {/* Cabecera decorativa - COLORES SOBRIOS */}
           <div className="h-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-600"></div>
           
           <form onSubmit={handleSubmit} className="p-6 md:p-8">
@@ -392,7 +509,6 @@ const UnidadForm = () => {
                       />
                     </div>
 
-                    {/* Indicador de validación de código */}
                     {!isEditing && formData.codigo && formData.codigo.length >= 3 && (
                       <div className="mt-2 flex items-center gap-1 text-xs">
                         {verificandoCodigo ? (
@@ -417,8 +533,7 @@ const UnidadForm = () => {
 
                     {isEditing && (
                       <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
-                        <Info size={12} />
-                        El código no se puede modificar
+                        <Info size={12} /> El código no se puede modificar
                       </p>
                     )}
                   </div>
@@ -429,11 +544,7 @@ const UnidadForm = () => {
                       Tipo de unidad <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
-                      {formData.tipo === 'policia' ? (
-                        <Shield size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                      ) : (
-                        <Ambulance size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                      )}
+                      <IconoEntidad entidad={tipoPreview.entidad} size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                       <select
                         ref={tipoRef}
                         name="tipo"
@@ -453,10 +564,12 @@ const UnidadForm = () => {
                         <option value="ambulancia">Ambulancia</option>
                       </select>
                     </div>
+                    <div className="mt-2">
+                      <BadgeIcono entidad={tipoPreview.entidad} texto={tipoPreview.texto} size={12} />
+                    </div>
                     {isEditing && (
                       <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
-                        <Info size={12} />
-                        El tipo no se puede modificar
+                        <Info size={12} /> El tipo no se puede modificar
                       </p>
                     )}
                   </div>
@@ -501,7 +614,6 @@ const UnidadForm = () => {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Estado inicial */}
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1">
                       Estado inicial
@@ -516,12 +628,10 @@ const UnidadForm = () => {
                       <option value="inactiva">Inactiva</option>
                     </select>
                     <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
-                      <Info size={12} />
-                      "Ocupada" se asigna automáticamente durante una alerta
+                      <Info size={12} /> "Ocupada" se asigna automáticamente durante una alerta
                     </p>
                   </div>
 
-                  {/* Checkbox activa */}
                   <div className="flex items-center pt-8">
                     <label className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all cursor-pointer w-full ${
                       formData.activa
@@ -545,7 +655,6 @@ const UnidadForm = () => {
                   </div>
                 </div>
 
-                {/* Relación Estado-Activa - VERSIÓN SOBRIA */}
                 <div className="mt-4 bg-gray-50 border border-gray-200 rounded-xl p-4">
                   <div className="flex items-start gap-3">
                     <Info size={18} className="text-blue-600 flex-shrink-0 mt-0.5" />
@@ -564,10 +673,7 @@ const UnidadForm = () => {
             <div className="flex justify-end gap-3 pt-8 mt-8 border-t border-gray-200">
               <button
                 type="button"
-                onClick={() => {
-                  if (!isEditing) limpiarStorage();
-                  navigate('/admin/unidades');
-                }}
+                onClick={handleCancel}
                 className="group px-6 py-3 border-2 border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all flex items-center gap-2 text-sm font-medium"
               >
                 <X size={18} className="text-gray-500 group-hover:text-gray-700" />
@@ -578,22 +684,17 @@ const UnidadForm = () => {
                 disabled={loading || (!isEditing && !codigoValido)}
                 className="group px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all disabled:opacity-50 flex items-center gap-2 text-sm font-medium shadow-lg shadow-blue-200"
               >
-                {loading ? (
-                  <Loader size={18} className="animate-spin" />
-                ) : (
-                  <Save size={18} />
-                )}
+                {loading ? <Loader size={18} className="animate-spin" /> : <Save size={18} />}
                 {loading ? 'Guardando...' : (isEditing ? 'Actualizar' : 'Guardar')}
               </button>
             </div>
           </form>
         </div>
 
-        {/* Indicador de guardado automático (solo para creación) */}
         {!isEditing && formData.codigo && (
           <div className="mt-4 flex items-center justify-end gap-2 text-xs text-gray-400">
             <Clock size={12} className="animate-pulse" />
-            <span>Guardado automático • Los datos se conservan si cambias de página</span>
+            <span>Guardado automático cada 30 segundos • Los datos se conservan si cierras la página</span>
           </div>
         )}
       </div>

@@ -2,32 +2,22 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Users, Plus, Search, Filter, ChevronLeft, ChevronRight,
-  Eye, Edit, Trash2, Power, Shield, Ambulance,
-  User, Mail, Phone, X, AlertTriangle, CheckCircle
+  Eye, Edit, Trash2, Power, User, Mail, Phone, X, AlertTriangle, CheckCircle
 } from 'lucide-react';
 import personalService from '../../../services/admin/personal.service';
 import toast from 'react-hot-toast';
 import { useDebounce } from '../../../hooks/useDebounce';
+import IconoEntidad, { BadgeIcono } from '../../../components/ui/IconoEntidad';
 
 // Función para normalizar texto (corregir acentos y caracteres especiales)
 const normalizarTexto = (texto) => {
   if (!texto) return '';
   
   const reemplazos = [
-    // Correcciones específicas para tu caso
-    { de: '¡', para: 'í' },
-    { de: '£', para: 'ú' },
-    { de: '¤', para: 'ñ' },
-    { de: '€', para: 'e' },
-    { de: '‚', para: 'é' },
-    { de: '¢', para: 'o' },
-    { de: 'Ram¡rez', para: 'Ramírez' },
-    { de: 'Param‚dico', para: 'Paramédico' },
-    { de: 'L¢pez', para: 'López' },
-    { de: 'Administrad', para: 'Administrador' },
-    { de: 'remerge', para: 'emergente' },
-    
-    // Reemplazos generales
+    { de: '¡', para: 'í' }, { de: '£', para: 'ú' }, { de: '¤', para: 'ñ' },
+    { de: '€', para: 'e' }, { de: '‚', para: 'é' }, { de: '¢', para: 'o' },
+    { de: 'Ram¡rez', para: 'Ramírez' }, { de: 'Param‚dico', para: 'Paramédico' },
+    { de: 'L¢pez', para: 'López' }, { de: 'Administrad', para: 'Administrador' },
     { de: 'Ã¡', para: 'á' }, { de: 'Ã©', para: 'é' }, { de: 'Ã­', para: 'í' },
     { de: 'Ã³', para: 'ó' }, { de: 'Ãº', para: 'ú' }, { de: 'Ã�', para: 'Á' },
     { de: 'Ã‰', para: 'É' }, { de: 'Ã�', para: 'Í' }, { de: 'Ã“', para: 'Ó' },
@@ -47,7 +37,6 @@ const normalizarTexto = (texto) => {
   return textoNormalizado;
 };
 
-// 🔥 NUEVA FUNCIÓN: Formatear nombre completo con apellidos
 const formatearNombreCompleto = (persona) => {
   if (!persona) return '';
   const { nombre, apellido_paterno, apellido_materno } = persona;
@@ -66,6 +55,14 @@ const formatearNombreCompleto = (persona) => {
     .join(' ');
 };
 
+// Mapeo de roles a entidades para iconos consistentes
+const rolToEntidad = {
+  admin: 'ADMIN',
+  superadmin: 'SUPERADMIN',
+  policia: 'POLICIA',
+  ambulancia: 'PERSONAL_AMBULANCIA'
+};
+
 const PersonalList = () => {
   const navigate = useNavigate();
   const [personal, setPersonal] = useState([]);
@@ -79,7 +76,6 @@ const PersonalList = () => {
     onConfirm: null
   });
   
-  // FILTROS
   const [filtros, setFiltros] = useState({
     rol: '',
     activo: '',
@@ -100,12 +96,10 @@ const PersonalList = () => {
 
   useEffect(() => {
     cargarPersonal();
-  }, []); // Solo cargar una vez al inicio
+  }, []);
 
-  // Función para filtrar datos localmente
   const filtrarDatos = (datos) => {
     return datos.filter(item => {
-      // Filtro por búsqueda
       if (filtros.search) {
         const termino = filtros.search.toLowerCase().trim();
         const nombreMatch = item.nombreCompleto?.toLowerCase().includes(termino);
@@ -114,16 +108,13 @@ const PersonalList = () => {
         if (!nombreMatch && !emailMatch && !placaMatch) return false;
       }
       
-      // Filtro por rol
       if (filtros.rol && item.rol !== filtros.rol) return false;
       
-      // Filtro por activo
       if (filtros.activo !== undefined && filtros.activo !== '') {
         const activoBool = filtros.activo === 'true';
         if (item.activo !== activoBool) return false;
       }
       
-      // Filtro por disponible
       if (filtros.disponible !== undefined && filtros.disponible !== '') {
         const disponibleBool = filtros.disponible === 'true';
         if (item.disponible !== disponibleBool) return false;
@@ -136,21 +127,13 @@ const PersonalList = () => {
   const cargarPersonal = async () => {
     setLoading(true);
     try {
-      const filtrosActivos = {
-        limite: 1000 // Traer todos
-      };
-
-      const response = await personalService.listarPersonal(filtrosActivos);
+      const response = await personalService.listarPersonal({ limite: 1000 });
       
-      // 🔥 AHORA FORMATEAMOS CON NOMBRE COMPLETO
       const personalFormateado = (response.data || []).map(p => {
         const nombreCompleto = formatearNombreCompleto(p);
         return {
           ...p,
-          nombreCompleto, // Guardamos el nombre completo para mostrar
-          nombre: p.nombre, // Mantenemos el original para referencia
-          apellido_paterno: p.apellido_paterno,
-          apellido_materno: p.apellido_materno,
+          nombreCompleto,
           email: p.email,
           telefono: p.telefono,
           placa: p.placa?.toUpperCase(),
@@ -163,10 +146,7 @@ const PersonalList = () => {
       
       setPersonalOriginal(personalFormateado);
       
-      // Aplicar filtros iniciales
       const datosFiltrados = filtrarDatos(personalFormateado);
-      
-      // Calcular paginación
       const total = datosFiltrados.length;
       const totalPaginas = Math.ceil(total / filtros.limite);
       const inicio = (filtros.pagina - 1) * filtros.limite;
@@ -207,7 +187,6 @@ const PersonalList = () => {
     });
   };
 
-  // Aplicar filtros cuando cambian
   useEffect(() => {
     if (personalOriginal.length) {
       const datosFiltrados = filtrarDatos(personalOriginal);
@@ -342,7 +321,6 @@ const PersonalList = () => {
           </div>
 
           <div className="flex flex-col md:flex-row gap-4">
-            {/* Buscador en tiempo real */}
             <div className="flex-1 relative">
               <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
               <input
@@ -362,7 +340,6 @@ const PersonalList = () => {
               )}
             </div>
 
-            {/* Filtros por select */}
             <select
               value={filtros.rol}
               onChange={(e) => setFiltros(prev => ({ ...prev, rol: e.target.value, pagina: 1 }))}
@@ -395,7 +372,6 @@ const PersonalList = () => {
               <option value="false">Ocupado</option>
             </select>
 
-            {/* Botón Limpiar */}
             <button
               onClick={limpiarFiltros}
               className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium whitespace-nowrap border border-gray-300"
@@ -408,7 +384,6 @@ const PersonalList = () => {
             <div className="mt-3 flex items-center gap-2 text-xs">
               <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></span>
               <span className="text-blue-600 font-medium">Filtros aplicados - {paginacion.total} resultados</span>
-              
             </div>
           )}
         </div>
@@ -478,19 +453,14 @@ const PersonalList = () => {
                           </div>
                         </td>
                         <td className="px-4 py-3">
-                          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
-                            persona.rol === 'admin' ? 'bg-purple-100 text-purple-700' :
-                            persona.rol === 'superadmin' ? 'bg-red-100 text-red-700' :
-                            persona.rol === 'policia' ? 'bg-blue-100 text-blue-700' :
-                            'bg-green-100 text-green-700'
-                          }`}>
-                            {persona.rol === 'policia' && <Shield size={12} />}
-                            {persona.rol === 'ambulancia' && <Ambulance size={12} />}
-                            {persona.rol === 'policia' ? 'Policía' :
-                             persona.rol === 'ambulancia' ? 'Ambulancia' :
-                             persona.rol === 'admin' ? 'Admin' :
-                             persona.rol === 'superadmin' ? 'Superadmin' : persona.rol}
-                          </span>
+                          <BadgeIcono 
+                            entidad={rolToEntidad[persona.rol] || 'ADMIN'} 
+                            texto={persona.rol === 'policia' ? 'Policía' :
+                                   persona.rol === 'ambulancia' ? 'Ambulancia' :
+                                   persona.rol === 'admin' ? 'Admin' :
+                                   persona.rol === 'superadmin' ? 'Superadmin' : persona.rol}
+                            size={12}
+                          />
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-600">{persona.placa}</td>
                         <td className="px-4 py-3">
@@ -594,7 +564,6 @@ const PersonalList = () => {
                   {modalInfo.tipo === 'error' && <AlertTriangle size={24} className="text-red-600" />}
                   {modalInfo.tipo === 'success' && <CheckCircle size={24} className="text-green-600" />}
                   {modalInfo.tipo === 'confirm' && <AlertTriangle size={24} className="text-yellow-600" />}
-                  {modalInfo.tipo === 'info' && <AlertTriangle size={24} className="text-blue-600" />}
                 </div>
                 <h3 className="text-lg font-semibold text-gray-800">{modalInfo.titulo}</h3>
               </div>

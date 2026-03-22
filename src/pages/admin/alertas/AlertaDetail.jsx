@@ -7,8 +7,41 @@ import {
   PhoneCall, Mail as MailIcon, UserCircle
 } from 'lucide-react';
 import alertasService from '../../../services/admin/alertas.service';
-import MapaConDireccion from '../../../components/maps/MapaConDireccion';
 import toast from 'react-hot-toast';
+import IconoEntidad, { BadgeTipoAlerta, ModalMapa } from '../../../components/ui/IconoEntidad';
+import BotonUbicacion from '../../../components/ui/BotonUbicacion';
+
+// Función para normalizar texto
+const normalizarTexto = (texto) => {
+  if (!texto) return '';
+  
+  const reemplazos = [
+    { de: '¡', para: 'í' }, { de: '£', para: 'ú' }, { de: '¤', para: 'ñ' },
+    { de: '€', para: 'e' }, { de: '‚', para: 'é' }, { de: '¢', para: 'o' },
+    { de: 'Ã¡', para: 'á' }, { de: 'Ã©', para: 'é' }, { de: 'Ã­', para: 'í' },
+    { de: 'Ã³', para: 'ó' }, { de: 'Ãº', para: 'ú' }, { de: 'Ã�', para: 'Á' },
+    { de: 'Ã‰', para: 'É' }, { de: 'Ã�', para: 'Í' }, { de: 'Ã“', para: 'Ó' },
+    { de: 'Ãš', para: 'Ú' }, { de: 'Ã±', para: 'ñ' }, { de: 'Ã‘', para: 'Ñ' },
+    { de: 'Â¿', para: '¿' }, { de: 'Â¡', para: '¡' }
+  ];
+  
+  let textoNormalizado = texto;
+  reemplazos.forEach(({ de, para }) => {
+    textoNormalizado = textoNormalizado.split(de).join(para);
+  });
+  
+  return textoNormalizado;
+};
+
+const formatearNombre = (nombre) => {
+  if (!nombre) return '';
+  const nombreNormalizado = normalizarTexto(nombre);
+  return nombreNormalizado
+    .toLowerCase()
+    .split(' ')
+    .map(palabra => palabra.charAt(0).toUpperCase() + palabra.slice(1))
+    .join(' ');
+};
 
 const AlertaDetail = () => {
   const navigate = useNavigate();
@@ -20,8 +53,15 @@ const AlertaDetail = () => {
   const [motivoCierre, setMotivoCierre] = useState('');
   const [cerrando, setCerrando] = useState(false);
   
-  // Estado para controlar si el mapa está expandido
-  const [mapaExpandido, setMapaExpandido] = useState(false);
+  // Estado para modal de mapa
+  const [mapaModal, setMapaModal] = useState({
+    abierto: false,
+    lat: null,
+    lng: null,
+    titulo: null,
+    alertaId: null,
+    tipo: null
+  });
 
   useEffect(() => {
     cargarAlerta();
@@ -32,7 +72,6 @@ const AlertaDetail = () => {
       setLoading(true);
       console.log("Cargando alerta ID:", id);
       
-      // Buscar en expiradas y cerradas
       const [expiradasRes, cerradasRes] = await Promise.allSettled([
         alertasService.obtenerExpiradas({ limite: 100 }),
         alertasService.obtenerCerradasManual({ limite: 100 })
@@ -44,8 +83,15 @@ const AlertaDetail = () => {
       const encontrada = [...expiradas, ...cerradas].find(a => a.id === parseInt(id));
       
       if (encontrada) {
-        console.log("Alerta encontrada:", encontrada);
-        setAlerta(encontrada);
+        const alertaFormateada = {
+          ...encontrada,
+          ciudadano: encontrada.ciudadano ? {
+            ...encontrada.ciudadano,
+            nombre: formatearNombre(encontrada.ciudadano.nombre)
+          } : null
+        };
+        console.log("Alerta encontrada:", alertaFormateada);
+        setAlerta(alertaFormateada);
       } else {
         setError('Alerta no encontrada');
       }
@@ -73,7 +119,6 @@ const AlertaDetail = () => {
         setMostrarModalCierre(false);
         setMotivoCierre('');
         
-        // Actualizar la alerta localmente
         setAlerta(prev => ({
           ...prev,
           estado: 'cerrada',
@@ -81,7 +126,6 @@ const AlertaDetail = () => {
           motivo_cierre_manual: motivoCierre
         }));
         
-        // Recargar después de 2 segundos para asegurar datos actualizados
         setTimeout(() => cargarAlerta(), 2000);
       }
     } catch (error) {
@@ -90,6 +134,29 @@ const AlertaDetail = () => {
     } finally {
       setCerrando(false);
     }
+  };
+
+  const abrirMapaModal = () => {
+    if (!alerta?.lat || !alerta?.lng) return;
+    setMapaModal({
+      abierto: true,
+      lat: alerta.lat,
+      lng: alerta.lng,
+      titulo: alerta.tipo === 'panico' ? 'Alerta de Pánico' : 'Alerta Médica',
+      alertaId: alerta.id,
+      tipo: alerta.tipo
+    });
+  };
+
+  const cerrarMapaModal = () => {
+    setMapaModal({
+      abierto: false,
+      lat: null,
+      lng: null,
+      titulo: null,
+      alertaId: null,
+      tipo: null
+    });
   };
 
   const getEstadoColor = (estado) => {
@@ -113,13 +180,7 @@ const AlertaDetail = () => {
   const getTipoGradient = (tipo) => {
     return tipo === 'panico'
       ? 'from-red-600 to-rose-700'
-      : 'from-amber-600 to-orange-700';
-  };
-
-  const getBadgeColor = (tipo) => {
-    return tipo === 'panico'
-      ? 'bg-red-100 text-red-700 border-red-200'
-      : 'bg-amber-100 text-amber-700 border-amber-200';
+      : 'from-green-600 to-emerald-700';
   };
 
   if (loading) {
@@ -127,8 +188,8 @@ const AlertaDetail = () => {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 sm:p-6 md:p-8">
         <div className="max-w-6xl mx-auto">
           <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
-            <Loader size={48} className="animate-spin text-blue-600 mx-auto mb-4" />
-            <p className="text-gray-500">Cargando información de la alerta...</p>
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-gray-200 border-t-blue-600"></div>
+            <p className="mt-4 text-gray-500">Cargando información de la alerta...</p>
           </div>
         </div>
       </div>
@@ -204,11 +265,11 @@ const AlertaDetail = () => {
               <div className={`bg-gradient-to-r ${getTipoGradient(alerta.tipo)} px-6 py-4`}>
                 <div className="flex items-center gap-4">
                   <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
-                    {alerta.tipo === 'panico' ? (
-                      <AlertTriangle size={28} className="text-white" />
-                    ) : (
-                      <AlertCircle size={28} className="text-white" />
-                    )}
+                    <IconoEntidad 
+                      entidad={alerta.tipo === 'panico' ? 'ALERTA_PANICO' : 'ALERTA_MEDICA'} 
+                      size={28}
+                      color="text-white"
+                    />
                   </div>
                   <div>
                     <h2 className="text-xl font-bold text-white">
@@ -256,7 +317,7 @@ const AlertaDetail = () => {
                 {alerta.ciudadano && (
                   <div className="border-t border-gray-100 pt-6">
                     <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                      <UserCircle size={20} className="text-blue-600" />
+                      <UserCircle size={20} className="text-purple-600" />
                       Información del Ciudadano
                     </h3>
                     
@@ -310,9 +371,9 @@ const AlertaDetail = () => {
 
           {/* Columna derecha: Mapa y ubicación */}
           <div className="lg:col-span-1 space-y-6">
-            {/* Tarjeta de ubicación con mapa */}
-            <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100 sticky top-6">
-              <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
+            {/* Tarjeta de ubicación con botón profesional */}
+            <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100">
+              <div className={`bg-gradient-to-r ${getTipoGradient(alerta.tipo)} px-6 py-4`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
@@ -320,31 +381,17 @@ const AlertaDetail = () => {
                     </div>
                     <h3 className="font-semibold text-white">Ubicación del Evento</h3>
                   </div>
-                  
-                  {alerta.lat && alerta.lng && (
-                    <button
-                      onClick={() => setMapaExpandido(!mapaExpandido)}
-                      className="p-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors backdrop-blur-sm"
-                      title={mapaExpandido ? "Reducir mapa" : "Expandir mapa"}
-                    >
-                      {mapaExpandido ? (
-                        <span className="text-white text-xs px-2">−</span>
-                      ) : (
-                        <span className="text-white text-xs px-2">+</span>
-                      )}
-                    </button>
-                  )}
                 </div>
               </div>
 
-              <div className="p-6">
+              <div className="p-5">
                 {alerta.lat && alerta.lng ? (
                   <>
-                    {/* Coordenadas en formato legible */}
+                    {/* Coordenadas */}
                     <div className="mb-4 p-3 bg-gray-50 rounded-xl border border-gray-200">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <MapPin size={16} className="text-blue-600" />
+                          <MapPin size={16} className="text-red-500" />
                           <span className="text-xs text-gray-500">Coordenadas:</span>
                         </div>
                         <span className="text-sm font-mono font-medium text-gray-700">
@@ -353,38 +400,16 @@ const AlertaDetail = () => {
                       </div>
                     </div>
 
-                    {/* Mapa - altura dinámica según estado */}
-                    <div className={`rounded-xl overflow-hidden border-2 border-gray-100 transition-all duration-300 ${
-                      mapaExpandido ? 'h-[500px]' : 'h-[300px]'
-                    }`}>
-                      <MapaConDireccion
-                        lat={alerta.lat}
-                        lng={alerta.lng}
-                        titulo={
-                          <div className="flex items-center gap-1.5">
-                            {alerta.tipo === 'panico' ? (
-                              <>
-                                <AlertTriangle size={14} className="text-red-500" />
-                                <span className="text-xs font-medium text-gray-700">
-                                  Alerta de Pánico
-                                </span>
-                              </>
-                            ) : (
-                              <>
-                                <AlertCircle size={14} className="text-amber-500" />
-                                <span className="text-xs font-medium text-gray-700">
-                                  Alerta Médica
-                                </span>
-                              </>
-                            )}
-                          </div>
-                        }
-                        alertaId={alerta.id}
-                        altura={mapaExpandido ? "500px" : "300px"}
-                      />
-                    </div>
+                    {/* Botón de ubicación profesional */}
+                    <BotonUbicacion
+                      lat={alerta.lat}
+                      lng={alerta.lng}
+                      titulo={alerta.tipo === 'panico' ? 'Alerta de Pánico' : 'Alerta Médica'}
+                      alertaId={alerta.id}
+                      altura="280px"
+                    />
 
-                    {/* Botón para abrir en Google Maps (opcional) */}
+                    {/* Botón para abrir en Google Maps */}
                     <div className="mt-4">
                       <a
                         href={`https://www.google.com/maps?q=${alerta.lat},${alerta.lng}`}
@@ -406,7 +431,7 @@ const AlertaDetail = () => {
               </div>
             </div>
 
-            {/* Estadísticas rápidas (opcional) */}
+            {/* Información adicional */}
             <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
               <h4 className="text-sm font-semibold text-gray-700 mb-4">Información adicional</h4>
               <div className="space-y-3">
@@ -416,9 +441,7 @@ const AlertaDetail = () => {
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-gray-100">
                   <span className="text-xs text-gray-500">Tipo</span>
-                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${getBadgeColor(alerta.tipo)}`}>
-                    {alerta.tipo === 'panico' ? 'Pánico' : 'Médica'}
-                  </span>
+                  <BadgeTipoAlerta tipo={alerta.tipo} size={12} />
                 </div>
                 {alerta.ciudadano && (
                   <div className="flex justify-between items-center py-2">
@@ -484,22 +507,16 @@ const AlertaDetail = () => {
         </div>
       )}
 
-      {/* Estilos para animaciones */}
-      <style jsx>{`
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: scale(0.95);
-          }
-          to {
-            opacity: 1;
-            transform: scale(1);
-          }
-        }
-        .animate-fadeIn {
-          animation: fadeIn 0.2s ease-out;
-        }
-      `}</style>
+      {/* Modal del Mapa */}
+      <ModalMapa
+        isOpen={mapaModal.abierto}
+        onClose={cerrarMapaModal}
+        lat={mapaModal.lat}
+        lng={mapaModal.lng}
+        titulo={mapaModal.titulo}
+        alertaId={mapaModal.alertaId}
+        tipo={mapaModal.tipo}
+      />
     </div>
   );
 };
@@ -512,11 +529,17 @@ const InfoCard = ({ icon: Icon, label, value, color = 'blue' }) => {
     green: 'bg-green-50 border-green-100'
   };
 
+  const iconColors = {
+    blue: 'text-blue-600',
+    amber: 'text-amber-600',
+    green: 'text-green-600'
+  };
+
   return (
     <div className={`p-4 rounded-xl border ${colorClasses[color]}`}>
       <div className="flex items-start gap-3">
         <div className={`p-2 bg-white rounded-lg`}>
-          <Icon size={18} className={`text-${color}-600`} />
+          <Icon size={18} className={iconColors[color]} />
         </div>
         <div>
           <p className="text-xs text-gray-500 uppercase tracking-wider">{label}</p>

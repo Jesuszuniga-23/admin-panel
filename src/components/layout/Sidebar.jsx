@@ -1,46 +1,79 @@
-import { useState } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   UserCog,
   Bell,
   Users,
-  BarChart3,
   FileText,
-  AlertTriangle,
   CheckCircle,
-  Shield,
   LogOut,
   Truck,
   RefreshCw,
   ChevronDown,
   ChevronRight,
   Clock,
-  XCircle,
   UserPlus,
   Key,
-  Activity, Globe 
+  Activity,
+  Globe,
+  HelpCircle
 } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
 import authService from '../../services/auth.service';
 import toast from 'react-hot-toast';
 
-// Función para formatear nombres (acentos y mayúsculas)
+// Componente Modal de Confirmación con z-index más alto
+const ConfirmacionModal = ({ isOpen, onClose, onConfirm, onCancel }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full relative z-[10000]">
+        <div className="p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 bg-amber-100 rounded-full">
+              <HelpCircle size={24} className="text-amber-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-800">
+              ¿Guardar progreso?
+            </h3>
+          </div>
+          
+          <p className="text-gray-600 mb-6">
+            Tienes cambios sin guardar en el formulario. ¿Deseas guardar el progreso antes de salir?
+          </p>
+          
+          <div className="flex gap-3 justify-end">
+            <button
+              onClick={onCancel}
+              className="px-4 py-2 border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-all text-sm font-medium"
+            >
+              No, descartar
+            </button>
+            <button
+              onClick={onConfirm}
+              className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all text-sm font-medium shadow-md"
+            >
+              Sí, guardar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Función para formatear nombres
 const formatearNombre = (nombre) => {
   if (!nombre) return '';
 
-  // Mapa de caracteres mal codificados
   const reemplazos = [
     { de: 'Ã¡', para: 'á' }, { de: 'Ã©', para: 'é' }, { de: 'Ã­', para: 'í' },
     { de: 'Ã³', para: 'ó' }, { de: 'Ãº', para: 'ú' }, { de: 'Ã�', para: 'Á' },
     { de: 'Ã‰', para: 'É' }, { de: 'Ã�', para: 'Í' }, { de: 'Ã“', para: 'Ó' },
     { de: 'Ãš', para: 'Ú' }, { de: 'Ã±', para: 'ñ' }, { de: 'Ã‘', para: 'Ñ' },
-    { de: 'Â¿', para: '¿' }, { de: 'Â¡', para: '¡' },
-    { de: '£', para: 'ú' }, { de: '¤', para: 'ñ' }, { de: '€', para: 'é' },
-    { de: '‚', para: 'é' }, { de: '¢', para: 'ó' },
-    { de: 'Ram¡rez', para: 'Ramírez' }, { de: 'Z£¤iga', para: 'Zúñiga' },
-    { de: 'L¢pez', para: 'López' }, { de: 'Jes£s', para: 'Jesús' },
-    { de: 'Param‚dico', para: 'Paramédico' }, { de: 'Oficial', para: 'Oficial' }
+    { de: '£', para: 'ú' }, { de: '¤', para: 'ñ' }
   ];
 
   let nombreFormateado = nombre;
@@ -48,7 +81,6 @@ const formatearNombre = (nombre) => {
     nombreFormateado = nombreFormateado.split(de).join(para);
   });
 
-  // Capitalizar primera letra de cada palabra
   return nombreFormateado
     .toLowerCase()
     .split(' ')
@@ -58,15 +90,49 @@ const formatearNombre = (nombre) => {
 
 const Sidebar = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, logout } = useAuthStore();
   const [openMenus, setOpenMenus] = useState({
-    alertas: true,      // Abierto por defecto
-    usuarios: false,
-    unidades: false,
-    reportes: false
+    alertas: true,
+    usuarios: false
   });
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [pendingPath, setPendingPath] = useState(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isPersonalFormActive, setIsPersonalFormActive] = useState(false);
+
+  // Escuchar eventos de cambios sin guardar
+  useEffect(() => {
+    const handleUnsavedStatus = (event) => {
+      setHasUnsavedChanges(event.detail.hasUnsaved);
+      setIsPersonalFormActive(event.detail.isPersonalFormActive || false);
+    };
+
+    window.addEventListener('formUnsavedStatus', handleUnsavedStatus);
+    
+    return () => {
+      window.removeEventListener('formUnsavedStatus', handleUnsavedStatus);
+    };
+  }, []);
+
+  // Resetear estado cuando se sale de la ruta del formulario
+  useEffect(() => {
+    if (!location.pathname.includes('/admin/personal')) {
+      setHasUnsavedChanges(false);
+      setIsPersonalFormActive(false);
+    }
+  }, [location.pathname]);
 
   const handleLogout = async () => {
+    if (hasUnsavedChanges && isPersonalFormActive) {
+      setPendingPath('logout');
+      setShowConfirmModal(true);
+    } else {
+      await performLogout();
+    }
+  };
+
+  const performLogout = async () => {
     try {
       console.log("Cerrando sesión...");
       await authService.logout();
@@ -79,6 +145,55 @@ const Sidebar = () => {
     }
   };
 
+  const handleNavigation = (path) => {
+    // Solo mostrar modal si hay cambios y estamos en el formulario de personal
+    if (hasUnsavedChanges && isPersonalFormActive && path !== location.pathname) {
+      setPendingPath(path);
+      setShowConfirmModal(true);
+    } else {
+      navigate(path);
+    }
+  };
+
+  const handleConfirmSave = () => {
+    setShowConfirmModal(false);
+    
+    const saveEvent = new CustomEvent('saveFormProgress');
+    window.dispatchEvent(saveEvent);
+    
+    setTimeout(() => {
+      if (pendingPath === 'logout') {
+        performLogout();
+      } else if (pendingPath) {
+        navigate(pendingPath);
+      }
+      setPendingPath(null);
+    }, 100);
+  };
+
+  const handleConfirmDiscard = () => {
+    setShowConfirmModal(false);
+    
+    const discardEvent = new CustomEvent('discardFormProgress');
+    window.dispatchEvent(discardEvent);
+    
+    // Resetear estado local
+    setHasUnsavedChanges(false);
+    setIsPersonalFormActive(false);
+    
+    if (pendingPath === 'logout') {
+      performLogout();
+    } else if (pendingPath) {
+      navigate(pendingPath);
+    }
+    setPendingPath(null);
+  };
+
+  const handleCancel = () => {
+    setShowConfirmModal(false);
+    setPendingPath(null);
+  };
+
   const toggleMenu = (menu) => {
     setOpenMenus(prev => ({
       ...prev,
@@ -88,279 +203,250 @@ const Sidebar = () => {
 
   if (!user) return null;
 
-  // Formatear nombre del usuario
   const nombreFormateado = formatearNombre(user.nombre);
 
   return (
-    <aside className="w-72 bg-white shadow-lg flex flex-col h-screen overflow-y-auto">
-      <div className="p-6 border-b">
-        <h2 className="text-xl font-bold text-gray-800">Sistema de Alertas</h2>
-        <p className="text-xs text-gray-500 mt-1">
-          Administración Sistema Central
-        </p>
-      </div>
+    <>
+      <aside className="w-72 bg-white shadow-lg flex flex-col h-screen overflow-y-auto relative z-10">
+        <div className="p-6 border-b">
+          <h2 className="text-xl font-bold text-gray-800">Sistema de Alertas</h2>
+          <p className="text-xs text-gray-500 mt-1">
+            Administración Sistema Central
+          </p>
+        </div>
 
-      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
 
-        {/*  DASHBOARD  */}
-        <NavLink
-          to="/admin/dashboard"
-          className={({ isActive }) =>
-            `flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive
-              ? 'bg-blue-50 text-blue-600 font-semibold border-l-4 border-blue-600'
-              : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600'
-            }`
-          }
-        >
-          <LayoutDashboard size={18} />
-          <span>Dashboard</span>
-        </NavLink>
-
-        {/*  PERFIL  */}
-        <NavLink
-          to="/admin/perfil"
-          className={({ isActive }) =>
-            `flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive
-              ? 'bg-blue-50 text-blue-600 font-semibold border-l-4 border-blue-600'
-              : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600'
-            }`
-          }
-        >
-          <UserCog size={18} />
-          <span>Perfil</span>
-        </NavLink>
-
-        {/*  ALERTAS (MENÚ PRINCIPAL)  */}
-        <div className="border-t pt-2 mt-2">
+          {/* DASHBOARD */}
           <button
-            onClick={() => toggleMenu('alertas')}
-            className="w-full flex items-center justify-between px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg transition-all"
+            onClick={() => handleNavigation("/admin/dashboard")}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+              location.pathname === "/admin/dashboard"
+                ? 'bg-blue-50 text-blue-600 font-semibold border-l-4 border-blue-600'
+                : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600'
+            }`}
           >
-            <div className="flex items-center gap-3">
-              <Bell size={18} className="text-gray-500" />
-              <span className="font-medium">Alertas</span>
-            </div>
-            {openMenus.alertas ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+            <LayoutDashboard size={18} />
+            <span>Dashboard</span>
           </button>
 
-          {openMenus.alertas && (
-            <div className="ml-4 mt-1 space-y-1 pl-4 border-l-2 border-gray-100">
-              {/* Todas las Alertas (próximamente) */}
-              <button
-                onClick={() => console.log("Todas las Alertas - en construcción")}
-                className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-400 cursor-not-allowed hover:bg-gray-50 rounded-lg transition-all"
-                disabled
-              >
-
-
-              </button>
-
-
-
-
-              {/* Alertas Activas */}
-              <NavLink
-                to="/admin/alertas/activas"
-                className={({ isActive }) =>
-                  `flex items-center gap-3 px-4 py-2 text-sm rounded-lg transition-all ${isActive
-                    ? 'bg-blue-50 text-blue-600 font-semibold'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
-                  }`
-                }
-              >
-                <Bell size={16} />
-                <span>Activas</span>
-              </NavLink>
-
-              {/* Alertas en Proceso  */}
-              <NavLink
-                to="/admin/alertas/en-proceso"
-                className={({ isActive }) =>
-                  `flex items-center gap-3 px-4 py-2 text-sm rounded-lg transition-all ${isActive
-                    ? 'bg-blue-50 text-blue-600 font-semibold'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
-                  }`
-                }
-              >
-                <Activity size={16} />
-                <span>En Proceso</span>
-              </NavLink>
-
-              {/* Alertas Cerradas (NUEVO) */}
-              <NavLink
-                to="/admin/alertas/cerradas"
-                className={({ isActive }) =>
-                  `flex items-center gap-3 px-4 py-2 text-sm rounded-lg transition-all ${isActive
-                    ? 'bg-blue-50 text-blue-600 font-semibold'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
-                  }`
-                }
-              >
-                <CheckCircle size={16} />
-                <span>Cerradas</span>
-              </NavLink>
-              {/* Alertas Expiradas */}
-              <NavLink
-                to="/admin/alertas/expiradas"
-                className={({ isActive }) =>
-                  `flex items-center gap-3 px-4 py-2 text-sm rounded-lg transition-all ${isActive
-                    ? 'bg-blue-50 text-blue-600 font-semibold'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
-                  }`
-                }
-              >
-                <Clock size={16} />
-                <span>Expiradas</span>
-              </NavLink>
-              {/* Alertas Cerradas Manualmente */}
-              <NavLink
-                to="/admin/alertas/cerradas-manual"
-                className={({ isActive }) =>
-                  `flex items-center gap-3 px-4 py-2 text-sm rounded-lg transition-all ${isActive
-                    ? 'bg-blue-50 text-blue-600 font-semibold'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
-                  }`
-                }
-              >
-                <CheckCircle size={16} />
-                <span>Cerradas Manualmente</span>
-              </NavLink>
-            </div>
-          )}
-        </div>
-
-        {/*  REASIGNACIONES  */}
-        <NavLink
-          to="/admin/reasignaciones/pendientes"
-          className={({ isActive }) =>
-            `flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive
-              ? 'bg-blue-50 text-blue-600 font-semibold border-l-4 border-blue-600'
-              : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600'
-            }`
-          }
-        >
-          <RefreshCw size={18} />
-          <span>Reasignaciones</span>
-        </NavLink>
-
-        {/*  GESTIÓN DE USUARIOS  */}
-        <div className="border-t pt-2 mt-2">
+          {/* PERFIL */}
           <button
-            onClick={() => toggleMenu('usuarios')}
-            className="w-full flex items-center justify-between px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg transition-all"
+            onClick={() => handleNavigation("/admin/perfil")}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+              location.pathname === "/admin/perfil"
+                ? 'bg-blue-50 text-blue-600 font-semibold border-l-4 border-blue-600'
+                : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600'
+            }`}
           >
-            <div className="flex items-center gap-3">
-              <Users size={18} className="text-gray-500" />
-              <span className="font-medium">Gestión de Usuarios</span>
-            </div>
-            {openMenus.usuarios ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+            <UserCog size={18} />
+            <span>Perfil</span>
           </button>
 
-          {openMenus.usuarios && (
-            <div className="ml-4 mt-1 space-y-1 pl-4 border-l-2 border-gray-100">
-              {/* Personal */}
-              <NavLink
-                to="/admin/personal"
-                className={({ isActive }) =>
-                  `flex items-center gap-3 px-4 py-2 text-sm rounded-lg transition-all ${isActive
-                    ? 'bg-blue-50 text-blue-600 font-semibold'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
-                  }`
-                }
-              >
-                <UserPlus size={16} />
-                <span>Personal</span>
-              </NavLink>
+          {/* ALERTAS (MENÚ PRINCIPAL) */}
+          <div className="border-t pt-2 mt-2">
+            <button
+              onClick={() => toggleMenu('alertas')}
+              className="w-full flex items-center justify-between px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg transition-all"
+            >
+              <div className="flex items-center gap-3">
+                <Bell size={18} className="text-gray-500" />
+                <span className="font-medium">Alertas</span>
+              </div>
+              {openMenus.alertas ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+            </button>
 
-              {/* Recuperaciones */}
-              <NavLink
-                to="/admin/recuperaciones/pendientes"
-                className={({ isActive }) =>
-                  `flex items-center gap-3 px-4 py-2 text-sm rounded-lg transition-all ${isActive
-                    ? 'bg-blue-50 text-blue-600 font-semibold'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
-                  }`
-                }
-              >
-                <Key size={16} />
-                <span>Recuperaciones</span>
-              </NavLink>
+            {openMenus.alertas && (
+              <div className="ml-4 mt-1 space-y-1 pl-4 border-l-2 border-gray-100">
+                <button
+                  onClick={() => handleNavigation("/admin/alertas/activas")}
+                  className={`w-full flex items-center gap-3 px-4 py-2 text-sm rounded-lg transition-all ${
+                    location.pathname === "/admin/alertas/activas"
+                      ? 'bg-blue-50 text-blue-600 font-semibold'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
+                  }`}
+                >
+                  <Bell size={16} />
+                  <span>Activas</span>
+                </button>
+
+                <button
+                  onClick={() => handleNavigation("/admin/alertas/en-proceso")}
+                  className={`w-full flex items-center gap-3 px-4 py-2 text-sm rounded-lg transition-all ${
+                    location.pathname === "/admin/alertas/en-proceso"
+                      ? 'bg-blue-50 text-blue-600 font-semibold'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
+                  }`}
+                >
+                  <Activity size={16} />
+                  <span>En Proceso</span>
+                </button>
+
+                <button
+                  onClick={() => handleNavigation("/admin/alertas/cerradas")}
+                  className={`w-full flex items-center gap-3 px-4 py-2 text-sm rounded-lg transition-all ${
+                    location.pathname === "/admin/alertas/cerradas"
+                      ? 'bg-blue-50 text-blue-600 font-semibold'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
+                  }`}
+                >
+                  <CheckCircle size={16} />
+                  <span>Cerradas</span>
+                </button>
+
+                <button
+                  onClick={() => handleNavigation("/admin/alertas/expiradas")}
+                  className={`w-full flex items-center gap-3 px-4 py-2 text-sm rounded-lg transition-all ${
+                    location.pathname === "/admin/alertas/expiradas"
+                      ? 'bg-blue-50 text-blue-600 font-semibold'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
+                  }`}
+                >
+                  <Clock size={16} />
+                  <span>Expiradas</span>
+                </button>
+
+                <button
+                  onClick={() => handleNavigation("/admin/alertas/cerradas-manual")}
+                  className={`w-full flex items-center gap-3 px-4 py-2 text-sm rounded-lg transition-all ${
+                    location.pathname === "/admin/alertas/cerradas-manual"
+                      ? 'bg-blue-50 text-blue-600 font-semibold'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
+                  }`}
+                >
+                  <CheckCircle size={16} />
+                  <span>Cerradas Manualmente</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* REASIGNACIONES */}
+          <button
+            onClick={() => handleNavigation("/admin/reasignaciones/pendientes")}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+              location.pathname === "/admin/reasignaciones/pendientes"
+                ? 'bg-blue-50 text-blue-600 font-semibold border-l-4 border-blue-600'
+                : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600'
+            }`}
+          >
+            <RefreshCw size={18} />
+            <span>Reasignaciones</span>
+          </button>
+
+          {/* GESTIÓN DE USUARIOS */}
+          <div className="border-t pt-2 mt-2">
+            <button
+              onClick={() => toggleMenu('usuarios')}
+              className="w-full flex items-center justify-between px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg transition-all"
+            >
+              <div className="flex items-center gap-3">
+                <Users size={18} className="text-gray-500" />
+                <span className="font-medium">Gestión de Usuarios</span>
+              </div>
+              {openMenus.usuarios ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+            </button>
+
+            {openMenus.usuarios && (
+              <div className="ml-4 mt-1 space-y-1 pl-4 border-l-2 border-gray-100">
+                <button
+                  onClick={() => handleNavigation("/admin/personal")}
+                  className={`w-full flex items-center gap-3 px-4 py-2 text-sm rounded-lg transition-all ${
+                    location.pathname === "/admin/personal"
+                      ? 'bg-blue-50 text-blue-600 font-semibold'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
+                  }`}
+                >
+                  <UserPlus size={16} />
+                  <span>Personal</span>
+                </button>
+
+                <button
+                  onClick={() => handleNavigation("/admin/recuperaciones/pendientes")}
+                  className={`w-full flex items-center gap-3 px-4 py-2 text-sm rounded-lg transition-all ${
+                    location.pathname === "/admin/recuperaciones/pendientes"
+                      ? 'bg-blue-50 text-blue-600 font-semibold'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
+                  }`}
+                >
+                  <Key size={16} />
+                  <span>Recuperaciones</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* UNIDADES */}
+          <button
+            onClick={() => handleNavigation("/admin/unidades")}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+              location.pathname === "/admin/unidades"
+                ? 'bg-blue-50 text-blue-600 font-semibold border-l-4 border-blue-600'
+                : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600'
+            }`}
+          >
+            <Truck size={18} />
+            <span>Unidades</span>
+          </button>
+
+          {/* CENTRO DE REPORTES */}
+          <button
+            onClick={() => handleNavigation("/admin/reportes")}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+              location.pathname === "/admin/reportes"
+                ? 'bg-blue-50 text-blue-600 font-semibold border-l-4 border-blue-600'
+                : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600'
+            }`}
+          >
+            <FileText size={18} />
+            <span>Centro de Reportes</span>
+          </button>
+
+          {/* ANÁLISIS GEOGRÁFICO */}
+          <button
+            onClick={() => handleNavigation("/admin/analisis/geografico")}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+              location.pathname === "/admin/analisis/geografico"
+                ? 'bg-indigo-50 text-indigo-600 font-semibold border-l-4 border-indigo-600'
+                : 'text-gray-700 hover:bg-gray-50 hover:text-indigo-600'
+            }`}
+          >
+            <Globe size={18} />
+            <span>Análisis Geográfico</span>
+          </button>
+          
+        </nav>
+
+        {/* Información del usuario y Logout */}
+        <div className="border-t p-4">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg flex items-center justify-center text-white font-bold">
+              {nombreFormateado?.charAt(0).toUpperCase()}
             </div>
-          )}
-        </div>
-
-        {/*  UNIDADES  */}
-        <NavLink
-          to="/admin/unidades"
-          className={({ isActive }) =>
-            `flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive
-              ? 'bg-blue-50 text-blue-600 font-semibold border-l-4 border-blue-600'
-              : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600'
-            }`
-          }
-        >
-          <Truck size={18} />
-          <span>Unidades</span>
-        </NavLink>
-
-        {/* */}
-        <button
-          onClick={() => console.log("Estadísticas - en construcción")}
-          className="w-full flex items-center gap-3 px-4 py-3 text-gray-400 cursor-not-allowed hover:bg-gray-50 rounded-lg transition-all"
-          disabled
-        >
-
-        </button>
-
-        {/*  CENTRO DE REPORTES  */}
-        <NavLink
-          to="/admin/reportes"
-          className={({ isActive }) =>
-            `flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive
-              ? 'bg-blue-50 text-blue-600 font-semibold border-l-4 border-blue-600'
-              : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600'
-            }`
-          }
-        >
-          <FileText size={18} />
-          <span>Centro de Reportes</span>
-        </NavLink>
-        <NavLink
-          to="/admin/analisis/geografico"
-          className={({ isActive }) =>
-            `flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${isActive
-              ? 'bg-indigo-50 text-indigo-600 font-semibold border-l-4 border-indigo-600'
-              : 'text-gray-700 hover:bg-gray-50 hover:text-indigo-600'
-            }`
-          }
-        >
-          <Globe size={18} />
-          <span>Análisis Geográfico</span>
-        </NavLink>
-        
-      </nav>
-
-      {/* Información del usuario y Logout */}
-      <div className="border-t p-4">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg flex items-center justify-center text-white font-bold">
-            {nombreFormateado?.charAt(0).toUpperCase()}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-800 truncate">{nombreFormateado}</p>
+              <p className="text-xs text-gray-500 truncate capitalize">{user.rol}</p>
+            </div>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-800 truncate">{nombreFormateado}</p>
-            <p className="text-xs text-gray-500 truncate capitalize">{user.rol}</p>
-          </div>
-        </div>
 
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-4 py-3 text-red-600 hover:bg-red-50 rounded-lg transition-all font-medium"
-        >
-          <LogOut size={18} />
-          <span>Cerrar Sesión</span>
-        </button>
-      </div>
-    </aside>
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-4 py-3 text-red-600 hover:bg-red-50 rounded-lg transition-all font-medium"
+          >
+            <LogOut size={18} />
+            <span>Cerrar Sesión</span>
+          </button>
+        </div>
+      </aside>
+
+      {/* Modal de Confirmación */}
+      <ConfirmacionModal
+        isOpen={showConfirmModal}
+        onClose={handleCancel}
+        onConfirm={handleConfirmSave}
+        onCancel={handleConfirmDiscard}
+      />
+    </>
   );
 };
 

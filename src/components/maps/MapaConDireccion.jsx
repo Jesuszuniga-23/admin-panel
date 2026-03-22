@@ -1,7 +1,6 @@
-// src/components/maps/MapaConDireccion.jsx
 import { useState } from 'react';
 import MapaOSM from './MapaOSM';
-import { MapPin, Loader } from 'lucide-react';
+import { MapPin, Loader, X } from 'lucide-react';
 
 const MapaConDireccion = ({
   lat,
@@ -10,10 +9,10 @@ const MapaConDireccion = ({
   alertaId,
   altura = '320px'
 }) => {
-  const [mostrarMapa, setMostrarMapa] = useState(false);
   const [cargandoDireccion, setCargandoDireccion] = useState(false);
   const [direccion, setDireccion] = useState('');
   const [error, setError] = useState('');
+  const [mapaVisible, setMapaVisible] = useState(true); // Siempre visible al montar el componente
 
   // Validar coordenadas
   if (!lat || !lng || isNaN(parseFloat(lat)) || isNaN(parseFloat(lng))) {
@@ -26,72 +25,67 @@ const MapaConDireccion = ({
     );
   }
 
-  const handleVerUbicacion = async () => {
-    setMostrarMapa(true);
-    setCargandoDireccion(true);
-
-    try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=es`,
-        {
-          headers: {
-            'User-Agent': 'SistemaEmergencias/1.0'
+  // Obtener dirección automáticamente al montar el componente
+  useState(() => {
+    const obtenerDireccion = async () => {
+      setCargandoDireccion(true);
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=es`,
+          {
+            headers: {
+              'User-Agent': 'SistemaEmergencias/1.0'
+            }
           }
-        }
-      );
+        );
 
-      if (!response.ok) throw new Error('Error al obtener dirección');
+        if (!response.ok) throw new Error('Error al obtener dirección');
 
-      const data = await response.json();
-      setDireccion(data.display_name || 'Dirección no disponible');
+        const data = await response.json();
+        setDireccion(data.display_name || 'Dirección no disponible');
 
-    } catch (err) {
-      console.error('Error obteniendo dirección:', err);
-      setError('No se pudo obtener la dirección');
-    } finally {
-      setCargandoDireccion(false);
-    }
-  };
+      } catch (err) {
+        console.error('Error obteniendo dirección:', err);
+        setError('No se pudo obtener la dirección');
+      } finally {
+        setCargandoDireccion(false);
+      }
+    };
+
+    obtenerDireccion();
+  }, [lat, lng]);
 
   return (
-    <div className="space-y-2">
-      {!mostrarMapa ? (
-        <button
-          onClick={handleVerUbicacion}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-50 hover:bg-blue-100 border-2 border-blue-200 rounded-xl text-blue-700 font-medium transition-all group"
-        >
-          <MapPin size={18} className="text-blue-600 group-hover:scale-110 transition-transform" />
-          <span>Ver ubicación en mapa</span>
-        </button>
-      ) : (
-        <div className="space-y-3">
-          <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-            {cargandoDireccion ? (
-              <div className="flex items-center gap-2 text-blue-600">
-                <Loader size={16} className="animate-spin" />
-                <span className="text-sm">Obteniendo dirección...</span>
-              </div>
-            ) : error ? (
-              <p className="text-sm text-red-600">{error}</p>
-            ) : direccion ? (
-              <div className="text-sm text-gray-700">
-                <span className="font-semibold text-blue-800 flex items-center gap-1">
-                  <MapPin size={14} className="text-blue-600" /> Dirección:
-                </span>
-                <p className="mt-1">{direccion}</p>
-              </div>
-            ) : null}
-          </div>
-
-          <MapaOSM
-            lat={lat}
-            lng={lng}
-            titulo={titulo}
-            subtitulo={`ID: #${alertaId}`}
-            altura={altura}
-          />
+    <div className="space-y-3">
+      {/* Dirección (si está disponible) */}
+      {cargandoDireccion ? (
+        <div className="bg-blue-50 p-3 rounded-lg border border-blue-200 flex items-center gap-2">
+          <Loader size={16} className="animate-spin text-blue-600" />
+          <span className="text-sm text-blue-600">Obteniendo dirección...</span>
         </div>
-      )}
+      ) : error ? (
+        <div className="bg-red-50 p-3 rounded-lg border border-red-200">
+          <p className="text-sm text-red-600">{error}</p>
+        </div>
+      ) : direccion ? (
+        <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+          <div className="text-sm text-gray-700">
+            <span className="font-semibold text-blue-800 flex items-center gap-1">
+              <MapPin size={14} className="text-blue-600" /> Dirección:
+            </span>
+            <p className="mt-1">{direccion}</p>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Mapa - DIRECTAMENTE VISIBLE */}
+      <MapaOSM
+        lat={lat}
+        lng={lng}
+        titulo={titulo}
+        subtitulo={`ID: #${alertaId}`}
+        altura={altura}
+      />
     </div>
   );
 };

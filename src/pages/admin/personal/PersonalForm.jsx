@@ -1,13 +1,22 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
   User, Mail, Phone, Shield, Hash, Save, X,
   ChevronLeft, AlertCircle, CheckCircle, Loader,
   AlertTriangle, Info, Lock, Clock,
-  BadgeCheck, Activity
+  BadgeCheck, Activity, HelpCircle
 } from 'lucide-react';
 import personalService from '../../../services/admin/personal.service';
 import toast from 'react-hot-toast';
+import IconoEntidad, { BadgeIcono } from '../../../components/ui/IconoEntidad';
+
+// Mapeo de roles a entidades para iconos consistentes
+const rolToEntidad = {
+  admin: 'ADMIN',
+  superadmin: 'SUPERADMIN',
+  policia: 'POLICIA',
+  ambulancia: 'PERSONAL_AMBULANCIA'
+};
 
 // Función para corregir caracteres mal codificados
 const corregirTexto = (texto) => {
@@ -28,7 +37,7 @@ const corregirTexto = (texto) => {
   return textoCorregido;
 };
 
-// Componente de barra de progreso - VERSIÓN SOBRIA
+// Componente de barra de progreso
 const ProgressBar = ({ completed, total }) => {
   const percentage = Math.min(100, Math.round((completed / total) * 100));
   
@@ -55,6 +64,7 @@ const ProgressBar = ({ completed, total }) => {
 
 const PersonalForm = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams();
   const isEditing = !!id;
   const storageKey = isEditing ? `personal_form_edit_${id}` : 'personal_form_new';
@@ -62,7 +72,6 @@ const PersonalForm = () => {
   const [loading, setLoading] = useState(false);
   const [cargandoDatos, setCargandoDatos] = useState(isEditing);
   
-  // RECUPERAR DATOS GUARDADOS
   const [formData, setFormData] = useState(() => {
     const savedData = sessionStorage.getItem(storageKey);
     if (savedData && !isEditing) {
@@ -86,6 +95,7 @@ const PersonalForm = () => {
     };
   });
   
+  const [originalFormData, setOriginalFormData] = useState(null);
   const [errors, setErrors] = useState({
     nombre: '',
     apellido_paterno: '',
@@ -104,12 +114,10 @@ const PersonalForm = () => {
   const [todosPersonales, setTodosPersonales] = useState([]);
   const [touched, setTouched] = useState({});
   
-  // Estados para control de clics en teléfono (solo en edición)
   const [telefonoClicks, setTelefonoClicks] = useState(0);
   const [telefonoBloqueado, setTelefonoBloqueado] = useState(isEditing);
   const [ultimoClickTelefono, setUltimoClickTelefono] = useState(0);
   
-  // Refs para enfoque
   const nombreRef = useRef(null);
   const apellidoPaternoRef = useRef(null);
   const apellidoMaternoRef = useRef(null);
@@ -120,35 +128,136 @@ const PersonalForm = () => {
 
   const clickTimeoutRef = useRef(null);
 
-  // GUARDAR DATOS AUTOMÁTICAMENTE
+  // Guardar estado original cuando se cargan los datos
   useEffect(() => {
-    if (!isEditing && !cargandoDatos) {
-      sessionStorage.setItem(storageKey, JSON.stringify(formData));
+    if (formData && !originalFormData && !cargandoDatos) {
+      setOriginalFormData(JSON.parse(JSON.stringify(formData)));
     }
-  }, [formData, isEditing, cargandoDatos]);
+  }, [formData, originalFormData, cargandoDatos]);
 
-  // Limpiar storage al enviar
-  const limpiarStorage = () => {
+  // Función para verificar si hay cambios
+  const hasUnsavedChanges = () => {
+    if (!originalFormData || isEditing) return false;
+    
+    const camposImportantes = ['nombre', 'apellido_paterno', 'apellido_materno', 'email', 'telefono', 'placa', 'rol', 'activo', 'disponible'];
+    
+    for (let campo of camposImportantes) {
+      if (formData[campo] !== originalFormData[campo]) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  // Emitir evento de cambios sin guardar
+  useEffect(() => {
+    const emitUnsavedStatus = () => {
+      const hasChanges = hasUnsavedChanges() && !isEditing;
+      const event = new CustomEvent('formUnsavedStatus', { 
+        detail: { 
+          hasUnsaved: hasChanges,
+          isPersonalFormActive: true
+        }
+      });
+      window.dispatchEvent(event);
+    };
+
+    emitUnsavedStatus();
+    
+    const interval = setInterval(emitUnsavedStatus, 500);
+    return () => clearInterval(interval);
+  }, [formData, originalFormData, isEditing]);
+
+  // Limpiar estado cuando el componente se desmonta
+  useEffect(() => {
+    return () => {
+      // Cuando el componente se desmonta, asegurar que el sidebar sepa que ya no hay cambios
+      const event = new CustomEvent('formUnsavedStatus', { 
+        detail: { 
+          hasUnsaved: false,
+          isPersonalFormActive: false
+        }
+      });
+      window.dispatchEvent(event);
+    };
+  }, []);
+
+  // Escuchar eventos del sidebar
+  useEffect(() => {
+    const handleSaveProgress = () => {
+      if (!isEditing) {
+        sessionStorage.setItem(storageKey, JSON.stringify(formData));
+        toast.success('Progreso guardado', {
+          icon: <Save size={18} className="text-green-600" />,
+          duration: 2000
+        });
+      }
+    };
+
+    const handleDiscardProgress = () => {
+      if (!isEditing) {
+        sessionStorage.removeItem(storageKey);
+        toast.success('Cambios descartados', {
+          icon: <X size={18} className="text-red-600" />,
+          duration: 1500
+        });
+      }
+    };
+
+    window.addEventListener('saveFormProgress', handleSaveProgress);
+    window.addEventListener('discardFormProgress', handleDiscardProgress);
+    
+    return () => {
+      window.removeEventListener('saveFormProgress', handleSaveProgress);
+      window.removeEventListener('discardFormProgress', handleDiscardProgress);
+    };
+  }, [formData, isEditing, storageKey]);
+
+  // Interceptar navegación con beforeunload para recargar página
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (hasUnsavedChanges() && !isEditing) {
+        e.preventDefault();
+        e.returnValue = '';
+        return '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [formData, originalFormData, isEditing]);
+
+  // Función para limpiar progreso
+  const limpiarProgreso = () => {
     sessionStorage.removeItem(storageKey);
   };
 
-  // Cargar todos los personales al inicio
   useEffect(() => {
     cargarTodosPersonales();
   }, []);
 
-  // Cargar datos si es edición
   useEffect(() => {
     if (isEditing) {
       cargarPersonal();
     }
   }, [id]);
 
-  // Resetear contadores cuando cambia el modo edición
   useEffect(() => {
     setTelefonoBloqueado(isEditing);
     setTelefonoClicks(0);
   }, [isEditing]);
+
+  useEffect(() => {
+    // Auto-guardado cada 30 segundos si hay cambios
+    const autoSaveInterval = setInterval(() => {
+      if (hasUnsavedChanges() && !isEditing) {
+        sessionStorage.setItem(storageKey, JSON.stringify(formData));
+        console.log('Auto-guardado realizado');
+      }
+    }, 30000);
+
+    return () => clearInterval(autoSaveInterval);
+  }, [formData, isEditing, storageKey]);
 
   const cargarTodosPersonales = async () => {
     try {
@@ -170,7 +279,7 @@ const PersonalForm = () => {
       setCargandoDatos(true);
       const response = await personalService.obtenerPersonal(id);
       
-      setFormData({
+      const loadedData = {
         nombre: corregirTexto(response.data.nombre || ''),
         apellido_paterno: corregirTexto(response.data.apellido_paterno || ''),
         apellido_materno: corregirTexto(response.data.apellido_materno || ''),
@@ -180,7 +289,10 @@ const PersonalForm = () => {
         rol: response.data.rol || 'policia',
         activo: response.data.activo ?? true,
         disponible: response.data.activo ? (response.data.disponible ?? true) : false
-      });
+      };
+      
+      setFormData(loadedData);
+      setOriginalFormData(JSON.parse(JSON.stringify(loadedData)));
     } catch (error) {
       console.error('Error cargando personal:', error);
       toast.error('Error al cargar los datos');
@@ -190,12 +302,9 @@ const PersonalForm = () => {
     }
   };
 
-  // Manejador de clics para teléfono (solo en edición)
   const handleTelefonoClick = (e) => {
     if (!isEditing) return;
-    
     e.preventDefault();
-    
     if (!telefonoBloqueado) return;
     
     const ahora = Date.now();
@@ -230,57 +339,34 @@ const PersonalForm = () => {
     }
   };
 
-  // Validar campo específico
   const validarCampo = (name, value) => {
     let error = '';
     
     switch(name) {
       case 'nombre':
-        if (!value.trim()) {
-          error = 'El nombre es obligatorio';
-        } else if (value.length < 2) {
-          error = 'El nombre debe tener al menos 2 caracteres';
-        }
+        if (!value.trim()) error = 'El nombre es obligatorio';
+        else if (value.length < 2) error = 'El nombre debe tener al menos 2 caracteres';
         break;
-        
       case 'apellido_paterno':
-        if (!value.trim()) {
-          error = 'El apellido paterno es obligatorio';
-        } else if (value.length < 2) {
-          error = 'El apellido paterno debe tener al menos 2 caracteres';
-        }
+        if (!value.trim()) error = 'El apellido paterno es obligatorio';
+        else if (value.length < 2) error = 'El apellido paterno debe tener al menos 2 caracteres';
         break;
-        
       case 'email':
-        if (!value.trim()) {
-          error = 'El email es obligatorio';
-        } else if (!value.includes('@') || !value.includes('.')) {
-          error = 'El email no es válido';
-        }
+        if (!value.trim()) error = 'El email es obligatorio';
+        else if (!value.includes('@') || !value.includes('.')) error = 'El email no es válido';
         break;
-        
       case 'telefono':
-        if (value && value.length !== 10) {
-          error = 'El teléfono debe tener 10 dígitos';
-        }
+        if (value && value.length !== 10) error = 'El teléfono debe tener 10 dígitos';
         break;
-        
       case 'placa':
-        if (!value.trim()) {
-          error = 'La placa es obligatoria';
-        } else if (value.length < 3) {
-          error = 'La placa debe tener al menos 3 caracteres';
-        }
+        if (!value.trim()) error = 'La placa es obligatoria';
+        else if (value.length < 3) error = 'La placa debe tener al menos 3 caracteres';
         break;
-        
-      default:
-        break;
+      default: break;
     }
-    
     return error;
   };
 
-  // Verificar duplicados (solo usuarios activos)
   const verificarDuplicado = (campo, valor) => {
     if (!valor || (isEditing && campo === 'email')) {
       setDuplicados(prev => ({ ...prev, [campo]: null }));
@@ -295,26 +381,19 @@ const PersonalForm = () => {
     
     switch(campo) {
       case 'email':
-        duplicado = otrosPersonales.find(p => 
-          p.email?.toLowerCase() === valor.toLowerCase()
-        );
+        duplicado = otrosPersonales.find(p => p.email?.toLowerCase() === valor.toLowerCase());
         break;
       case 'telefono':
         duplicado = otrosPersonales.find(p => p.telefono === valor);
         break;
       case 'placa':
-        duplicado = otrosPersonales.find(p => 
-          p.placa?.toLowerCase() === valor.toLowerCase()
-        );
+        duplicado = otrosPersonales.find(p => p.placa?.toLowerCase() === valor.toLowerCase());
         break;
     }
     
     setDuplicados(prev => ({
       ...prev,
-      [campo]: duplicado ? {
-        existe: true,
-        usuario: duplicado.nombre
-      } : null
+      [campo]: duplicado ? { existe: true, usuario: duplicado.nombre } : null
     }));
   };
 
@@ -326,20 +405,9 @@ const PersonalForm = () => {
     const { name, value, type, checked } = e.target;
     
     if (isEditing) {
-      if (name === 'telefono' && telefonoBloqueado) {
-        return;
-      }
-      
-      if (name === 'placa' || name === 'email') {
+      if (name === 'telefono' && telefonoBloqueado) return;
+      if ((name === 'placa' || name === 'email' || name === 'rol')) {
         toast.error('Este campo no se puede modificar', {
-          duration: 2000,
-          icon: <Lock size={18} className="text-yellow-600" /> 
-        });
-        return;
-      }
-
-      if (name === 'rol') {
-        toast.error('El rol no se puede modificar', {
           duration: 2000,
           icon: <Lock size={18} className="text-yellow-600" /> 
         });
@@ -353,7 +421,6 @@ const PersonalForm = () => {
       const soloNumeros = value.replace(/\D/g, '');
       if (soloNumeros.length <= 10) {
         setFormData(prev => ({ ...prev, telefono: soloNumeros }));
-        
         const error = validarCampo(name, soloNumeros);
         setErrors(prev => ({ ...prev, [name]: error }));
         verificarDuplicado(name, soloNumeros);
@@ -362,7 +429,6 @@ const PersonalForm = () => {
     else if (name === 'nombre' || name === 'apellido_paterno' || name === 'apellido_materno') {
       const valorLimpio = value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '');
       setFormData(prev => ({ ...prev, [name]: valorLimpio }));
-      
       const error = validarCampo(name, valorLimpio);
       setErrors(prev => ({ ...prev, [name]: error }));
     }
@@ -370,7 +436,6 @@ const PersonalForm = () => {
       const valorLimpio = value.replace(/[^a-zA-Z0-9\-]/g, '').toUpperCase();
       if (valorLimpio.length <= 10) {
         setFormData(prev => ({ ...prev, placa: valorLimpio }));
-        
         const error = validarCampo(name, valorLimpio);
         setErrors(prev => ({ ...prev, [name]: error }));
         verificarDuplicado(name, valorLimpio);
@@ -378,46 +443,62 @@ const PersonalForm = () => {
     }
     else if (name === 'email' && !isEditing) {
       setFormData(prev => ({ ...prev, email: value }));
-      
       const error = validarCampo(name, value);
       setErrors(prev => ({ ...prev, [name]: error }));
       verificarDuplicado(name, value);
     }
     else if (name === 'activo') {
       if (!checked) {
-        setFormData(prev => ({
-          ...prev,
-          activo: false,
-          disponible: false
-        }));
+        setFormData(prev => ({ ...prev, activo: false, disponible: false }));
       } else {
-        setFormData(prev => ({
-          ...prev,
-          activo: true
-        }));
+        setFormData(prev => ({ ...prev, activo: true }));
       }
     }
     else if (name === 'disponible' && formData.activo) {
-      setFormData(prev => ({
-        ...prev,
-        disponible: checked
-      }));
+      setFormData(prev => ({ ...prev, disponible: checked }));
     }
     else if (name === 'rol' && !isEditing) {
-      setFormData(prev => ({
-        ...prev,
-        rol: value
-      }));
+      setFormData(prev => ({ ...prev, rol: value }));
     }
   };
 
-  // Calcular progreso del formulario
   const calcularProgreso = () => {
     const camposRequeridos = ['nombre', 'apellido_paterno', 'email', 'placa'];
     const completados = camposRequeridos.filter(campo => 
       formData[campo] && formData[campo].trim() !== ''
     ).length;
     return completados;
+  };
+
+  const getBorderColor = (campo) => {
+    if (errors[campo]) return 'border-red-300 bg-red-50';
+    if (duplicados[campo]?.existe) return 'border-yellow-300 bg-yellow-50';
+    if (touched[campo] && formData[campo] && !errors[campo]) return 'border-green-300 bg-green-50';
+    return 'border-gray-200';
+  };
+
+  const isFieldDisabled = (campo) => {
+    if (!isEditing) return false;
+    switch(campo) {
+      case 'email': case 'placa': case 'rol': return true;
+      case 'telefono': return telefonoBloqueado;
+      default: return false;
+    }
+  };
+
+  const getClicksRestantes = () => {
+    if (!isEditing || !telefonoBloqueado) return null;
+    const restantes = 3 - telefonoClicks;
+    return restantes > 0 ? `${restantes} clic${restantes !== 1 ? 's' : ''} restantes` : '¡Ya puedes editar!';
+  };
+
+  const getRolPreview = () => {
+    const entidad = rolToEntidad[formData.rol] || 'ADMIN';
+    const texto = formData.rol === 'policia' ? 'Policía' :
+                  formData.rol === 'ambulancia' ? 'Ambulancia' :
+                  formData.rol === 'admin' ? 'Administrador' :
+                  formData.rol === 'superadmin' ? 'Super Administrador' : formData.rol;
+    return { entidad, texto };
   };
 
   const handleSubmit = async (e) => {
@@ -496,7 +577,7 @@ const PersonalForm = () => {
       } else {
         await personalService.crearPersonal(datosAEnviar);
         toast.success('Personal creado correctamente');
-        limpiarStorage();
+        limpiarProgreso();
       }
       
       navigate('/admin/personal');
@@ -508,41 +589,35 @@ const PersonalForm = () => {
     }
   };
 
-  const getBorderColor = (campo) => {
-    if (errors[campo]) return 'border-red-300 bg-red-50';
-    if (duplicados[campo]?.existe) return 'border-yellow-300 bg-yellow-50';
-    if (touched[campo] && formData[campo] && !errors[campo]) return 'border-green-300 bg-green-50';
-    return 'border-gray-200';
-  };
-
-  const isFieldDisabled = (campo) => {
-    if (!isEditing) return false;
-    
-    switch(campo) {
-      case 'email':
-      case 'placa':
-      case 'rol':
-        return true;
-      case 'telefono':
-        return telefonoBloqueado;
-      default:
-        return false;
+  const handleCancel = () => {
+    // Resetear el estado original al estado actual ANTES de navegar
+    if (originalFormData && !isEditing) {
+      setOriginalFormData(JSON.parse(JSON.stringify(formData)));
     }
+    
+    if (!isEditing) limpiarProgreso();
+    
+    // Emitir que ya no hay cambios activos
+    const event = new CustomEvent('formUnsavedStatus', { 
+      detail: { 
+        hasUnsaved: false,
+        isPersonalFormActive: false
+      }
+    });
+    window.dispatchEvent(event);
+    
+    navigate('/admin/personal');
   };
 
-  const getClicksRestantes = () => {
-    if (!isEditing || !telefonoBloqueado) return null;
-    const restantes = 3 - telefonoClicks;
-    return restantes > 0 ? `${restantes} clic${restantes !== 1 ? 's' : ''} restantes` : '¡Ya puedes editar!';
-  };
+  const rolPreview = getRolPreview();
 
   if (cargandoDatos) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 sm:p-6 md:p-8">
         <div className="max-w-3xl mx-auto">
           <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
-            <Loader size={40} className="animate-spin text-blue-600 mx-auto mb-4" />
-            <p className="text-gray-500">Cargando datos del personal...</p>
+            <div className="inline-block animate-spin rounded-full h-10 w-10 border-4 border-gray-200 border-t-blue-600"></div>
+            <p className="mt-4 text-gray-500">Cargando datos del personal...</p>
           </div>
         </div>
       </div>
@@ -556,10 +631,7 @@ const PersonalForm = () => {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => {
-                if (!isEditing) limpiarStorage();
-                navigate('/admin/personal');
-              }}
+              onClick={handleCancel}
               className="p-2 hover:bg-white rounded-xl transition-colors"
             >
               <ChevronLeft size={20} className="text-gray-500" />
@@ -569,25 +641,24 @@ const PersonalForm = () => {
                 {isEditing ? 'Editar Personal' : 'Nuevo Personal'}
               </h1>
               <p className="text-sm text-gray-500 mt-1">
-                {isEditing
-                  ? `Editando ID: ${id}`
-                  : 'Ingresa los datos del nuevo miembro del equipo'}
+                {isEditing ? `Editando ID: ${id}` : 'Ingresa los datos del nuevo miembro del equipo'}
               </p>
             </div>
           </div>
+          
+          {/* Indicador de cambios no guardados */}
+          {!isEditing && hasUnsavedChanges() && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+              <AlertTriangle size={14} className="text-amber-600" />
+              <span className="text-xs text-amber-700">Cambios sin guardar</span>
+            </div>
+          )}
         </div>
 
-        {/* Barra de progreso */}
-        {!isEditing && (
-          <ProgressBar 
-            completed={calcularProgreso()} 
-            total={4} 
-          />
-        )}
+        {!isEditing && <ProgressBar completed={calcularProgreso()} total={4} />}
 
         {/* Formulario */}
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-200">
-          {/* Cabecera decorativa - SOBRIA */}
           <div className="h-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-600"></div>
           
           <form onSubmit={handleSubmit} className="p-6 md:p-8">
@@ -605,7 +676,6 @@ const PersonalForm = () => {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* Nombre */}
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1">
                       Nombre(s) <span className="text-red-500">*</span>
@@ -626,13 +696,11 @@ const PersonalForm = () => {
                     </div>
                     {errors.nombre && (
                       <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
-                        <AlertCircle size={12} />
-                        {errors.nombre}
+                        <AlertCircle size={12} /> {errors.nombre}
                       </p>
                     )}
                   </div>
 
-                  {/* Apellido Paterno */}
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1">
                       Apellido paterno <span className="text-red-500">*</span>
@@ -653,13 +721,11 @@ const PersonalForm = () => {
                     </div>
                     {errors.apellido_paterno && (
                       <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
-                        <AlertCircle size={12} />
-                        {errors.apellido_paterno}
+                        <AlertCircle size={12} /> {errors.apellido_paterno}
                       </p>
                     )}
                   </div>
 
-                  {/* Apellido Materno */}
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1">
                       Apellido materno
@@ -691,7 +757,6 @@ const PersonalForm = () => {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Email */}
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1">
                       Correo electrónico <span className="text-red-500">*</span>
@@ -712,32 +777,26 @@ const PersonalForm = () => {
                     </div>
                     {errors.email && (
                       <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
-                        <AlertCircle size={12} />
-                        {errors.email}
+                        <AlertCircle size={12} /> {errors.email}
                       </p>
                     )}
                     {duplicados.email?.existe && !errors.email && (
                       <p className="text-xs text-yellow-600 mt-1 flex items-center gap-1">
-                        <AlertTriangle size={12} />
-                        Registrado por {duplicados.email.usuario}
+                        <AlertTriangle size={12} /> Registrado por {duplicados.email.usuario}
                       </p>
                     )}
                     {isEditing && (
                       <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
-                        <Info size={12} />
-                        No se puede modificar
+                        <Info size={12} /> No se puede modificar
                       </p>
                     )}
                   </div>
 
-                  {/* Teléfono */}
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1">
                       Teléfono
                       {isEditing && telefonoBloqueado && (
-                        <span className="ml-2 text-amber-600 font-normal">
-                          ({getClicksRestantes()})
-                        </span>
+                        <span className="ml-2 text-amber-600 font-normal">({getClicksRestantes()})</span>
                       )}
                     </label>
                     <div className="relative">
@@ -758,20 +817,12 @@ const PersonalForm = () => {
                     </div>
                     {errors.telefono && (
                       <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
-                        <AlertCircle size={12} />
-                        {errors.telefono}
+                        <AlertCircle size={12} /> {errors.telefono}
                       </p>
                     )}
                     {duplicados.telefono?.existe && !errors.telefono && formData.telefono.length === 10 && (
                       <p className="text-xs text-yellow-600 mt-1 flex items-center gap-1">
-                        <AlertTriangle size={12} />
-                        Registrado por {duplicados.telefono.usuario}
-                      </p>
-                    )}
-                    {formData.telefono && formData.telefono.length < 10 && (
-                      <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
-                        <AlertCircle size={12} />
-                        Faltan {10 - formData.telefono.length} dígitos
+                        <AlertTriangle size={12} /> Registrado por {duplicados.telefono.usuario}
                       </p>
                     )}
                   </div>
@@ -788,7 +839,6 @@ const PersonalForm = () => {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Placa */}
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1">
                       Placa <span className="text-red-500">*</span>
@@ -810,31 +860,27 @@ const PersonalForm = () => {
                     </div>
                     {errors.placa && (
                       <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
-                        <AlertCircle size={12} />
-                        {errors.placa}
+                        <AlertCircle size={12} /> {errors.placa}
                       </p>
                     )}
                     {duplicados.placa?.existe && !errors.placa && (
                       <p className="text-xs text-yellow-600 mt-1 flex items-center gap-1">
-                        <AlertTriangle size={12} />
-                        Registrada por {duplicados.placa.usuario}
+                        <AlertTriangle size={12} /> Registrada por {duplicados.placa.usuario}
                       </p>
                     )}
                     {isEditing && (
                       <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
-                        <Info size={12} />
-                        No se puede modificar
+                        <Info size={12} /> No se puede modificar
                       </p>
                     )}
                   </div>
 
-                  {/* Rol */}
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1">
                       Rol <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
-                      <Shield size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                      <IconoEntidad entidad={rolPreview.entidad} size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                       <select
                         ref={rolRef}
                         name="rol"
@@ -849,10 +895,12 @@ const PersonalForm = () => {
                         <option value="superadmin">Super Admin</option>
                       </select>
                     </div>
+                    <div className="mt-2">
+                      <BadgeIcono entidad={rolPreview.entidad} texto={rolPreview.texto} size={12} />
+                    </div>
                     {isEditing && (
-                      <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
-                        <Info size={12} />
-                        No se puede modificar
+                      <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
+                        <Info size={12} /> No se puede modificar
                       </p>
                     )}
                   </div>
@@ -870,9 +918,7 @@ const PersonalForm = () => {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <label className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all cursor-pointer ${
-                    formData.activo
-                      ? 'border-blue-200 bg-blue-50 hover:bg-blue-100'
-                      : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
+                    formData.activo ? 'border-blue-200 bg-blue-50 hover:bg-blue-100' : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
                   }`}>
                     <input
                       type="checkbox"
@@ -890,11 +936,8 @@ const PersonalForm = () => {
                   </label>
 
                   <label className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all cursor-pointer ${
-                    !formData.activo
-                      ? 'border-gray-200 bg-gray-100 opacity-50 cursor-not-allowed'
-                      : formData.disponible
-                        ? 'border-blue-200 bg-blue-50 hover:bg-blue-100'
-                        : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
+                    !formData.activo ? 'border-gray-200 bg-gray-100 opacity-50 cursor-not-allowed' :
+                    formData.disponible ? 'border-blue-200 bg-blue-50 hover:bg-blue-100' : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
                   }`}>
                     <input
                       type="checkbox"
@@ -907,18 +950,13 @@ const PersonalForm = () => {
                     <div>
                       <p className="text-sm font-semibold text-gray-700">Disponible</p>
                       <p className="text-xs text-gray-500">
-                        {!formData.activo 
-                          ? 'No disponible'
-                          : formData.disponible 
-                            ? 'Puede recibir alertas' 
-                            : 'Ocupado'}
+                        {!formData.activo ? 'No disponible' : formData.disponible ? 'Puede recibir alertas' : 'Ocupado'}
                       </p>
                     </div>
                   </label>
                 </div>
               </div>
 
-              {/* Mensaje informativo */}
               {!formData.activo && (
                 <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
                   <div className="flex items-start gap-3">
@@ -938,36 +976,27 @@ const PersonalForm = () => {
             <div className="flex justify-end gap-3 pt-8 mt-8 border-t border-gray-200">
               <button
                 type="button"
-                onClick={() => {
-                  if (!isEditing) limpiarStorage();
-                  navigate('/admin/personal');
-                }}
+                onClick={handleCancel}
                 className="px-6 py-3 border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-all flex items-center gap-2 text-sm font-medium"
               >
-                <X size={18} />
-                Cancelar
+                <X size={18} /> Cancelar
               </button>
               <button
                 type="submit"
                 disabled={loading}
                 className="px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all disabled:opacity-50 flex items-center gap-2 text-sm font-medium shadow-lg shadow-blue-200"
               >
-                {loading ? (
-                  <Loader size={18} className="animate-spin" />
-                ) : (
-                  <Save size={18} />
-                )}
+                {loading ? <Loader size={18} className="animate-spin" /> : <Save size={18} />}
                 {loading ? 'Guardando...' : (isEditing ? 'Actualizar' : 'Guardar')}
               </button>
             </div>
           </form>
         </div>
 
-        {/* Indicador de guardado automático */}
         {!isEditing && formData.nombre && (
           <div className="mt-4 flex items-center justify-end gap-2 text-xs text-gray-400">
             <Clock size={12} className="animate-pulse" />
-            <span>Guardado automático • Los datos se conservan si cierras la página</span>
+            <span>Guardado automático cada 30 segundos • Los datos se conservan si cierras la página</span>
           </div>
         )}
       </div>

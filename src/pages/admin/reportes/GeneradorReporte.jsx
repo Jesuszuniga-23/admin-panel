@@ -5,7 +5,7 @@ import {
   Loader, Users, Truck, Bell, FileSpreadsheet,
   FilePieChart, Eye, X, RefreshCw, MapPin,
   TrendingUp, Clock, AlertTriangle, CheckCircle,
-  Activity, BarChart3,XCircle 
+  Activity, BarChart3, XCircle,Search
 } from 'lucide-react';
 import personalService from '../../../services/admin/personal.service';
 import unidadService from '../../../services/admin/unidad.service';
@@ -13,6 +13,20 @@ import alertasService from '../../../services/admin/alertas.service';
 import reportesService from '../../../services/admin/reportes.service';
 import toast from 'react-hot-toast';
 import useAuthStore from '../../../store/authStore';
+import IconoEntidad, { BadgeTipoAlerta, BadgeIcono } from '../../../components/ui/IconoEntidad';
+
+// Mapeo de roles/tipos a entidades
+const rolToEntidad = {
+  policia: 'POLICIA',
+  ambulancia: 'PERSONAL_AMBULANCIA',
+  admin: 'ADMIN',
+  superadmin: 'SUPERADMIN'
+};
+
+const tipoUnidadToEntidad = {
+  policia: 'PATRULLA',
+  ambulancia: 'AMBULANCIA'
+};
 
 const GeneradorReporte = () => {
   const navigate = useNavigate();
@@ -39,6 +53,7 @@ const GeneradorReporte = () => {
       titulo: 'Reporte de Personal',
       icono: Users,
       color: 'blue',
+      gradient: 'from-blue-600 to-indigo-700',
       campos: [
         { key: 'nombre', label: 'Nombre' },
         { key: 'email', label: 'Email' },
@@ -59,6 +74,7 @@ const GeneradorReporte = () => {
       titulo: 'Reporte de Unidades',
       icono: Truck,
       color: 'purple',
+      gradient: 'from-purple-600 to-indigo-700',
       campos: [
         { key: 'codigo', label: 'Código' },
         { key: 'tipo', label: 'Tipo' },
@@ -78,6 +94,7 @@ const GeneradorReporte = () => {
       titulo: 'Reporte de Alertas',
       icono: Bell,
       color: 'amber',
+      gradient: 'from-amber-600 to-orange-700',
       campos: [
         { key: 'id', label: 'ID' },
         { key: 'tipo', label: 'Tipo' },
@@ -124,7 +141,6 @@ const GeneradorReporte = () => {
         const res = await unidadService.listarUnidades({ limite: 1000, ...params });
         data = res.data || [];
       } else if (tipo === 'alertas') {
-        // Para alertas, necesitamos datos más completos
         const [exp, cer, act, proc] = await Promise.all([
           alertasService.obtenerExpiradas({ limite: 500, ...params }),
           alertasService.obtenerCerradasManual({ limite: 500, ...params }),
@@ -152,8 +168,6 @@ const GeneradorReporte = () => {
 
   const calcularZona = (lat, lng) => {
     if (!lat || !lng) return 'No especificada';
-    // Aquí puedes implementar la lógica de zonas según coordenadas
-    // Por ejemplo: Norte, Sur, Centro, etc.
     if (lat > 19.5) return 'Norte';
     if (lat < 18.5) return 'Sur';
     return 'Centro';
@@ -171,7 +185,6 @@ const GeneradorReporte = () => {
   const aplicarFiltrosYEstadisticas = () => {
     let filtrados = [...datos];
 
-    // Filtro por fecha (CORREGIDO)
     if (filtros.fechaInicio && filtros.fechaFin) {
       const inicio = new Date(filtros.fechaInicio);
       inicio.setHours(0, 0, 0, 0);
@@ -198,14 +211,12 @@ const GeneradorReporte = () => {
       });
     }
 
-    // Filtro por tipo
     if (filtros.tipo !== 'todos') {
       filtrados = filtrados.filter(item => 
         item.tipo === filtros.tipo || item.rol === filtros.tipo
       );
     }
 
-    // Filtro por estado
     if (filtros.estado !== 'todos') {
       filtrados = filtrados.filter(item => {
         if (tipo === 'personal') return item.activo === (filtros.estado === 'activo');
@@ -215,7 +226,6 @@ const GeneradorReporte = () => {
       });
     }
 
-    // Filtro por zona (NUEVO para alertas)
     if (tipo === 'alertas' && filtros.zona !== 'todas') {
       filtrados = filtrados.filter(item => {
         const zona = calcularZona(item.lat, item.lng);
@@ -223,7 +233,6 @@ const GeneradorReporte = () => {
       });
     }
 
-    // Búsqueda
     if (filtros.busqueda) {
       const busqueda = filtros.busqueda.toLowerCase();
       filtrados = filtrados.filter(item => {
@@ -237,15 +246,13 @@ const GeneradorReporte = () => {
         }
         if (tipo === 'alertas') {
           return item.id?.toString().includes(busqueda) ||
-                 item.ciudadano_nombre?.toLowerCase().includes(busqueda);
+                 item.ciudadano?.nombre?.toLowerCase().includes(busqueda);
         }
         return true;
       });
     }
 
     setDatosFiltrados(filtrados);
-    
-    // Calcular estadísticas
     calcularEstadisticas(filtrados);
   };
 
@@ -283,7 +290,6 @@ const GeneradorReporte = () => {
       stats.cerradas = datosFiltrados.filter(d => d.estado === 'cerrada').length;
       stats.expiradas = datosFiltrados.filter(d => d.estado === 'expirada').length;
       
-      // Tiempo promedio de respuesta
       const tiempos = datosFiltrados
         .filter(d => d.fecha_creacion && d.fecha_cierre)
         .map(d => (new Date(d.fecha_cierre) - new Date(d.fecha_creacion)) / 60000);
@@ -292,13 +298,11 @@ const GeneradorReporte = () => {
         ? Math.round(tiempos.reduce((a, b) => a + b, 0) / tiempos.length) 
         : 0;
       
-      // Por tipo
       stats.porTipo = {
         panico: datosFiltrados.filter(d => d.tipo === 'panico').length,
         medica: datosFiltrados.filter(d => d.tipo === 'medica').length
       };
       
-      // Por zona
       const zonas = {};
       datosFiltrados.forEach(d => {
         const zona = calcularZona(d.lat, d.lng);
@@ -312,7 +316,6 @@ const GeneradorReporte = () => {
 
   const exportarExcel = () => {
     try {
-      // Pasar estadísticas también para la hoja de análisis
       reportesService.generarExcelPersonalizado(datosFiltrados, tipo, filtros, user, estadisticas);
       toast.success('Reporte Excel generado');
     } catch (error) {
@@ -329,30 +332,80 @@ const GeneradorReporte = () => {
     }
   };
 
+  const renderValorCelda = (item, campo) => {
+    let valor = item[campo.key];
+    
+    if (campo.key === 'tiempo_respuesta' && item.fecha_creacion && item.fecha_cierre) {
+      valor = calcularTiempoRespuesta(item.fecha_creacion, item.fecha_cierre);
+    } else if (campo.key === 'zona' && item.lat && item.lng) {
+      valor = calcularZona(item.lat, item.lng);
+    } else if (campo.key === 'ciudadano_nombre') {
+      valor = item.ciudadano?.nombre || '—';
+    } else if (campo.key === 'unidad_codigo') {
+      valor = item.unidad?.codigo || '—';
+    } else if (campo.key === 'activo') {
+      valor = item.activo ? 'Activo' : 'Inactivo';
+    } else if (campo.key === 'disponible') {
+      valor = item.disponible ? 'Disponible' : 'No disponible';
+    } else if (campo.key === 'personal_asignado') {
+      valor = item.personal_asignado?.length || 0;
+    } else if (campo.key === 'ubicacion' && item.lat && item.lng) {
+      valor = `${item.lat.toFixed(4)}, ${item.lng.toFixed(4)}`;
+    } else if (campo.key === 'creado_en' || campo.key === 'fecha_creacion') {
+      valor = new Date(item[campo.key]).toLocaleDateString('es-MX');
+    }
+    
+    return valor?.toString() || '-';
+  };
+
+  const renderBadgeRol = (rol) => {
+    const entidad = rolToEntidad[rol] || 'ADMIN';
+    const texto = rol === 'policia' ? 'Policía' :
+                  rol === 'ambulancia' ? 'Ambulancia' :
+                  rol === 'admin' ? 'Admin' :
+                  rol === 'superadmin' ? 'Superadmin' : rol;
+    return <BadgeIcono entidad={entidad} texto={texto} size={12} />;
+  };
+
+  const renderBadgeTipoUnidad = (tipo) => {
+    const entidad = tipoUnidadToEntidad[tipo] || 'PATRULLA';
+    const texto = tipo === 'policia' ? 'Policía' : 'Ambulancia';
+    return <BadgeIcono entidad={entidad} texto={texto} size={12} />;
+  };
+
+  const renderBadgeAlerta = (tipo) => {
+    return <BadgeTipoAlerta tipo={tipo} size={12} />;
+  };
+
   if (cargando) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
         <div className="text-center">
-          <Loader size={40} className="animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-500">Cargando datos para el reporte...</p>
+          <div className="inline-block animate-spin rounded-full h-10 w-10 border-4 border-gray-200 border-t-blue-600"></div>
+          <p className="mt-4 text-gray-500">Cargando datos para el reporte...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 sm:p-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate('/admin/reportes')}
-            className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
+            className="p-2 hover:bg-white rounded-xl transition-colors"
           >
             <ChevronLeft size={20} className="text-gray-500" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-800">{info.titulo}</h1>
+            <div className="flex items-center gap-2">
+              <div className={`bg-gradient-to-r ${info.gradient} p-2 rounded-lg shadow-lg shadow-${info.color}-200`}>
+                <info.icono size={20} className="text-white" />
+              </div>
+              <h1 className="text-2xl font-bold text-gray-800">{info.titulo}</h1>
+            </div>
             <p className="text-sm text-gray-500 mt-1">
               {datosFiltrados.length} registros encontrados
             </p>
@@ -362,28 +415,28 @@ const GeneradorReporte = () => {
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setVistaPrevia(!vistaPrevia)}
-            className="px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm"
+            className="px-3 py-2 border border-gray-200 bg-white rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm"
           >
             <Eye size={16} className="text-gray-500" />
             {vistaPrevia ? 'Ocultar' : 'Ver'} vista
           </button>
           <button
             onClick={exportarExcel}
-            className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 text-sm"
+            className="px-3 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 transition-colors flex items-center gap-2 text-sm shadow-md"
           >
             <FileSpreadsheet size={16} />
             Excel
           </button>
           <button
             onClick={exportarPDF}
-            className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 text-sm"
+            className="px-3 py-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg hover:from-red-700 hover:to-red-800 transition-colors flex items-center gap-2 text-sm shadow-md"
           >
             <FilePieChart size={16} />
             PDF
           </button>
           <button
             onClick={cargarDatos}
-            className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+            className="p-2 border border-gray-200 bg-white rounded-lg hover:bg-gray-50 transition-colors"
             title="Actualizar datos"
           >
             <RefreshCw size={16} className={`text-gray-500 ${cargando ? 'animate-spin' : ''}`} />
@@ -391,7 +444,7 @@ const GeneradorReporte = () => {
         </div>
       </div>
 
-      {/* Panel de filtros mejorado */}
+      {/* Panel de filtros */}
       <div className="bg-white rounded-xl shadow-lg p-5 mb-6 border border-gray-100">
         <div className="flex items-center gap-2 mb-4">
           <Filter size={16} className="text-blue-600" />
@@ -401,22 +454,28 @@ const GeneradorReporte = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
             <label className="block text-xs text-gray-500 mb-1">Fecha inicio</label>
-            <input
-              type="date"
-              value={filtros.fechaInicio}
-              onChange={(e) => setFiltros(prev => ({ ...prev, fechaInicio: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-            />
+            <div className="relative">
+              <Calendar size={14} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <input
+                type="date"
+                value={filtros.fechaInicio}
+                onChange={(e) => setFiltros(prev => ({ ...prev, fechaInicio: e.target.value }))}
+                className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              />
+            </div>
           </div>
 
           <div>
             <label className="block text-xs text-gray-500 mb-1">Fecha fin</label>
-            <input
-              type="date"
-              value={filtros.fechaFin}
-              onChange={(e) => setFiltros(prev => ({ ...prev, fechaFin: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-            />
+            <div className="relative">
+              <Calendar size={14} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <input
+                type="date"
+                value={filtros.fechaFin}
+                onChange={(e) => setFiltros(prev => ({ ...prev, fechaFin: e.target.value }))}
+                className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              />
+            </div>
           </div>
 
           <div>
@@ -424,7 +483,7 @@ const GeneradorReporte = () => {
             <select
               value={filtros.tipo}
               onChange={(e) => setFiltros(prev => ({ ...prev, tipo: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
             >
               <option value="todos">Todos</option>
               {info.filtrosDisponibles[0]?.opciones.map(op => (
@@ -438,7 +497,7 @@ const GeneradorReporte = () => {
             <select
               value={filtros.estado}
               onChange={(e) => setFiltros(prev => ({ ...prev, estado: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
             >
               <option value="todos">Todos</option>
               {info.filtrosDisponibles[1]?.opciones.map(op => (
@@ -453,14 +512,12 @@ const GeneradorReporte = () => {
               <select
                 value={filtros.zona}
                 onChange={(e) => setFiltros(prev => ({ ...prev, zona: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
               >
                 <option value="todas">Todas las zonas</option>
                 <option value="Norte">Norte</option>
                 <option value="Sur">Sur</option>
                 <option value="Centro">Centro</option>
-                <option value="Oriente">Oriente</option>
-                <option value="Poniente">Poniente</option>
               </select>
             </div>
           )}
@@ -468,19 +525,22 @@ const GeneradorReporte = () => {
 
         <div className="mt-4">
           <label className="block text-xs text-gray-500 mb-1">Búsqueda</label>
-          <input
-            type="text"
-            placeholder={`Buscar por ${tipo === 'personal' ? 'nombre, email o placa' : 
-                               tipo === 'unidades' ? 'código' : 
-                               'ID o ciudadano'}`}
-            value={filtros.busqueda}
-            onChange={(e) => setFiltros(prev => ({ ...prev, busqueda: e.target.value }))}
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-          />
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder={`Buscar por ${tipo === 'personal' ? 'nombre, email o placa' : 
+                                 tipo === 'unidades' ? 'código' : 
+                                 'ID o ciudadano'}`}
+              value={filtros.busqueda}
+              onChange={(e) => setFiltros(prev => ({ ...prev, busqueda: e.target.value }))}
+              className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            />
+          </div>
         </div>
       </div>
 
-      {/* Tarjetas de estadísticas - NUEVO */}
+      {/* Tarjetas de estadísticas */}
       {estadisticas && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
           {tipo === 'personal' && (
@@ -541,32 +601,34 @@ const GeneradorReporte = () => {
                 {datosFiltrados.slice(0, 10).map((item, idx) => (
                   <tr key={idx} className="hover:bg-gray-50">
                     {info.campos.map(campo => {
-                      let valor = item[campo.key];
+                      let valor = renderValorCelda(item, campo);
                       
-                      // Formatear según el tipo de campo
-                      if (campo.key === 'tiempo_respuesta' && item.fecha_creacion && item.fecha_cierre) {
-                        valor = calcularTiempoRespuesta(item.fecha_creacion, item.fecha_cierre);
-                      } else if (campo.key === 'zona' && item.lat && item.lng) {
-                        valor = calcularZona(item.lat, item.lng);
-                      } else if (campo.key === 'ciudadano_nombre') {
-                        valor = item.ciudadano?.nombre || '—';
-                      } else if (campo.key === 'unidad_codigo') {
-                        valor = item.unidad?.codigo || '—';
-                      } else if (campo.key === 'activo') {
-                        valor = item.activo ? 'Activo' : 'Inactivo';
-                      } else if (campo.key === 'disponible') {
-                        valor = item.disponible ? 'Disponible' : 'No disponible';
-                      } else if (campo.key === 'personal_asignado') {
-                        valor = item.personal_asignado?.length || 0;
-                      } else if (campo.key === 'ubicacion' && item.lat && item.lng) {
-                        valor = `${item.lat.toFixed(4)}, ${item.lng.toFixed(4)}`;
-                      } else if (campo.key === 'creado_en' || campo.key === 'fecha_creacion') {
-                        valor = new Date(item[campo.key]).toLocaleDateString('es-MX');
+                      // Renderizado especial para ciertos campos
+                      if (campo.key === 'rol' && tipo === 'personal') {
+                        return (
+                          <td key={campo.key} className="px-4 py-3">
+                            {renderBadgeRol(item.rol)}
+                          </td>
+                        );
+                      }
+                      if (campo.key === 'tipo' && tipo === 'unidades') {
+                        return (
+                          <td key={campo.key} className="px-4 py-3">
+                            {renderBadgeTipoUnidad(item.tipo)}
+                          </td>
+                        );
+                      }
+                      if (campo.key === 'tipo' && tipo === 'alertas') {
+                        return (
+                          <td key={campo.key} className="px-4 py-3">
+                            {renderBadgeAlerta(item.tipo)}
+                          </td>
+                        );
                       }
                       
                       return (
                         <td key={campo.key} className="px-4 py-3 text-sm text-gray-600">
-                          {valor?.toString() || '-'}
+                          {valor}
                         </td>
                       );
                     })}
@@ -579,13 +641,15 @@ const GeneradorReporte = () => {
       )}
 
       {/* Resumen del reporte */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200">
+      <div className={`bg-gradient-to-r ${info.gradient} rounded-xl p-4 border border-${info.color}-200`}>
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <info.icono size={24} className={`text-${info.color}-600`} />
+            <div className="p-2 bg-white/20 rounded-lg">
+              <info.icono size={24} className="text-white" />
+            </div>
             <div>
-              <p className="text-sm font-medium text-gray-700">Resumen del reporte</p>
-              <p className="text-xs text-gray-500">
+              <p className="text-sm font-medium text-white">Resumen del reporte</p>
+              <p className="text-xs text-white/80">
                 Se incluirán {datosFiltrados.length} registros en el reporte final
               </p>
             </div>
@@ -593,14 +657,16 @@ const GeneradorReporte = () => {
           <div className="flex gap-2 w-full sm:w-auto">
             <button
               onClick={exportarExcel}
-              className="flex-1 sm:flex-none text-sm bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+              className="flex-1 sm:flex-none text-sm bg-white text-green-600 px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors font-medium"
             >
+              <FileSpreadsheet size={16} className="inline mr-2" />
               Excel
             </button>
             <button
               onClick={exportarPDF}
-              className="flex-1 sm:flex-none text-sm bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
+              className="flex-1 sm:flex-none text-sm bg-white text-red-600 px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors font-medium"
             >
+              <FilePieChart size={16} className="inline mr-2" />
               PDF
             </button>
           </div>
@@ -613,16 +679,16 @@ const GeneradorReporte = () => {
 // Componente de tarjeta de estadísticas
 const StatCard = ({ label, value, icon: Icon, color }) => {
   const colors = {
-    blue: 'bg-blue-50 text-blue-600',
-    green: 'bg-green-50 text-green-600',
-    red: 'bg-red-50 text-red-600',
-    amber: 'bg-amber-50 text-amber-600',
-    purple: 'bg-purple-50 text-purple-600',
-    gray: 'bg-gray-50 text-gray-600'
+    blue: 'bg-blue-50 text-blue-600 border-blue-100',
+    green: 'bg-green-50 text-green-600 border-green-100',
+    red: 'bg-red-50 text-red-600 border-red-100',
+    amber: 'bg-amber-50 text-amber-600 border-amber-100',
+    purple: 'bg-purple-50 text-purple-600 border-purple-100',
+    gray: 'bg-gray-50 text-gray-600 border-gray-100'
   };
 
   return (
-    <div className={`${colors[color]} rounded-lg p-3 flex items-center gap-2`}>
+    <div className={`${colors[color]} rounded-lg p-3 flex items-center gap-2 border`}>
       <Icon size={16} />
       <div className="min-w-0">
         <p className="text-xs text-gray-500 truncate">{label}</p>

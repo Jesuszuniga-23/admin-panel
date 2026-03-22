@@ -1,29 +1,31 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  CheckCircle, MapPin, User, Phone, Clock, Eye,
-  Filter, FileText, Image as ImageIcon,
-  Truck, Download, X, AlertTriangle, Heart,
-  Calendar, ChevronLeft, ChevronRight,
-  CalendarClock, CalendarCheck, MapPinned,
+  CheckCircle, Filter, Calendar, ChevronLeft, ChevronRight,
+  Eye, Clock, MapPin, User, Phone, Search, X, AlertTriangle
 } from 'lucide-react';
 import alertasPanelService from '../../../services/admin/alertasPanel.service';
 import Loader from '../../../components/common/Loader';
-import MapaConDireccion from '../../../components/maps/MapaConDireccion';
+import { BadgeTipoAlerta, BotonMapa, ModalMapa } from '../../../components/ui/IconoEntidad';
 import toast from 'react-hot-toast';
 
 // Función para normalizar texto
 const normalizarTexto = (texto) => {
   if (!texto) return '';
+  
   const reemplazos = [
     { de: 'Ã¡', para: 'á' }, { de: 'Ã©', para: 'é' }, { de: 'Ã­', para: 'í' },
     { de: 'Ã³', para: 'ó' }, { de: 'Ãº', para: 'ú' }, { de: 'Ã±', para: 'ñ' },
-    { de: '£', para: 'ú' }, { de: '¤', para: 'ñ' }
+    { de: 'Ã�', para: 'Á' }, { de: 'Ã‰', para: 'É' }, { de: 'Ã�', para: 'Í' },
+    { de: 'Ã“', para: 'Ó' }, { de: 'Ãš', para: 'Ú' }, { de: 'Ã‘', para: 'Ñ' },
+    { de: '¡', para: 'í' }, { de: '£', para: 'ú' }, { de: '¤', para: 'ñ' }
   ];
+  
   let textoNormalizado = texto;
   reemplazos.forEach(({ de, para }) => {
     textoNormalizado = textoNormalizado.split(de).join(para);
   });
+  
   return textoNormalizado;
 };
 
@@ -37,11 +39,41 @@ const formatearNombre = (nombre) => {
     .join(' ');
 };
 
+// Función para calcular tiempo de atención en minutos
+const calcularTiempoAtencionMinutos = (creacion, cierre) => {
+  if (!creacion || !cierre) return null;
+  return Math.round((new Date(cierre) - new Date(creacion)) / 60000);
+};
+
+const formatearTiempoAtencion = (creacion, cierre) => {
+  const minutos = calcularTiempoAtencionMinutos(creacion, cierre);
+  if (minutos === null) return 'N/A';
+  if (minutos < 60) return `${minutos} min`;
+  const horas = Math.floor(minutos / 60);
+  const mins = minutos % 60;
+  return `${horas}h ${mins}m`;
+};
+
 const AlertasCerradas = () => {
   const navigate = useNavigate();
   const [alertas, setAlertas] = useState([]);
   const [alertasOriginal, setAlertasOriginal] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [tipoFiltro, setTipoFiltro] = useState('todos');
+  const [tiempoMinimo, setTiempoMinimo] = useState('');
+  const [tiempoMaximo, setTiempoMaximo] = useState('');
+  
+  // Estado para el modal del mapa
+  const [mapaModal, setMapaModal] = useState({
+    abierto: false,
+    lat: null,
+    lng: null,
+    titulo: null,
+    alertaId: null,
+    tipo: null
+  });
+  
   const [filtros, setFiltros] = useState({
     desde: '',
     hasta: '',
@@ -53,8 +85,6 @@ const AlertasCerradas = () => {
     pagina: 1,
     total_paginas: 1
   });
-  const [imagenSeleccionada, setImagenSeleccionada] = useState(null);
-  const [filtroFechaActivo, setFiltroFechaActivo] = useState(false);
 
   useEffect(() => {
     cargarAlertas();
@@ -71,7 +101,8 @@ const AlertasCerradas = () => {
           ciudadano: alerta.ciudadano ? {
             ...alerta.ciudadano,
             nombre: formatearNombre(alerta.ciudadano.nombre)
-          } : null
+          } : null,
+          tiempoAtencionMinutos: calcularTiempoAtencionMinutos(alerta.fecha_asignacion, alerta.fecha_cierre)
         }));
 
         setAlertasOriginal(alertasFormateadas);
@@ -90,10 +121,9 @@ const AlertasCerradas = () => {
   const aplicarFiltrosLocal = (datos = alertasOriginal) => {
     let datosFiltrados = datos;
 
+    // Filtro por rango de fechas
     if (filtros.desde && filtros.hasta) {
-      setFiltroFechaActivo(true);
-
-      datosFiltrados = datos.filter(item => {
+      datosFiltrados = datosFiltrados.filter(item => {
         const fechaCierre = new Date(item.fecha_cierre);
 
         const desdeParts = filtros.desde.split('-');
@@ -115,8 +145,34 @@ const AlertasCerradas = () => {
 
         return fechaCierre >= desde && fechaCierre <= hasta;
       });
-    } else {
-      setFiltroFechaActivo(false);
+    }
+
+    // Filtro por tipo de alerta
+    if (tipoFiltro !== 'todos') {
+      datosFiltrados = datosFiltrados.filter(item => item.tipo === tipoFiltro);
+    }
+
+    // Filtro por búsqueda (nombre de ciudadano)
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase().trim();
+      datosFiltrados = datosFiltrados.filter(item => 
+        item.ciudadano?.nombre?.toLowerCase().includes(term) ||
+        item.ciudadano?.telefono?.includes(term)
+      );
+    }
+
+    // Filtro por tiempo de atención (minutos)
+    if (tiempoMinimo) {
+      datosFiltrados = datosFiltrados.filter(item => 
+        item.tiempoAtencionMinutos !== null && 
+        item.tiempoAtencionMinutos >= parseInt(tiempoMinimo)
+      );
+    }
+    if (tiempoMaximo) {
+      datosFiltrados = datosFiltrados.filter(item => 
+        item.tiempoAtencionMinutos !== null && 
+        item.tiempoAtencionMinutos <= parseInt(tiempoMaximo)
+      );
     }
 
     const total = datosFiltrados.length;
@@ -144,7 +200,10 @@ const AlertasCerradas = () => {
       pagina: 1,
       limite: 10
     });
-    setFiltroFechaActivo(false);
+    setSearchTerm('');
+    setTipoFiltro('todos');
+    setTiempoMinimo('');
+    setTiempoMaximo('');
   };
 
   const cambiarPagina = (nuevaPagina) => {
@@ -155,29 +214,35 @@ const AlertasCerradas = () => {
     if (alertasOriginal.length) {
       aplicarFiltrosLocal();
     }
-  }, [filtros.desde, filtros.hasta, filtros.pagina]);
+  }, [filtros.desde, filtros.hasta, filtros.pagina, searchTerm, tipoFiltro, tiempoMinimo, tiempoMaximo]);
 
-  const getColorByTipo = (tipo) => {
-    return tipo === 'panico'
-      ? 'bg-red-100 text-red-700 border-red-200'
-      : 'bg-green-100 text-green-700 border-green-200';
-  };
-
-  const getIconByTipo = (tipo) => {
-    return tipo === 'panico'
-      ? <AlertTriangle size={16} className="text-red-500" />
-      : <Heart size={16} className="text-green-500" />;
-  };
-
-  const formatearFecha = (fecha) => {
-    if (!fecha) return 'N/A';
-    return new Date(fecha).toLocaleString('es-MX', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+  // Función para abrir modal del mapa
+  const abrirMapaModal = (e, alerta) => {
+    e.stopPropagation();
+    setMapaModal({
+      abierto: true,
+      lat: alerta.lat,
+      lng: alerta.lng,
+      titulo: alerta.tipo === 'panico' ? 'Alerta de Pánico' : 'Alerta Médica',
+      alertaId: alerta.id,
+      tipo: alerta.tipo
     });
+  };
+
+  // Función para cerrar modal
+  const cerrarMapaModal = () => {
+    setMapaModal({
+      abierto: false,
+      lat: null,
+      lng: null,
+      titulo: null,
+      alertaId: null,
+      tipo: null
+    });
+  };
+
+  const handleRowClick = (alertaId) => {
+    navigate(`/admin/alertas/${alertaId}`);
   };
 
   const formatearFechaCorta = (fecha) => {
@@ -189,17 +254,12 @@ const AlertasCerradas = () => {
     });
   };
 
-  const calcularTiempoAtencion = (creacion, cierre) => {
-    if (!creacion || !cierre) return 'N/A';
-    const minutos = Math.round((new Date(cierre) - new Date(creacion)) / 60000);
-    if (minutos < 60) return `${minutos} min`;
-    const horas = Math.floor(minutos / 60);
-    const mins = minutos % 60;
-    return `${horas}h ${mins}m`;
-  };
-
   const inicio = paginacion.total > 0 ? ((paginacion.pagina - 1) * filtros.limite) + 1 : 0;
   const fin = Math.min(paginacion.pagina * filtros.limite, paginacion.total);
+
+  const tieneFiltrosActivos = () => {
+    return filtros.desde || filtros.hasta || searchTerm || tipoFiltro !== 'todos' || tiempoMinimo || tiempoMaximo;
+  };
 
   if (loading && alertas.length === 0) {
     return (
@@ -210,363 +270,285 @@ const AlertasCerradas = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 md:py-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 sm:p-6 md:p-8">
+      <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 mb-4 sm:mb-6 md:mb-8">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="bg-gradient-to-br from-green-500 to-emerald-600 p-2 sm:p-2.5 md:p-3 rounded-lg sm:rounded-xl shadow-lg shadow-green-200">
-              <CheckCircle size={20} className="sm:w-5 sm:h-5 md:w-6 md:h-6 text-white" />
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+          <div className="flex items-center gap-3">
+            <div className="bg-gradient-to-br from-green-500 to-emerald-600 p-3 rounded-xl shadow-lg shadow-green-200">
+              <CheckCircle size={24} className="text-white" />
             </div>
             <div>
-              <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-gray-800">Alertas Cerradas</h1>
-              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Historial de alertas atendidas</p>
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Alertas Cerradas</h1>
+              <p className="text-sm text-gray-500 mt-1">
+                {paginacion.total} {paginacion.total === 1 ? 'alerta atendida' : 'alertas atendidas'}
+              </p>
             </div>
           </div>
 
           <button
             onClick={() => navigate('/admin/dashboard')}
-            className="flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-white border border-gray-200 rounded-lg sm:rounded-xl shadow-sm hover:bg-gray-50 transition-colors text-gray-600 text-xs sm:text-sm font-medium"
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl shadow-sm hover:bg-gray-50 transition-colors text-gray-600 text-sm font-medium"
           >
-            <ChevronLeft size={14} className="sm:w-4 sm:h-4" />
+            <ChevronLeft size={16} />
             <span>Dashboard</span>
           </button>
         </div>
 
-        {/* Panel de filtros */}
-        <div className="bg-white rounded-lg sm:rounded-xl shadow-lg p-3 sm:p-4 md:p-5 mb-4 sm:mb-6 md:mb-8 border border-gray-100">
-          <div className="flex items-center gap-2 mb-3 sm:mb-4">
-            <div className="p-1 sm:p-1.5 bg-blue-50 rounded-lg">
-              <Filter size={14} className="sm:w-4 sm:h-4 text-blue-600" />
-            </div>
-            <span className="text-xs sm:text-sm font-semibold text-gray-700">Filtros por fecha</span>
-            {filtroFechaActivo && (
-              <span className="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded-full ml-auto">
-                {paginacion.total} {paginacion.total === 1 ? 'resultado' : 'resultados'}
-              </span>
+        {/* Buscador y Filtros Mejorados */}
+        <div className="bg-white rounded-xl shadow-lg p-5 mb-6 border border-gray-100">
+          {/* Buscador principal */}
+          <div className="relative mb-5">
+            <Search size={18} className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Buscar por nombre de ciudadano o teléfono..."
+              className="w-full pl-11 pr-10 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all text-sm"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                <X size={14} className="text-gray-400" />
+              </button>
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div className="flex items-center gap-2 mb-4">
+            <Filter size={16} className="text-green-500" />
+            <span className="text-sm font-semibold text-gray-700">Filtros avanzados</span>
+            {tieneFiltrosActivos() && (
+              <span className="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded-full ml-2">
+                {paginacion.total} resultados
+              </span>
+            )}
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Desde</label>
-              <input
-                type="date"
-                value={filtros.desde}
-                onChange={(e) => handleFechaChange('desde', e.target.value)}
-                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm"
-              />
+              <label className="block text-xs font-medium text-gray-500 mb-1">Tipo de alerta</label>
+              <select
+                value={tipoFiltro}
+                onChange={(e) => setTipoFiltro(e.target.value)}
+                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all text-sm"
+              >
+                <option value="todos">Todos</option>
+                <option value="panico">Pánico</option>
+                <option value="medica">Médica</option>
+              </select>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Hasta</label>
-              <input
-                type="date"
-                value={filtros.hasta}
-                onChange={(e) => handleFechaChange('hasta', e.target.value)}
-                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm"
-              />
+              <label className="block text-xs font-medium text-gray-500 mb-1">Fecha desde</label>
+              <div className="relative">
+                <Calendar size={14} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <input
+                  type="date"
+                  value={filtros.desde}
+                  onChange={(e) => handleFechaChange('desde', e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all text-sm"
+                />
+              </div>
             </div>
 
-            <div className="lg:col-span-2 flex items-end">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Fecha hasta</label>
+              <div className="relative">
+                <Calendar size={14} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <input
+                  type="date"
+                  value={filtros.hasta}
+                  onChange={(e) => handleFechaChange('hasta', e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all text-sm"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Tiempo atención (min)</label>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  placeholder="Mínimo"
+                  value={tiempoMinimo}
+                  onChange={(e) => setTiempoMinimo(e.target.value)}
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all text-sm"
+                />
+                <span className="text-gray-400 self-center">-</span>
+                <input
+                  type="number"
+                  placeholder="Máximo"
+                  value={tiempoMaximo}
+                  onChange={(e) => setTiempoMaximo(e.target.value)}
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-end gap-2">
               <button
                 onClick={limpiarFiltros}
-                className="w-full px-4 py-2 border border-gray-200 bg-white rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all text-sm font-medium text-gray-600"
+                className="w-full px-6 py-2 border border-gray-200 bg-white rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all text-sm font-medium text-gray-600 flex items-center justify-center gap-2"
               >
+                <X size={14} />
                 Limpiar filtros
               </button>
             </div>
           </div>
         </div>
 
-        {/* Lista de Alertas */}
-        {loading ? (
-          <div className="text-center py-12">
-            <Loader />
-          </div>
-        ) : alertas.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-lg p-12 text-center border border-gray-100">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle size={32} className="text-gray-400" />
+        {/* Tabla de Alertas */}
+        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+          {loading ? (
+            <div className="p-12 text-center">
+              <Loader />
             </div>
-            <h3 className="text-lg font-semibold text-gray-700 mb-2">No hay alertas cerradas</h3>
-            <p className="text-sm text-gray-400">
-              {filtroFechaActivo
-                ? `No se encontraron alertas entre ${formatearFechaCorta(filtros.desde)} y ${formatearFechaCorta(filtros.hasta)}`
-                : 'Las alertas atendidas aparecerán aquí'}
-            </p>
-          </div>
-        ) : (
-          <>
-            {/* Indicador de resultados */}
-            <div className="flex justify-between items-center mb-4">
-              <p className="text-sm text-gray-500">
-                Mostrando <span className="font-medium text-gray-700">{inicio}</span> a{' '}
-                <span className="font-medium text-gray-700">{fin}</span> de{' '}
-                <span className="font-medium text-gray-700">{paginacion.total}</span> alertas
+          ) : alertas.length === 0 ? (
+            <div className="p-16 text-center">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle size={32} className="text-gray-400" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-700 mb-2">No hay alertas cerradas</h3>
+              <p className="text-sm text-gray-400">
+                {tieneFiltrosActivos()
+                  ? 'No se encontraron alertas con los filtros seleccionados'
+                  : 'Las alertas atendidas aparecerán aquí'}
               </p>
             </div>
-
-            {/* Tarjetas de alertas */}
-            <div className="space-y-6">
-              {alertas.map((alerta) => (
-                <div
-                  key={alerta.id}
-                  className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all border border-gray-100 overflow-hidden"
-                >
-                  {/* Cabecera con tipo e ID */}
-                  <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-3 border-b border-gray-100 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg ${alerta.tipo === 'panico' ? 'bg-red-100' : 'bg-green-100'}`}>
-                        {getIconByTipo(alerta.tipo)}
-                      </div>
-                      <div>
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getColorByTipo(alerta.tipo)}`}>
-                          {alerta.tipo === 'panico' ? 'ALERTA DE PÁNICO' : 'ALERTA MÉDICA'}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className="text-right">
-                        <p className="text-xs text-gray-500">ID</p>
-                        <p className="text-sm font-semibold text-gray-700">#{alerta.id}</p>
-                      </div>
-                      {alerta.unidad && (
-                        <div className="text-right">
-                          <p className="text-xs text-gray-500">Unidad</p>
-                          <p className="text-sm font-semibold text-blue-600">{alerta.unidad.codigo}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Contenido principal */}
-                  <div className="p-6">
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                      {/* Columna izquierda: Información del ciudadano */}
-                      <div className="lg:col-span-1 space-y-4">
-                        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-100">
-                          <h3 className="text-xs font-semibold text-blue-800 uppercase tracking-wider mb-3 flex items-center gap-2">
-                            <User size={14} className="text-blue-600" />
-                            INFORMACIÓN DEL CIUDADANO
-                          </h3>
-
-                          <div className="space-y-3">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                                <span className="text-blue-700 font-semibold">
-                                  {alerta.ciudadano?.nombre?.charAt(0).toUpperCase() || '?'}
-                                </span>
-                              </div>
-                              <div>
-                                <p className="text-sm font-medium text-gray-800">{alerta.ciudadano?.nombre || 'Desconocido'}</p>
-                                <p className="text-xs text-gray-500">Ciudadano</p>
-                              </div>
-                            </div>
-
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[900px]">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">TIPO</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">CIUDADANO</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">UBICACIÓN</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">TIEMPO ATENCIÓN</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">FECHA CIERRE</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">ACCIONES</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {alertas.map((alerta) => (
+                      <tr 
+                        key={alerta.id}
+                        onClick={() => handleRowClick(alerta.id)}
+                        className="hover:bg-green-50/30 cursor-pointer transition-colors"
+                      >
+                        <td className="px-4 py-3">
+                          <BadgeTipoAlerta tipo={alerta.tipo} />
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium text-gray-800">
+                              {alerta.ciudadano?.nombre || 'Desconocido'}
+                            </span>
                             {alerta.ciudadano?.telefono && (
-                              <div className="flex items-center gap-2 p-2 bg-white rounded-lg border border-blue-100">
-                                <Phone size={14} className="text-blue-500" />
-                                <span className="text-sm text-gray-700">{alerta.ciudadano.telefono}</span>
-                              </div>
+                              <span className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                                <Phone size={10} />
+                                {alerta.ciudadano.telefono}
+                              </span>
                             )}
                           </div>
-                        </div>
-
-                        {/* Tiempo de atención */}
-                        <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-lg p-4 border border-amber-100">
-                          <h3 className="text-xs font-semibold text-amber-800 uppercase tracking-wider mb-3 flex items-center gap-2">
-                            <Clock size={14} className="text-amber-600" />
-                            TIEMPO DE ATENCIÓN
-                          </h3>
-
-                          <div className="flex items-center justify-center p-3 bg-white rounded-lg border border-amber-100">
-                            <div className="text-center">
-                              <p className="text-2xl font-bold text-amber-700">
-                                {calcularTiempoAtencion(alerta.fecha_asignacion, alerta.fecha_cierre)}
-                              </p>
-                              <p className="text-xs text-gray-500 mt-1">desde asignación hasta cierre</p>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Fechas */}
-                        <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between text-sm">
-                              <span className="text-gray-500 flex items-center gap-2">
-                                <CalendarClock size={14} className="text-gray-400" />
-                                Creación:
-                              </span>
-                              <span className="font-medium text-gray-700">{formatearFecha(alerta.fecha_creacion)}</span>
-                            </div>
-                            <div className="flex items-center justify-between text-sm">
-                              <span className="text-gray-500 flex items-center gap-2">
-                                <CalendarCheck size={14} className="text-gray-400" />
-                                Cierre:
-                              </span>
-                              <span className="font-medium text-gray-700">{formatearFecha(alerta.fecha_cierre)}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Columna derecha: Mapa */}
-                      <div className="lg:col-span-2">
-                        <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 h-full">
-                          <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-3 flex items-center gap-2">
-                            <MapPinned size={14} className="text-blue-600" />
-                            UBICACIÓN DEL EVENTO
-                          </h3>
-
-                          <div className="rounded-lg overflow-hidden border border-gray-200">
-                            {/* Mapa con petición bajo demanda */}
-                            <MapaConDireccion
-                              lat={alerta.lat}
-                              lng={alerta.lng}
-                              titulo={
-                                <div className="flex items-center gap-1.5">
-                                  {alerta.tipo === 'panico' ? (
-                                    <>
-                                      <AlertTriangle size={14} className="text-red-500" />
-                                      <span className="text-xs font-medium text-gray-700">Alerta de Pánico</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Heart size={14} className="text-green-500" />
-                                      <span className="text-xs font-medium text-gray-700">Alerta Médica</span>
-                                    </>
-                                  )}
-                                </div>
-                              }
-                              alertaId={alerta.id}
-                              altura="320px"
+                        </td>
+                        <td className="px-4 py-3">
+                          {alerta.lat && alerta.lng ? (
+                            <BotonMapa
+                              onClick={(e) => abrirMapaModal(e, alerta)}
+                              texto="Ver mapa"
+                              size={14}
                             />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Reporte (si existe) */}
-                    {alerta.reporte && (
-                      <div className="mt-6 pt-6 border-t border-gray-200">
-                        <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg p-4 border border-purple-100">
-                          <h3 className="text-xs font-semibold text-purple-800 uppercase tracking-wider mb-3 flex items-center gap-2">
-                            <FileText size={14} className="text-purple-600" />
-                            REPORTE DE ATENCIÓN
-                          </h3>
-
-                          <p className="text-sm text-gray-700 mb-4 leading-relaxed">
-                            {alerta.reporte.descripcion}
-                          </p>
-
-                          {alerta.reporte.fotos?.length > 0 && (
-                            <div>
-                              <p className="text-xs text-gray-500 mb-2 flex items-center gap-1">
-                                <ImageIcon size={12} />
-                                {alerta.reporte.fotos.length} {alerta.reporte.fotos.length === 1 ? 'foto' : 'fotos'}
-                              </p>
-                              <div className="flex flex-wrap gap-2">
-                                {alerta.reporte.fotos.slice(0, 4).map((foto, idx) => (
-                                  <div
-                                    key={idx}
-                                    className="relative cursor-pointer group"
-                                    onClick={() => setImagenSeleccionada(foto.url)}
-                                  >
-                                    <img
-                                      src={foto.url}
-                                      alt=""
-                                      className="w-20 h-20 object-cover rounded-lg border-2 border-white shadow-sm group-hover:border-purple-500 transition-all"
-                                    />
-                                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 rounded-lg transition-all"></div>
-                                  </div>
-                                ))}
-                                {alerta.reporte.fotos.length > 4 && (
-                                  <div className="w-20 h-20 bg-purple-100 rounded-lg flex items-center justify-center text-sm font-medium text-purple-700 border-2 border-white shadow-sm">
-                                    +{alerta.reporte.fotos.length - 4}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-400">—</span>
                           )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1.5">
+                            <Clock size={14} className="text-green-600" />
+                            <span className="text-sm font-semibold text-green-600">
+                              {formatearTiempoAtencion(alerta.fecha_asignacion, alerta.fecha_cierre)}
+                            </span>
+                            {alerta.tiempoAtencionMinutos !== null && (
+                              <span className="text-xs text-gray-400">
+                                ({alerta.tiempoAtencionMinutos} min)
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-500">
+                          {formatearFechaCorta(alerta.fecha_cierre)}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRowClick(alerta.id);
+                            }}
+                            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                            title="Ver detalle completo"
+                          >
+                            <Eye size={16} className="text-gray-500" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
-                  {/* Footer con botón de acción */}
-                  <div className="bg-gray-50 px-6 py-3 border-t border-gray-100 flex justify-end">
+              {/* Paginación */}
+              {paginacion.total_paginas > 1 && (
+                <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <p className="text-sm text-gray-500">
+                    Mostrando <span className="font-medium">{inicio}</span> a{' '}
+                    <span className="font-medium">{fin}</span> de{' '}
+                    <span className="font-medium">{paginacion.total}</span> alertas
+                  </p>
+                  
+                  <div className="flex items-center gap-2">
                     <button
-                      onClick={() => navigate(`/admin/alertas/${alerta.id}`)}
-                      className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-200 hover:text-blue-600 transition-all text-sm font-medium text-gray-600 group"
+                      onClick={() => cambiarPagina(paginacion.pagina - 1)}
+                      disabled={paginacion.pagina === 1}
+                      className="px-4 py-2 border border-gray-200 bg-white rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-all text-sm font-medium flex items-center gap-2"
                     >
-                      <Eye size={16} className="group-hover:text-blue-600" />
-                      Ver detalle completo
+                      <ChevronLeft size={16} />
+                      Anterior
+                    </button>
+                    
+                    <span className="px-4 py-2 text-sm text-gray-600 font-medium">
+                      Página {paginacion.pagina} de {paginacion.total_paginas}
+                    </span>
+                    
+                    <button
+                      onClick={() => cambiarPagina(paginacion.pagina + 1)}
+                      disabled={paginacion.pagina === paginacion.total_paginas}
+                      className="px-4 py-2 border border-gray-200 bg-white rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-all text-sm font-medium flex items-center gap-2"
+                    >
+                      Siguiente
+                      <ChevronRight size={16} />
                     </button>
                   </div>
                 </div>
-              ))}
-            </div>
-
-            {/* Paginación */}
-            {paginacion.total_paginas > 1 && (
-              <div className="mt-8 bg-white rounded-xl shadow-sm p-4 border border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <p className="text-sm text-gray-500">
-                  Mostrando <span className="font-medium text-gray-700">{inicio}</span> a{' '}
-                  <span className="font-medium text-gray-700">{fin}</span> de{' '}
-                  <span className="font-medium text-gray-700">{paginacion.total}</span> alertas
-                </p>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => cambiarPagina(paginacion.pagina - 1)}
-                    disabled={paginacion.pagina === 1}
-                    className="px-4 py-2 border border-gray-200 bg-white rounded-lg hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 transition-all text-sm font-medium flex items-center gap-2"
-                  >
-                    <ChevronLeft size={16} />
-                    Anterior
-                  </button>
-
-                  <span className="px-4 py-2 text-sm text-gray-600 font-medium">
-                    Página {paginacion.pagina} de {paginacion.total_paginas}
-                  </span>
-
-                  <button
-                    onClick={() => cambiarPagina(paginacion.pagina + 1)}
-                    disabled={paginacion.pagina === paginacion.total_paginas}
-                    className="px-4 py-2 border border-gray-200 bg-white rounded-lg hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 transition-all text-sm font-medium flex items-center gap-2"
-                  >
-                    Siguiente
-                    <ChevronRight size={16} />
-                  </button>
-                </div>
-              </div>
-            )}
-          </>
-        )}
+              )}
+            </>
+          )}
+        </div>
       </div>
 
-      {/* Modal para ver imagen grande */}
-      {imagenSeleccionada && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-95 z-50 flex items-center justify-center p-4"
-          onClick={() => setImagenSeleccionada(null)}
-        >
-          <div className="relative max-w-6xl max-h-full">
-            <img
-              src={imagenSeleccionada}
-              alt=""
-              className="max-h-[90vh] max-w-full object-contain rounded-lg"
-            />
-            <button
-              onClick={() => setImagenSeleccionada(null)}
-              className="absolute top-4 right-4 text-white bg-black bg-opacity-50 hover:bg-opacity-75 rounded-full p-3 transition-all"
-            >
-              <X size={20} />
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Modal del Mapa */}
+      <ModalMapa
+        isOpen={mapaModal.abierto}
+        onClose={cerrarMapaModal}
+        lat={mapaModal.lat}
+        lng={mapaModal.lng}
+        titulo={mapaModal.titulo}
+        alertaId={mapaModal.alertaId}
+        tipo={mapaModal.tipo}
+      />
     </div>
   );
 };

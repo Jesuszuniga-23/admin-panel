@@ -10,8 +10,19 @@ import {
 import unidadService from '../../../services/admin/unidad.service';
 import personalService from '../../../services/admin/personal.service';
 import toast from 'react-hot-toast';
+import IconoEntidad, { BadgeIcono } from '../../../components/ui/IconoEntidad';
 
-// FUNCIÓN PARA CORREGIR CARACTERES MAL CODIFICADOS
+// Mapeo de tipos a entidades para iconos consistentes
+const tipoToEntidad = {
+  policia: 'PATRULLA',
+  ambulancia: 'AMBULANCIA'
+};
+
+const capitalizar = (texto) => {
+  if (!texto) return '';
+  return texto.charAt(0).toUpperCase() + texto.slice(1).toLowerCase();
+};
+
 const corregirTexto = (texto) => {
   if (!texto) return '';
 
@@ -32,7 +43,6 @@ const corregirTexto = (texto) => {
   return textoCorregido;
 };
 
-// MODAL PARA ACCIONES NO PERMITIDAS
 const ModalAccionNoPermitida = ({ isOpen, onClose, mensaje }) => {
   if (!isOpen) return null;
 
@@ -46,9 +56,7 @@ const ModalAccionNoPermitida = ({ isOpen, onClose, mensaje }) => {
             </div>
             <h3 className="text-lg font-semibold text-gray-800">Acción no permitida</h3>
           </div>
-
           <p className="text-sm text-gray-600 mb-6">{mensaje}</p>
-
           <div className="flex justify-end">
             <button
               onClick={onClose}
@@ -63,7 +71,6 @@ const ModalAccionNoPermitida = ({ isOpen, onClose, mensaje }) => {
   );
 };
 
-// MODAL DE CONFIRMACIÓN PERSONALIZADO
 const ModalConfirmacion = ({ 
   isOpen, 
   onClose, 
@@ -119,9 +126,7 @@ const ModalConfirmacion = ({
             <h3 className="text-lg font-semibold text-gray-800">{titulo}</h3>
           </div>
           
-          <p className="text-sm text-gray-600 mb-2">
-            {mensaje}
-          </p>
+          <p className="text-sm text-gray-600 mb-2">{mensaje}</p>
           {itemNombre && (
             <p className="text-base font-semibold text-center p-3 rounded-lg mb-4" style={{
               color: tipoAccion === 'eliminar' ? '#dc2626' : 
@@ -173,12 +178,7 @@ const UnidadDetail = () => {
   const [personalSeleccionado, setPersonalSeleccionado] = useState('');
   const [cargandoPersonal, setCargandoPersonal] = useState(false);
   
-  // Estados para modales
-  const [modalInfo, setModalInfo] = useState({
-    show: false,
-    mensaje: ''
-  });
-  
+  const [modalInfo, setModalInfo] = useState({ show: false, mensaje: '' });
   const [modalConfirmacion, setModalConfirmacion] = useState({
     show: false,
     tipo: '',
@@ -192,7 +192,6 @@ const UnidadDetail = () => {
     cargarUnidad();
   }, [id]);
 
-  // CARGA UNIDAD Y CORRIGE TEXTOS
   const cargarUnidad = async () => {
     try {
       setLoading(true);
@@ -220,7 +219,8 @@ const UnidadDetail = () => {
       if (error.response?.status === 429) {
         toast.error('Demasiadas peticiones. Espera unos segundos...', {
           icon: <Clock size={18} className="text-yellow-500" />
-        }); setTimeout(() => cargarUnidad(), 5000);
+        });
+        setTimeout(() => cargarUnidad(), 5000);
       } else {
         setError(error.error || 'Error al cargar los datos');
         toast.error('No se pudo cargar la información');
@@ -230,7 +230,6 @@ const UnidadDetail = () => {
     }
   };
 
-  // CARGA PERSONAL DISPONIBLE Y CORRIGE TEXTOS
   const cargarPersonalDisponible = async () => {
     try {
       setCargandoPersonal(true);
@@ -283,9 +282,7 @@ const UnidadDetail = () => {
     }
   };
 
-  // REMOVER PERSONAL CON VALIDACIÓN DE UNIDAD OCUPADA
   const handleRemover = async (personalId, nombre) => {
-    // Validar si la unidad está ocupada
     if (unidad.estado === 'ocupada') {
       setModalInfo({
         show: true,
@@ -296,7 +293,6 @@ const UnidadDetail = () => {
 
     const nombreCorregido = corregirTexto(nombre);
     
-    // Abrir modal de confirmación para remover
     setModalConfirmacion({
       show: true,
       tipo: 'remover',
@@ -324,9 +320,7 @@ const UnidadDetail = () => {
     });
   };
 
-  // TOGGLE ACTIVA CON VALIDACIÓN DE UNIDAD OCUPADA
   const handleToggleActiva = async () => {
-    // Validar si la unidad está ocupada
     if (unidad.estado === 'ocupada') {
       setModalInfo({
         show: true,
@@ -359,7 +353,6 @@ const UnidadDetail = () => {
           await cargarUnidad();
         } catch (error) {
           setUnidad(prev => ({ ...prev, activa: estadoAnterior }));
-
           console.error("Error cambiando estado:", error);
           if (error.response?.status === 429) {
             toast.error('Demasiadas peticiones. Espera unos segundos...', {
@@ -373,9 +366,7 @@ const UnidadDetail = () => {
     });
   };
 
-  // ELIMINAR CON VALIDACIÓN DE UNIDAD OCUPADA
   const handleEliminar = async () => {
-    // Validar si la unidad está ocupada
     if (unidad.estado === 'ocupada') {
       setModalInfo({
         show: true,
@@ -411,7 +402,6 @@ const UnidadDetail = () => {
     });
   };
 
-  // EDITAR CON VALIDACIÓN DE UNIDAD OCUPADA
   const handleEditar = () => {
     if (unidad.estado === 'ocupada') {
       setModalInfo({
@@ -465,14 +455,12 @@ const UnidadDetail = () => {
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
-      {/* Modal de acción no permitida */}
       <ModalAccionNoPermitida
         isOpen={modalInfo.show}
         onClose={() => setModalInfo({ show: false, mensaje: '' })}
         mensaje={modalInfo.mensaje}
       />
 
-      {/* Modal de confirmación */}
       <ModalConfirmacion
         isOpen={modalConfirmacion.show}
         onClose={() => setModalConfirmacion({ ...modalConfirmacion, show: false })}
@@ -501,32 +489,38 @@ const UnidadDetail = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          <span className={`px-3 py-1 rounded-full text-sm ${unidad.activa
-            ? 'bg-green-100 text-green-700'
-            : 'bg-red-100 text-red-700'
-            }`}>
+          <span className={`px-3 py-1 rounded-full text-sm ${
+            unidad.activa
+              ? 'bg-green-100 text-green-700'
+              : 'bg-red-100 text-red-700'
+          }`}>
             {unidad.activa ? 'Activa' : 'Inactiva'}
           </span>
-          <span className={`px-3 py-1 rounded-full text-sm ${unidad.estado === 'disponible' ? 'bg-green-100 text-green-700' :
+          <span className={`px-3 py-1 rounded-full text-sm ${
+            unidad.estado === 'disponible' ? 'bg-green-100 text-green-700' :
             unidad.estado === 'ocupada' ? 'bg-red-100 text-red-700' :
-              'bg-gray-100 text-gray-700'
-            }`}>
-            {unidad.estado === 'disponible' ? 'Disponible' :
-              unidad.estado === 'ocupada' ? 'Ocupada' : 'Inactiva'}
+            'bg-gray-100 text-gray-700'
+          }`}>
+            {capitalizar(unidad.estado)}
           </span>
         </div>
       </div>
 
       {/* Tarjeta principal */}
       <div className="bg-white rounded-xl shadow overflow-hidden">
-        {/* Cabecera con icono */}
-        <div className={`bg-gradient-to-r px-6 py-8 ${unidad.tipo === 'policia'
-          ? 'from-blue-600 to-blue-800'
-          : 'from-green-600 to-green-800'
-          }`}>
+        {/* Cabecera con gradiente según tipo */}
+        <div className={`bg-gradient-to-r ${
+          unidad.tipo === 'policia'
+            ? 'from-blue-600 to-blue-700'
+            : 'from-green-600 to-emerald-700'
+        } px-6 py-8`}>
           <div className="flex items-center gap-6">
             <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-lg">
-              <Truck size={36} className={unidad.tipo === 'policia' ? 'text-blue-600' : 'text-green-600'} />
+              <IconoEntidad 
+                entidad={tipoToEntidad[unidad.tipo] || 'PATRULLA'} 
+                size={36}
+                color={unidad.tipo === 'policia' ? 'text-blue-600' : 'text-green-600'}
+              />
             </div>
             <div>
               <h2 className="text-2xl font-bold text-white">{unidad.codigo}</h2>
@@ -543,12 +537,11 @@ const UnidadDetail = () => {
               icon={unidad.tipo === 'policia' ? Shield : Ambulance}
               label="Tipo de unidad"
               value={
-                <span className={`px-2 py-1 rounded-full text-xs ${unidad.tipo === 'policia'
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'bg-green-100 text-green-700'
-                  }`}>
-                  {unidad.tipo === 'policia' ? 'Policía' : 'Ambulancia'}
-                </span>
+                <BadgeIcono 
+                  entidad={tipoToEntidad[unidad.tipo] || 'PATRULLA'}
+                  texto={unidad.tipo === 'policia' ? 'Policía' : 'Ambulancia'}
+                  size={12}
+                />
               }
             />
             <InfoItem
@@ -587,7 +580,6 @@ const UnidadDetail = () => {
               </button>
             </div>
 
-            {/* Formulario de asignación */}
             {mostrarAsignacion && (
               <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
                 <h4 className="font-medium text-blue-800 mb-3">Seleccionar personal</h4>
@@ -632,22 +624,22 @@ const UnidadDetail = () => {
               </div>
             )}
 
-            {/* Lista de personal asignado */}
             {unidad.personal_asignado && unidad.personal_asignado.length > 0 ? (
               <div className="space-y-3">
                 {unidad.personal_asignado.map((persona) => (
                   <div key={persona.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                        <span className="text-blue-600 font-medium">
-                          {persona.nombre?.charAt(0).toUpperCase()}
-                        </span>
+                        <IconoEntidad 
+                          entidad={persona.rol === 'policia' ? 'POLICIA' : persona.rol === 'ambulancia' ? 'PERSONAL_AMBULANCIA' : 'ADMIN'}
+                          size={14}
+                        />
                       </div>
                       <div>
                         <p className="font-medium text-gray-800">{persona.nombre}</p>
                         <p className="text-xs text-gray-500 flex items-center gap-1">
                           {persona.rol === 'policia' ? 'Policía' :
-                            persona.rol === 'ambulancia' ? 'Ambulancia' : persona.rol} • {persona.placa}
+                           persona.rol === 'ambulancia' ? 'Ambulancia' : persona.rol} • {persona.placa}
                         </p>
                       </div>
                     </div>
@@ -698,10 +690,11 @@ const UnidadDetail = () => {
         <div className="border-t px-6 py-4 bg-gray-50 flex justify-end gap-3">
           <button
             onClick={handleToggleActiva}
-            className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${unidad.activa
-              ? 'bg-yellow-600 text-white hover:bg-yellow-700'
-              : 'bg-green-600 text-white hover:bg-green-700'
-              }`}
+            className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${
+              unidad.activa
+                ? 'bg-yellow-600 text-white hover:bg-yellow-700'
+                : 'bg-green-600 text-white hover:bg-green-700'
+            }`}
           >
             <Power size={18} />
             {unidad.activa ? 'Desactivar' : 'Activar'}
@@ -728,7 +721,6 @@ const UnidadDetail = () => {
   );
 };
 
-// Componentes auxiliares
 const InfoItem = ({ icon: Icon, label, value }) => (
   <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-lg">
     <Icon size={20} className="text-blue-600 mt-1" />

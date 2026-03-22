@@ -2,24 +2,27 @@ import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Truck, Plus, Search, Filter, ChevronLeft, ChevronRight,
-  Eye, Edit, Trash2, Power, RotateCcw, Shield, Ambulance,
-  MapPin, Users, MoreVertical, Download, AlertCircle, X,
-  Clock, FileSpreadsheet, FilePieChart, AlertTriangle, CheckCircle
+  Eye, Edit, Trash2, Power, Users, X, FileSpreadsheet, FilePieChart,
+  Clock, AlertCircle, CheckCircle
 } from 'lucide-react';
 import unidadService from '../../../services/admin/unidad.service';
 import toast from 'react-hot-toast';
 import { useDebounce } from '../../../hooks/useDebounce';
-import ReporteBase from '../../../components/reportes/ReporteBase';
 import reportesService from '../../../services/admin/reportes.service';
 import useAuthStore from '../../../store/authStore';
+import IconoEntidad, { BadgeIcono } from '../../../components/ui/IconoEntidad';
 
-// Función para capitalizar primera letra
 const capitalizar = (texto) => {
   if (!texto) return '';
   return texto.charAt(0).toUpperCase() + texto.slice(1).toLowerCase();
 };
 
-// Modal personalizado para mensajes de acción no permitida
+// Mapeo de tipos a entidades para iconos consistentes
+const tipoToEntidad = {
+  policia: 'PATRULLA',
+  ambulancia: 'AMBULANCIA'
+};
+
 const ModalAccionNoPermitida = ({ isOpen, onClose, mensaje }) => {
   if (!isOpen) return null;
 
@@ -33,9 +36,7 @@ const ModalAccionNoPermitida = ({ isOpen, onClose, mensaje }) => {
             </div>
             <h3 className="text-base sm:text-lg font-semibold text-gray-800">Acción no permitida</h3>
           </div>
-
           <p className="text-xs sm:text-sm text-gray-600 mb-4 sm:mb-6">{mensaje}</p>
-
           <div className="flex justify-end">
             <button
               onClick={onClose}
@@ -50,16 +51,14 @@ const ModalAccionNoPermitida = ({ isOpen, onClose, mensaje }) => {
   );
 };
 
-// Modal de confirmación personalizado
 const ModalConfirmacion = ({ isOpen, onClose, onConfirm, titulo, mensaje, itemNombre, tipoAccion = 'eliminar' }) => {
   if (!isOpen) return null;
 
   const config = {
     eliminar: {
-      icon: <AlertTriangle size={24} className="text-red-600" />,
+      icon: <Trash2 size={24} className="text-red-600" />,
       bgColor: 'bg-red-100',
       buttonColor: 'bg-red-600 hover:bg-red-700',
-      buttonIcon: <Trash2 size={16} />,
       buttonText: 'Eliminar',
       mensajeAdicional: 'Esta acción no se puede deshacer.'
     },
@@ -67,7 +66,6 @@ const ModalConfirmacion = ({ isOpen, onClose, onConfirm, titulo, mensaje, itemNo
       icon: <Power size={24} className="text-yellow-600" />,
       bgColor: 'bg-yellow-100',
       buttonColor: 'bg-yellow-600 hover:bg-yellow-700',
-      buttonIcon: <Power size={16} />,
       buttonText: 'Desactivar',
       mensajeAdicional: 'La unidad dejará de recibir alertas y no estará operativa.'
     },
@@ -75,7 +73,6 @@ const ModalConfirmacion = ({ isOpen, onClose, onConfirm, titulo, mensaje, itemNo
       icon: <CheckCircle size={24} className="text-green-600" />,
       bgColor: 'bg-green-100',
       buttonColor: 'bg-green-600 hover:bg-green-700',
-      buttonIcon: <Power size={16} />,
       buttonText: 'Activar',
       mensajeAdicional: 'La unidad volverá a estar operativa y podrá recibir alertas.'
     }
@@ -94,13 +91,13 @@ const ModalConfirmacion = ({ isOpen, onClose, onConfirm, titulo, mensaje, itemNo
             <h3 className="text-lg font-semibold text-gray-800">{titulo || 'Confirmar acción'}</h3>
           </div>
           
-          <p className="text-sm text-gray-600 mb-2">
-            {mensaje || `¿Estás seguro de ${tipoAccion === 'activar' ? 'activar' : tipoAccion === 'desactivar' ? 'desactivar' : 'eliminar'} la unidad`}
-          </p>
+          <p className="text-sm text-gray-600 mb-2">{mensaje}</p>
           {itemNombre && (
-            <p className="text-base font-semibold text-center p-2 rounded-lg mb-4" style={{
-              color: tipoAccion === 'eliminar' ? '#dc2626' : tipoAccion === 'desactivar' ? '#d97706' : '#059669',
-              backgroundColor: tipoAccion === 'eliminar' ? '#fee2e2' : tipoAccion === 'desactivar' ? '#fef3c7' : '#d1fae5'
+            <p className="text-base font-semibold text-center p-3 rounded-lg mb-4" style={{
+              color: tipoAccion === 'eliminar' ? '#dc2626' : 
+                     tipoAccion === 'desactivar' ? '#d97706' : '#059669',
+              backgroundColor: tipoAccion === 'eliminar' ? '#fee2e2' : 
+                             tipoAccion === 'desactivar' ? '#fef3c7' : '#d1fae5'
             }}>
               "{itemNombre}"
             </p>
@@ -121,7 +118,7 @@ const ModalConfirmacion = ({ isOpen, onClose, onConfirm, titulo, mensaje, itemNo
               }}
               className={`px-4 py-2 ${conf.buttonColor} text-white rounded-lg transition-colors text-sm font-medium flex items-center gap-2`}
             >
-              {conf.buttonIcon}
+              {conf.icon}
               {conf.buttonText}
             </button>
           </div>
@@ -136,16 +133,9 @@ const UnidadesList = () => {
   const { user } = useAuthStore();
   const [unidades, setUnidades] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [mostrarReporte, setMostrarReporte] = useState(false);
   const [exportando, setExportando] = useState(false);
   
-  // Estados para modales
-  const [modalInfo, setModalInfo] = useState({
-    show: false,
-    mensaje: ''
-  });
-  
-  // Estado para modal de confirmación de eliminación
+  const [modalInfo, setModalInfo] = useState({ show: false, mensaje: '' });
   const [modalConfirmacion, setModalConfirmacion] = useState({
     show: false,
     id: null,
@@ -153,8 +143,6 @@ const UnidadesList = () => {
     unidad: null,
     tipoAccion: 'eliminar'
   });
-
-  // 🔥 NUEVO: Estado para modal de confirmación de activar/desactivar
   const [modalToggle, setModalToggle] = useState({
     show: false,
     id: null,
@@ -215,30 +203,17 @@ const UnidadesList = () => {
     cargarUnidades();
   }, [cargarUnidades]);
 
-  // VALIDACIÓN: Unidad ocupada
   const isUnidadOcupada = (unidad) => {
     return unidad.estado === 'ocupada';
   };
 
-  // =====================================================
-  // FUNCIONES DE EXPORTACIÓN PROFESIONAL
-  // =====================================================
-  
   const exportarExcel = async () => {
     try {
       setExportando(true);
       toast.loading('Generando reporte de Excel...', { id: 'export' });
-      
       const response = await unidadService.listarUnidades({ limite: 1000 });
       const todasUnidades = response.data || [];
-      
-      await reportesService.generarExcelPersonalizado(
-        todasUnidades, 
-        'unidades', 
-        filtros, 
-        user
-      );
-      
+      await reportesService.generarExcelPersonalizado(todasUnidades, 'unidades', filtros, user);
       toast.success('Reporte de Excel generado correctamente', { id: 'export' });
     } catch (error) {
       console.error('Error exportando Excel:', error);
@@ -252,17 +227,9 @@ const UnidadesList = () => {
     try {
       setExportando(true);
       toast.loading('Generando reporte PDF...', { id: 'export' });
-      
       const response = await unidadService.listarUnidades({ limite: 1000 });
       const todasUnidades = response.data || [];
-      
-      reportesService.generarPDFPersonalizado(
-        todasUnidades, 
-        'unidades', 
-        filtros, 
-        user
-      );
-      
+      reportesService.generarPDFPersonalizado(todasUnidades, 'unidades', filtros, user);
       toast.success('Reporte PDF generado correctamente', { id: 'export' });
     } catch (error) {
       console.error('Error exportando PDF:', error);
@@ -272,7 +239,6 @@ const UnidadesList = () => {
     }
   };
 
-  // 🔥 MODIFICADO: Ahora usa el modal de confirmación para activar/desactivar
   const handleToggleActivo = async (id, codigo, unidad) => {
     if (isUnidadOcupada(unidad)) {
       setModalInfo({
@@ -282,7 +248,6 @@ const UnidadesList = () => {
       return;
     }
 
-    // Abrir modal de confirmación para activar/desactivar
     setModalToggle({
       show: true,
       id,
@@ -293,48 +258,35 @@ const UnidadesList = () => {
     });
   };
 
-  // 🔥 NUEVO: Función para ejecutar el toggle después de confirmar
   const ejecutarToggle = async () => {
     const { id, codigo, unidad, activar } = modalToggle;
     const accion = activar ? 'activar' : 'desactivar';
     const estadoAnterior = unidades.find(u => u.id === id);
     const activa = unidad.activa;
 
-    // Optimistic update
     setUnidades(prevUnidades =>
       prevUnidades.map(u =>
         u.id === id
-          ? {
-            ...u,
-            activa: activar,
-            estado: activar ? 'disponible' : 'inactiva'
-          }
+          ? { ...u, activa: activar, estado: activar ? 'disponible' : 'inactiva' }
           : u
       )
     );
 
     try {
       const response = await unidadService.toggleActiva(id, activar);
-
       if (response.data?.estado) {
         setUnidades(prevUnidades =>
           prevUnidades.map(u =>
             u.id === id
-              ? {
-                ...u,
-                estado: response.data.estado,
-                activa: response.data.activa
-              }
+              ? { ...u, estado: response.data.estado, activa: response.data.activa }
               : u
           )
         );
       }
-
       toast.success(`Unidad ${accion}da correctamente`, {
         icon: <Power size={18} className={activar ? 'text-green-500' : 'text-yellow-500'} />
       });
     } catch (error) {
-      // Revertir en caso de error
       setUnidades(prevUnidades =>
         prevUnidades.map(u =>
           u.id === id
@@ -342,7 +294,6 @@ const UnidadesList = () => {
             : u
         )
       );
-
       if (error.response?.status === 429) {
         toast.error('Demasiadas peticiones. Espera unos segundos...', {
           icon: <Clock size={18} className="text-yellow-500" />
@@ -353,7 +304,6 @@ const UnidadesList = () => {
     }
   };
 
-  // MANEJADOR PARA ELIMINAR
   const handleEliminar = async (id, codigo, unidad) => {
     if (isUnidadOcupada(unidad)) {
       setModalInfo({
@@ -363,7 +313,6 @@ const UnidadesList = () => {
       return;
     }
 
-    // Abrir modal de confirmación para eliminar
     setModalConfirmacion({
       show: true,
       id,
@@ -373,10 +322,8 @@ const UnidadesList = () => {
     });
   };
 
-  // Función para ejecutar la eliminación después de confirmar
   const ejecutarEliminar = async () => {
     const { id, codigo } = modalConfirmacion;
-    
     try {
       await unidadService.eliminarUnidad(id);
       toast.success('Unidad eliminada correctamente');
@@ -392,7 +339,7 @@ const UnidadesList = () => {
     }
   };
 
-  const handleVerDetalle = (id, unidad) => {
+  const handleVerDetalle = (id) => {
     navigate(`/admin/unidades/${id}`);
   };
 
@@ -419,14 +366,12 @@ const UnidadesList = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-3 sm:p-4 md:p-6 lg:p-8">
-      {/* Modal de acción no permitida */}
       <ModalAccionNoPermitida
         isOpen={modalInfo.show}
         onClose={() => setModalInfo({ show: false, mensaje: '' })}
         mensaje={modalInfo.mensaje}
       />
 
-      {/* Modal de confirmación para eliminar */}
       <ModalConfirmacion
         isOpen={modalConfirmacion.show}
         onClose={() => setModalConfirmacion({ show: false, id: null, codigo: '', unidad: null, tipoAccion: 'eliminar' })}
@@ -437,7 +382,6 @@ const UnidadesList = () => {
         tipoAccion="eliminar"
       />
 
-      {/* 🔥 NUEVO: Modal de confirmación para activar/desactivar */}
       <ModalConfirmacion
         isOpen={modalToggle.show}
         onClose={() => setModalToggle({ show: false, id: null, codigo: '', unidad: null, activar: false, estadoActual: null })}
@@ -450,7 +394,7 @@ const UnidadesList = () => {
         tipoAccion={modalToggle.activar ? "activar" : "desactivar"}
       />
 
-      {/* Header - RESPONSIVE */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
         <div className="flex items-center gap-2 sm:gap-3">
           <div className="bg-gradient-to-br from-purple-500 to-indigo-600 p-2 sm:p-2.5 md:p-3 rounded-lg sm:rounded-xl shadow-lg shadow-purple-200">
@@ -458,9 +402,7 @@ const UnidadesList = () => {
           </div>
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Unidades</h1>
-            <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
-              Gestión de unidades operativas
-            </p>
+            <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Gestión de unidades operativas</p>
           </div>
         </div>
         <div className="flex gap-2 w-full sm:w-auto">
@@ -468,9 +410,8 @@ const UnidadesList = () => {
             onClick={exportarExcel}
             disabled={exportando}
             className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-green-600 text-white px-3 sm:px-4 py-2 text-sm sm:text-base rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
-            title="Exportar a Excel"
           >
-            <FileSpreadsheet size={16} className="sm:w-[18px] sm:h-[18px]" />
+            <FileSpreadsheet size={16} />
             <span className="sm:hidden">Excel</span>
             <span className="hidden sm:inline">Excel</span>
           </button>
@@ -478,9 +419,8 @@ const UnidadesList = () => {
             onClick={exportarPDF}
             disabled={exportando}
             className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-red-600 text-white px-3 sm:px-4 py-2 text-sm sm:text-base rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
-            title="Exportar a PDF"
           >
-            <FilePieChart size={16} className="sm:w-[18px] sm:h-[18px]" />
+            <FilePieChart size={16} />
             <span className="sm:hidden">PDF</span>
             <span className="hidden sm:inline">PDF</span>
           </button>
@@ -488,14 +428,14 @@ const UnidadesList = () => {
             onClick={() => navigate('/admin/unidades/crear')}
             className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-blue-600 text-white px-3 sm:px-4 py-2 text-sm sm:text-base rounded-lg hover:bg-blue-700 transition-colors"
           >
-            <Plus size={16} className="sm:w-[18px] sm:h-[18px]" />
+            <Plus size={16} />
             <span className="sm:hidden">Nueva</span>
             <span className="hidden sm:inline">Nueva Unidad</span>
           </button>
         </div>
       </div>
 
-      {/* Filtros - COMPLETAMENTE RESPONSIVE */}
+      {/* Filtros */}
       <div className="bg-white rounded-xl shadow-lg p-3 sm:p-4 mb-4 sm:mb-6">
         <div className="flex items-center justify-between mb-2 sm:mb-3">
           <div className="flex items-center gap-1.5 sm:gap-2">
@@ -503,10 +443,7 @@ const UnidadesList = () => {
             <h2 className="text-xs sm:text-sm font-semibold text-gray-700">Filtros</h2>
           </div>
           {(filtros.tipo || filtros.estado || filtros.search) && (
-            <button
-              onClick={limpiarFiltros}
-              className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
-            >
+            <button onClick={limpiarFiltros} className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1">
               <X size={12} />
               <span className="hidden xs:inline">Limpiar</span>
             </button>
@@ -514,9 +451,8 @@ const UnidadesList = () => {
         </div>
 
         <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3">
-          {/* Buscador */}
           <div className="xs:col-span-2 lg:col-span-2 relative">
-            <Search size={14} className="sm:w-4 sm:h-4 absolute left-2.5 sm:left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <Search size={14} className="absolute left-2.5 sm:left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <input
               type="text"
               placeholder="Buscar código o descripción..."
@@ -526,7 +462,6 @@ const UnidadesList = () => {
             />
           </div>
 
-          {/* Select tipo */}
           <select
             value={filtros.tipo}
             onChange={(e) => setFiltros(prev => ({ ...prev, tipo: e.target.value, pagina: 1 }))}
@@ -537,7 +472,6 @@ const UnidadesList = () => {
             <option value="ambulancia">Ambulancia</option>
           </select>
 
-          {/* Select estado */}
           <select
             value={filtros.estado}
             onChange={(e) => setFiltros(prev => ({ ...prev, estado: e.target.value, pagina: 1 }))}
@@ -549,7 +483,6 @@ const UnidadesList = () => {
             <option value="inactiva">Inactiva</option>
           </select>
 
-          {/* Botón Aplicar */}
           <div className="flex gap-2 xs:col-span-2 lg:col-span-1">
             <button
               onClick={() => setFiltros(prev => ({ ...prev, pagina: 1 }))}
@@ -560,7 +493,6 @@ const UnidadesList = () => {
           </div>
         </div>
 
-        {/* Indicador de filtros activos */}
         {(filtros.tipo || filtros.estado || filtros.search) && (
           <div className="mt-2 sm:mt-3 flex items-center gap-1.5 text-xs">
             <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></span>
@@ -569,7 +501,7 @@ const UnidadesList = () => {
         )}
       </div>
 
-      {/* Tabla con scroll horizontal en móvil */}
+      {/* Tabla */}
       <div className="bg-white rounded-xl shadow-lg overflow-hidden">
         {loading ? (
           <div className="p-6 sm:p-8 text-center">
@@ -591,7 +523,6 @@ const UnidadesList = () => {
           </div>
         ) : (
           <>
-            {/* Contenedor con scroll horizontal para móvil */}
             <div className="overflow-x-auto">
               <table className="w-full min-w-[800px] lg:min-w-full">
                 <thead className="bg-gray-50 border-b">
@@ -608,36 +539,34 @@ const UnidadesList = () => {
                     <tr key={unidad.id} className="hover:bg-gray-50">
                       <td className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 lg:py-4">
                         <div className="flex items-center gap-2 sm:gap-3">
-                          <div className={`w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 rounded-full flex items-center justify-center flex-shrink-0 ${unidad.tipo === 'policia' ? 'bg-blue-100' : 'bg-green-100'
-                            }`}>
-                            <Truck
-                              size={12}
-                              className={`sm:w-[14px] sm:h-[14px] lg:w-4 lg:h-4 ${unidad.tipo === 'policia' ? 'text-blue-600' : 'text-green-600'
-                                }`}
-                            />
-                          </div>
+                          <IconoEntidad 
+                            entidad={tipoToEntidad[unidad.tipo] || 'PATRULLA'} 
+                            size={16} 
+                          />
                           <span className="text-xs sm:text-sm font-medium text-gray-800 truncate max-w-[80px] sm:max-w-[120px]">
                             {unidad.codigo}
                           </span>
                         </div>
                       </td>
                       <td className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 lg:py-4">
-                        <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs whitespace-nowrap ${unidad.tipo === 'policia' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
-                          }`}>
-                          {unidad.tipo === 'policia' ? 'Policía' : 'Ambulancia'}
-                        </span>
+                        <BadgeIcono 
+                          entidad={tipoToEntidad[unidad.tipo] || 'PATRULLA'}
+                          texto={unidad.tipo === 'policia' ? 'Policía' : 'Ambulancia'}
+                          size={12}
+                        />
                       </td>
                       <td className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 lg:py-4">
-                        <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs whitespace-nowrap ${unidad.estado === 'disponible' ? 'bg-green-100 text-green-700' :
+                        <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs whitespace-nowrap ${
+                          unidad.estado === 'disponible' ? 'bg-green-100 text-green-700' :
                           unidad.estado === 'ocupada' ? 'bg-red-100 text-red-700' :
-                            'bg-gray-100 text-gray-700'
-                          }`}>
+                          'bg-gray-100 text-gray-700'
+                        }`}>
                           {capitalizar(unidad.estado)}
                         </span>
                       </td>
                       <td className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 lg:py-4">
                         <div className="flex items-center gap-1">
-                          <Users size={12} className="sm:w-3 sm:h-3 lg:w-3.5 lg:h-3.5 text-gray-400" />
+                          <Users size={12} className="text-gray-400" />
                           <span className="text-xs sm:text-sm text-gray-600">
                             {unidad.personal_asignado?.length || 0}
                           </span>
@@ -647,35 +576,33 @@ const UnidadesList = () => {
                         <div className="flex items-center justify-end gap-1 sm:gap-1.5 lg:gap-2">
                           <button
                             onClick={() => handleToggleActivo(unidad.id, unidad.codigo, unidad)}
-                            className={`p-1 rounded-lg transition-colors ${unidad.activa ? 'hover:bg-yellow-50 text-yellow-600' : 'hover:bg-green-50 text-green-600'
-                              }`}
+                            className={`p-1 rounded-lg transition-colors ${
+                              unidad.activa ? 'hover:bg-yellow-50 text-yellow-600' : 'hover:bg-green-50 text-green-600'
+                            }`}
                             title={unidad.activa ? 'Desactivar' : 'Activar'}
                           >
-                            <Power size={14} className="sm:w-4 sm:h-4 lg:w-[18px] lg:h-[18px]" />
+                            <Power size={14} className="sm:w-4 sm:h-4" />
                           </button>
-
                           <button
-                            onClick={() => handleVerDetalle(unidad.id, unidad)}
+                            onClick={() => handleVerDetalle(unidad.id)}
                             className="p-1 hover:bg-gray-100 rounded-lg"
                             title="Ver detalles"
                           >
-                            <Eye size={14} className="sm:w-4 sm:h-4 lg:w-[18px] lg:h-[18px] text-gray-500" />
+                            <Eye size={14} className="text-gray-500" />
                           </button>
-
                           <button
                             onClick={() => handleEditar(unidad.id, unidad)}
                             className="p-1 hover:bg-gray-100 rounded-lg"
                             title="Editar"
                           >
-                            <Edit size={14} className="sm:w-4 sm:h-4 lg:w-[18px] lg:h-[18px] text-gray-500" />
+                            <Edit size={14} className="text-gray-500" />
                           </button>
-
                           <button
                             onClick={() => handleEliminar(unidad.id, unidad.codigo, unidad)}
                             className="p-1 hover:bg-red-50 rounded-lg"
                             title="Eliminar"
                           >
-                            <Trash2 size={14} className="sm:w-4 sm:h-4 lg:w-[18px] lg:h-[18px] text-red-500" />
+                            <Trash2 size={14} className="text-red-500" />
                           </button>
                         </div>
                       </td>
@@ -685,18 +612,14 @@ const UnidadesList = () => {
               </table>
             </div>
 
-            {/* Paginación - RESPONSIVE */}
+            {/* Paginación */}
             <div className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 border-t flex flex-col xs:flex-row items-center justify-between gap-3">
               <p className="text-xs sm:text-sm text-gray-500 text-center xs:text-left">
-                <span className="hidden xs:inline">Mostrando </span>
-                <span className="font-medium">{paginacion.total > 0 ? ((paginacion.pagina - 1) * paginacion.limite) + 1 : 0}</span>
-                <span className="hidden xs:inline"> a </span>
-                <span className="xs:hidden">-</span>
-                <span className="font-medium">{Math.min(paginacion.pagina * paginacion.limite, paginacion.total)}</span>
-                <span className="hidden xs:inline"> de </span>
-                <span className="xs:hidden">/</span>
-                <span className="font-medium">{paginacion.total}</span>
-                <span className="hidden xs:inline"> registros</span>
+                Mostrando <span className="font-medium">
+                  {paginacion.total > 0 ? ((paginacion.pagina - 1) * paginacion.limite) + 1 : 0}
+                </span> a{' '}
+                <span className="font-medium">{Math.min(paginacion.pagina * paginacion.limite, paginacion.total)}</span>{' '}
+                de <span className="font-medium">{paginacion.total}</span> registros
               </p>
               <div className="flex items-center gap-1 sm:gap-2">
                 <button
@@ -721,34 +644,6 @@ const UnidadesList = () => {
           </>
         )}
       </div>
-
-      {/* Modal de Reporte (ReporteBase) - MANTENIDO PARA COMPATIBILIDAD */}
-      {mostrarReporte && (
-        <ReporteBase
-          titulo="Reporte de Unidades"
-          tipo="unidades"
-          datos={unidades.map(u => ({
-            id: u.id,
-            codigo: u.codigo,
-            tipo: u.tipo === 'policia' ? 'Policía' : 'Ambulancia',
-            estado: capitalizar(u.estado),
-            activa: u.activa ? 'Sí' : 'No',
-            personal: u.personal_asignado?.length || 0,
-            ubicacion: u.lat && u.lng ? `${u.lat.toFixed(4)}, ${u.lng.toFixed(4)}` : 'Sin ubicación',
-            creado_en: new Date(u.creado_en).toLocaleDateString()
-          }))}
-          columnas={[
-            { key: 'id', label: 'ID' },
-            { key: 'codigo', label: 'Código' },
-            { key: 'tipo', label: 'Tipo' },
-            { key: 'estado', label: 'Estado' },
-            { key: 'activa', label: 'Activa' },
-            { key: 'personal', label: 'Personal' },
-            { key: 'creado_en', label: 'Fecha Creación' }
-          ]}
-          onClose={() => setMostrarReporte(false)}
-        />
-      )}
     </div>
   );
 };

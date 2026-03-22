@@ -7,8 +7,16 @@ import {
 } from 'lucide-react';
 import personalService from '../../../services/admin/personal.service';
 import toast from 'react-hot-toast';
+import IconoEntidad, { BadgeIcono } from '../../../components/ui/IconoEntidad';
 
-// Función para obtener nombre completo
+// Mapeo de roles a entidades para iconos consistentes
+const rolToEntidad = {
+  admin: 'ADMIN',
+  superadmin: 'SUPERADMIN',
+  policia: 'POLICIA',
+  ambulancia: 'PERSONAL_AMBULANCIA'
+};
+
 const getNombreCompleto = (personal) => {
   if (!personal) return '';
   const { nombre, apellido_paterno, apellido_materno } = personal;
@@ -29,9 +37,7 @@ const PersonalDetail = () => {
   const cargarPersonal = async () => {
     try {
       setLoading(true);
-      console.log(" Cargando detalle personal ID:", id);
       const response = await personalService.obtenerPersonal(id);
-      console.log("Datos recibidos:", response.data);
       setPersonal(response.data);
     } catch (error) {
       console.error("Error cargando personal:", error);
@@ -154,38 +160,41 @@ const PersonalDetail = () => {
 
       {/* Tarjeta principal */}
       <div className="bg-white rounded-xl shadow overflow-hidden">
-        {/* Cabecera con avatar */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-800 px-6 py-8">
+        {/* Cabecera con avatar - Color según rol */}
+        <div className={`bg-gradient-to-r ${
+          personal.rol === 'policia' ? 'from-blue-600 to-blue-700' :
+          personal.rol === 'ambulancia' ? 'from-green-600 to-emerald-700' :
+          personal.rol === 'admin' ? 'from-purple-600 to-indigo-700' :
+          'from-red-600 to-rose-700'
+        } px-6 py-8`}>
           <div className="flex items-center gap-6">
             <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-lg">
-              <span className="text-3xl font-bold text-blue-600">
-                {personal.nombre?.charAt(0).toUpperCase()}
-              </span>
+              <IconoEntidad 
+                entidad={rolToEntidad[personal.rol] || 'ADMIN'} 
+                size={32} 
+                color="text-blue-600"
+              />
             </div>
             <div>
               <h2 className="text-2xl font-bold text-white">{getNombreCompleto(personal)}</h2>
-              <p className="text-blue-100 mt-1">ID: {personal.id}</p>
             </div>
           </div>
         </div>
 
         {/* Contenido */}
         <div className="p-6">
-          {/* Grid de información - AHORA CON APELLIDOS SEPARADOS */}
+          {/* Grid de información */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            {/* NUEVA FILA: Nombre */}
             <InfoItem 
               icon={User} 
               label="Nombre(s)" 
               value={personal.nombre} 
             />
-            {/* NUEVA FILA: Apellido paterno */}
             <InfoItem 
               icon={User} 
               label="Apellido paterno" 
               value={personal.apellido_paterno || 'No registrado'} 
             />
-            {/* NUEVA FILA: Apellido materno */}
             <InfoItem 
               icon={User} 
               label="Apellido materno" 
@@ -210,14 +219,14 @@ const PersonalDetail = () => {
               icon={Shield} 
               label="Rol" 
               value={
-                <span className={`px-2 py-1 rounded-full text-xs ${
-                  personal.rol === 'admin' ? 'bg-purple-100 text-purple-700' :
-                  personal.rol === 'superadmin' ? 'bg-red-100 text-red-700' :
-                  personal.rol === 'policia' ? 'bg-blue-100 text-blue-700' :
-                  'bg-green-100 text-green-700'
-                }`}>
-                  {personal.rol}
-                </span>
+                <BadgeIcono 
+                  entidad={rolToEntidad[personal.rol] || 'ADMIN'}
+                  texto={personal.rol === 'policia' ? 'Policía' :
+                         personal.rol === 'ambulancia' ? 'Ambulancia' :
+                         personal.rol === 'admin' ? 'Admin' :
+                         personal.rol === 'superadmin' ? 'Superadmin' : personal.rol}
+                  size={12}
+                />
               } 
             />
           </div>
@@ -323,7 +332,6 @@ const PersonalDetail = () => {
   );
 };
 
-// Componente auxiliar para items de información
 const InfoItem = ({ icon: Icon, label, value }) => (
   <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-lg">
     <Icon size={20} className="text-blue-600 mt-1" />
@@ -334,7 +342,6 @@ const InfoItem = ({ icon: Icon, label, value }) => (
   </div>
 );
 
-// Componente auxiliar para items de auditoría
 const AuditItem = ({ icon: Icon, label, value, className = '' }) => (
   <div className="flex items-start gap-3">
     <Icon size={16} className="text-gray-400 mt-1" />

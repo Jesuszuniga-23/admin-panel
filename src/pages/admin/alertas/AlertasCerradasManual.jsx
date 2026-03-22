@@ -2,13 +2,12 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ChevronLeft, ChevronRight, Filter, Search, Calendar, User, MapPin,
-  Shield, XCircle, Clock, X, AlertTriangle, Heart
+  Shield, XCircle, Clock, X
 } from 'lucide-react';
 import alertasService from '../../../services/admin/alertas.service';
 import useAuthStore from '../../../store/authStore';
-import MapaConDireccion from '../../../components/maps/MapaConDireccion';
+import { BadgeTipoAlerta, BotonMapa, ModalMapa } from '../../../components/ui/IconoEntidad';
 
-// Función para normalizar texto 
 const normalizarTexto = (texto) => {
   if (!texto) return '';
   
@@ -30,7 +29,6 @@ const normalizarTexto = (texto) => {
   return textoNormalizado;
 };
 
-// Función para formatear nombres
 const formatearNombre = (nombre) => {
   if (!nombre) return '';
   const nombreNormalizado = normalizarTexto(nombre);
@@ -45,14 +43,10 @@ const AlertasCerradasManual = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   
-  // Estado para TODAS las alertas (sin filtrar)
   const [todasLasAlertas, setTodasLasAlertas] = useState([]);
-  
-  // Estado para las alertas filtradas y paginadas
   const [alertas, setAlertas] = useState([]);
   const [cargando, setCargando] = useState(true);
   
-  // Estado para el modal del mapa
   const [mapaModal, setMapaModal] = useState({
     abierto: false,
     lat: null,
@@ -62,7 +56,6 @@ const AlertasCerradasManual = () => {
     tipo: null
   });
   
-  // FILTROS
   const [filtros, setFiltros] = useState({
     limite: 10,
     pagina: 1,
@@ -79,9 +72,6 @@ const AlertasCerradasManual = () => {
     total_paginas: 0
   });
 
-  // =====================================================
-  // CARGAR TODAS LAS ALERTAS (UNA SOLA VEZ)
-  // =====================================================
   useEffect(() => {
     cargarTodasLasAlertas();
   }, []);
@@ -89,10 +79,7 @@ const AlertasCerradasManual = () => {
   const cargarTodasLasAlertas = async () => {
     setCargando(true);
     try {
-      // Traer TODAS las alertas sin filtros
       const resultado = await alertasService.obtenerCerradasManual({ limite: 1000 });
-      
-      // Formatear datos para visualización
       const alertasFormateadas = (resultado.data || []).map(alerta => ({
         ...alerta,
         ciudadano: alerta.ciudadano ? {
@@ -104,9 +91,7 @@ const AlertasCerradasManual = () => {
           nombre: formatearNombre(alerta.cerrador.nombre)
         } : null
       }));
-      
       setTodasLasAlertas(alertasFormateadas);
-      
     } catch (error) {
       console.error("Error:", error);
     } finally {
@@ -114,43 +99,31 @@ const AlertasCerradasManual = () => {
     }
   };
 
-  // =====================================================
-  // FILTRADO LOCAL (CADA VEZ QUE CAMBIAN LOS FILTROS)
-  // =====================================================
   useEffect(() => {
     if (todasLasAlertas.length === 0) return;
-    
     aplicarFiltrosYOrden();
   }, [filtros, todasLasAlertas]);
 
   const aplicarFiltrosYOrden = () => {
-    // 1. FILTRAR POR BÚSQUEDA (texto)
     let datosFiltrados = [...todasLasAlertas];
     
     if (filtros.search) {
       const busqueda = filtros.search.toLowerCase().trim();
       datosFiltrados = datosFiltrados.filter(alerta => {
-        // Buscar en varios campos
         const idMatch = alerta.id?.toString().includes(busqueda);
         const tipoMatch = alerta.tipo?.toLowerCase().includes(busqueda);
         const ciudadanoMatch = alerta.ciudadano?.nombre?.toLowerCase().includes(busqueda);
         const motivoMatch = alerta.motivo_cierre_manual?.toLowerCase().includes(busqueda);
         const cerradorMatch = alerta.cerrador?.nombre?.toLowerCase().includes(busqueda);
-        
         return idMatch || tipoMatch || ciudadanoMatch || motivoMatch || cerradorMatch;
       });
     }
     
-    // 2. FILTRAR POR FECHA (local)
     if (filtros.desde && filtros.hasta) {
       const desde = new Date(filtros.desde);
       desde.setHours(0, 0, 0, 0);
-      
       const hasta = new Date(filtros.hasta);
       hasta.setHours(23, 59, 59, 999);
-      
-      console.log('🔍 Filtrando desde:', desde.toLocaleString(), 'hasta:', hasta.toLocaleString());
-      
       datosFiltrados = datosFiltrados.filter(alerta => {
         if (!alerta.fecha_cierre) return false;
         const fechaCierre = new Date(alerta.fecha_cierre);
@@ -158,7 +131,6 @@ const AlertasCerradasManual = () => {
       });
     }
     
-    // 3. CALCULAR PAGINACIÓN
     const total = datosFiltrados.length;
     const totalPaginas = Math.ceil(total / filtros.limite);
     const inicio = (filtros.pagina - 1) * filtros.limite;
@@ -174,7 +146,6 @@ const AlertasCerradasManual = () => {
     });
   };
 
-  // Manejadores
   const handleSearchChange = (e) => {
     const value = e.target.value;
     setSearchInput(value);
@@ -251,7 +222,7 @@ const AlertasCerradasManual = () => {
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className="bg-gradient-to-br from-purple-500 to-indigo-600 p-2 sm:p-2.5 md:p-3 rounded-lg sm:rounded-xl shadow-lg shadow-purple-200">
+            <div className="bg-gradient-to-br from-purple-600 to-indigo-700 p-2 sm:p-2.5 md:p-3 rounded-lg sm:rounded-xl shadow-lg shadow-purple-200">
               <XCircle size={20} className="sm:w-5 sm:h-5 md:w-6 md:h-6 text-white" />
             </div>
             <div>
@@ -262,26 +233,24 @@ const AlertasCerradasManual = () => {
           
           <button
             onClick={() => navigate('/admin/dashboard')}
-            className="flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-white border border-slate-200 rounded-xl shadow-sm hover:bg-purple-50 hover:border-purple-200 hover:text-purple-700 transition-all text-slate-600 text-xs sm:text-sm font-medium whitespace-nowrap"
+            className="flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-white border border-slate-200 rounded-xl shadow-sm hover:bg-gray-50 hover:border-gray-300 transition-all text-slate-600 text-xs sm:text-sm font-medium whitespace-nowrap"
           >
             <ChevronLeft size={14} className="sm:w-4 sm:h-4" />
-            <span className="hidden xs:inline">Dashboard</span>
-            <span className="xs:hidden">Dashboard</span>
+            <span>Dashboard</span>
           </button>
         </div>
 
         {/* Panel de filtros */}
         <div className="bg-white rounded-xl md:rounded-2xl shadow-lg shadow-slate-200/50 p-4 md:p-5 mb-6">
           <div className="flex items-center gap-2 mb-3 md:mb-4">
-            <Filter size={14} className="sm:w-4 sm:h-4 text-purple-500" />
+            <Filter size={14} className="sm:w-4 sm:h-4 text-purple-600" />
             <span className="text-xs sm:text-sm font-medium text-slate-700">Filtros</span>
-            <span className="text-xs bg-purple-50 text-purple-600 px-1.5 sm:px-2 py-0.5 rounded-full ml-2">
+            <span className="text-xs bg-purple-100 text-purple-600 px-1.5 sm:px-2 py-0.5 rounded-full ml-2">
               Filtrado local
             </span>
           </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-            {/* Buscador */}
             <div className="sm:col-span-2 lg:col-span-2">
               <label className="block text-xs text-slate-500 mb-1">Buscar</label>
               <div className="relative">
@@ -291,7 +260,7 @@ const AlertasCerradasManual = () => {
                   placeholder="ID, tipo, ciudadano, motivo..."
                   value={searchInput}
                   onChange={handleSearchChange}
-                  className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-xl focus:bg-white focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-xs sm:text-sm"
+                  className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-xl focus:bg-white focus:ring-2 focus:ring-purple-600/20 focus:border-purple-600 transition-all text-xs sm:text-sm"
                 />
                 {searchInput && (
                   <button
@@ -304,7 +273,6 @@ const AlertasCerradasManual = () => {
               </div>
             </div>
 
-            {/* Desde */}
             <div>
               <label className="block text-xs text-slate-500 mb-1">Desde</label>
               <div className="relative">
@@ -313,12 +281,11 @@ const AlertasCerradasManual = () => {
                   type="date"
                   value={filtros.desde}
                   onChange={(e) => handleFechaChange('desde', e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-xl focus:bg-white focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-xs sm:text-sm"
+                  className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-xl focus:bg-white focus:ring-2 focus:ring-purple-600/20 focus:border-purple-600 transition-all text-xs sm:text-sm"
                 />
               </div>
             </div>
 
-            {/* Hasta */}
             <div>
               <label className="block text-xs text-slate-500 mb-1">Hasta</label>
               <div className="relative">
@@ -327,12 +294,11 @@ const AlertasCerradasManual = () => {
                   type="date"
                   value={filtros.hasta}
                   onChange={(e) => handleFechaChange('hasta', e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-xl focus:bg-white focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all text-xs sm:text-sm"
+                  className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg md:rounded-xl focus:bg-white focus:ring-2 focus:ring-purple-600/20 focus:border-purple-600 transition-all text-xs sm:text-sm"
                 />
               </div>
             </div>
 
-            {/* Botón Limpiar */}
             <div className="flex items-end">
               <button
                 onClick={limpiarFiltros}
@@ -345,9 +311,8 @@ const AlertasCerradasManual = () => {
 
           {(filtros.desde || filtros.hasta || filtros.search) && (
             <div className="mt-3 flex items-center gap-2 text-xs">
-              <span className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-pulse"></span>
+              <span className="w-1.5 h-1.5 bg-purple-600 rounded-full animate-pulse"></span>
               <span className="text-purple-600">Filtros aplicados - {paginacion.total} resultados</span>
-             
             </div>
           )}
         </div>
@@ -377,7 +342,6 @@ const AlertasCerradasManual = () => {
                 <table className="w-full min-w-[900px] md:min-w-full">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200">
-                      <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-slate-500 uppercase">ID</th>
                       <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-slate-500 uppercase">TIPO</th>
                       <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-slate-500 uppercase">CIUDADANO</th>
                       <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-slate-500 uppercase">CERRADO POR</th>
@@ -391,17 +355,10 @@ const AlertasCerradasManual = () => {
                       <tr 
                         key={alerta.id} 
                         onClick={() => handleRowClick(alerta.id)}
-                        className="hover:bg-purple-50/50 cursor-pointer transition-colors"
+                        className="hover:bg-purple-50/30 cursor-pointer transition-colors"
                       >
-                        <td className="px-3 md:px-6 py-2 md:py-3 text-xs md:text-sm text-slate-600">#{alerta.id}</td>
                         <td className="px-3 md:px-6 py-2 md:py-3">
-                          <span className={`text-xs px-1.5 md:px-2 py-0.5 md:py-1 rounded-full ${
-                            alerta.tipo === 'panico' 
-                              ? 'bg-rose-50 text-rose-600' 
-                              : 'bg-amber-50 text-amber-600'
-                          }`}>
-                            {alerta.tipo === 'panico' ? 'Pánico' : 'Médica'}
-                          </span>
+                          <BadgeTipoAlerta tipo={alerta.tipo} size={12} />
                         </td>
                         <td className="px-3 md:px-6 py-2 md:py-3">
                           <div className="flex items-center gap-1 md:gap-2">
@@ -434,14 +391,11 @@ const AlertasCerradasManual = () => {
                         </td>
                         <td className="px-3 md:px-6 py-2 md:py-3">
                           {alerta.lat && alerta.lng ? (
-                            <button
+                            <BotonMapa
                               onClick={(e) => abrirMapaModal(e, alerta)}
-                              className="flex items-center gap-1 text-purple-600 hover:text-purple-700 hover:bg-purple-50 px-2 py-1 rounded-lg transition-all group"
-                              title="Ver ubicación en mapa"
-                            >
-                              <MapPin size={16} className="md:w-4 md:h-4 group-hover:scale-110 transition-transform" />
-                              <span className="text-xs hidden md:inline">Ver mapa</span>
-                            </button>
+                              texto="Ver mapa"
+                              size={14}
+                            />
                           ) : (
                             <span className="text-xs text-slate-400">—</span>
                           )}
@@ -462,7 +416,7 @@ const AlertasCerradasManual = () => {
                   <button
                     onClick={() => cambiarPagina(paginacion.pagina - 1)}
                     disabled={paginacion.pagina === 1}
-                    className="px-3 py-1.5 text-xs sm:text-sm border border-slate-200 bg-white rounded-lg hover:bg-purple-50 hover:border-purple-200 disabled:opacity-50 transition-colors"
+                    className="px-3 py-1.5 text-xs sm:text-sm border border-slate-200 bg-white rounded-lg hover:bg-purple-50 hover:border-purple-300 disabled:opacity-50 transition-colors"
                   >
                     Anterior
                   </button>
@@ -473,7 +427,7 @@ const AlertasCerradasManual = () => {
                   <button
                     onClick={() => cambiarPagina(paginacion.pagina + 1)}
                     disabled={paginacion.pagina === paginacion.total_paginas}
-                    className="px-3 py-1.5 text-xs sm:text-sm border border-slate-200 bg-white rounded-lg hover:bg-purple-50 hover:border-purple-200 disabled:opacity-50 transition-colors"
+                    className="px-3 py-1.5 text-xs sm:text-sm border border-slate-200 bg-white rounded-lg hover:bg-purple-50 hover:border-purple-300 disabled:opacity-50 transition-colors"
                   >
                     Siguiente
                   </button>
@@ -484,78 +438,16 @@ const AlertasCerradasManual = () => {
         </div>
       </div>
 
-      {/* MODAL DEL MAPA */}
-      {mapaModal.abierto && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
-          onClick={cerrarMapaModal}
-        >
-          <div 
-            className="bg-white rounded-xl shadow-2xl w-full max-w-3xl overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header del modal */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-indigo-50">
-              <div className="flex items-center gap-2">
-                <div className={`p-2 rounded-lg ${
-                  mapaModal.tipo === 'panico' ? 'bg-red-100' : 'bg-green-100'
-                }`}>
-                  {mapaModal.tipo === 'panico' ? (
-                    <AlertTriangle size={18} className="text-red-600" />
-                  ) : (
-                    <Heart size={18} className="text-green-600" />
-                  )}
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-800">Ubicación de la Alerta</h3>
-                  <p className="text-xs text-gray-500">ID: #{mapaModal.alertaId} • {mapaModal.titulo}</p>
-                </div>
-              </div>
-              <button
-                onClick={cerrarMapaModal}
-                className="p-2 hover:bg-white rounded-lg transition-colors"
-              >
-                <X size={18} className="text-gray-500" />
-              </button>
-            </div>
-
-            {/* Contenido del modal - Mapa */}
-            <div className="p-4">
-              <MapaConDireccion
-                lat={mapaModal.lat}
-                lng={mapaModal.lng}
-                titulo={
-                  <div className="flex items-center gap-1.5">
-                    {mapaModal.tipo === 'panico' ? (
-                      <>
-                        <AlertTriangle size={14} className="text-red-500" />
-                        <span className="text-xs font-medium text-gray-700">Alerta de Pánico</span>
-                      </>
-                    ) : (
-                      <>
-                        <Heart size={14} className="text-green-500" />
-                        <span className="text-xs font-medium text-gray-700">Alerta Médica</span>
-                      </>
-                    )}
-                  </div>
-                }
-                alertaId={mapaModal.alertaId}
-                altura="400px"
-              />
-            </div>
-
-            {/* Footer del modal */}
-            <div className="p-4 border-t border-gray-200 bg-gray-50 flex justify-end">
-              <button
-                onClick={cerrarMapaModal}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
-              >
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Modal del Mapa - Usando componente reutilizable */}
+      <ModalMapa
+        isOpen={mapaModal.abierto}
+        onClose={cerrarMapaModal}
+        lat={mapaModal.lat}
+        lng={mapaModal.lng}
+        titulo={mapaModal.titulo}
+        alertaId={mapaModal.alertaId}
+        tipo={mapaModal.tipo}
+      />
     </div>
   );
 };

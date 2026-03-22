@@ -1,4 +1,3 @@
-// src/pages/admin/analisis/AnalisisGeografico.jsx
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -21,27 +20,34 @@ import Loader from '../../../components/common/Loader';
 import MapaMultiAlertas from '../../../components/maps/MapaMultiAlertas';
 import useAuthStore from '../../../store/authStore';
 import toast from 'react-hot-toast';
+import IconoEntidad, { BadgeTipoAlerta } from '../../../components/ui/IconoEntidad';
 
-// Colores para gráficas
+// Colores consistentes para gráficas (igual que en constants/iconos.js)
 const COLORS = {
-  panico: '#ef4444',
-  medica: '#10b981',
-  activa: '#3b82f6',
-  proceso: '#f59e0b',
-  cerrada: '#8b5cf6',
-  expirada: '#6b7280'
+  panico: '#EF4444',
+  medica: '#10B981',
+  activa: '#3B82F6',
+  proceso: '#F59E0B',
+  cerrada: '#8B5CF6',
+  expirada: '#6B7280'
+};
+
+// Gradientes consistentes
+const GRADIENTS = {
+  header: 'from-indigo-600 to-purple-700',
+  card: 'from-indigo-500 to-purple-600',
+  filtros: 'from-indigo-50 to-purple-50'
 };
 
 const AnalisisGeografico = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   
-  // Refs para capturar las gráficas y el mapa
   const graficaBarrasRef = useRef(null);
   const graficaPastelRef = useRef(null);
   const graficaTendenciasRef = useRef(null);
   const graficaEstadosRef = useRef(null);
-  const mapaRef = useRef(null); // 👈 NUEVA REF PARA EL MAPA
+  const mapaRef = useRef(null);
   
   const [cargando, setCargando] = useState(true);
   const [exportando, setExportando] = useState(false);
@@ -70,7 +76,6 @@ const AnalisisGeografico = () => {
     zona: 'todas'
   });
 
-  // Función de zonificación
   const calcularZona = (lat, lng) => {
     if (!lat || !lng || isNaN(lat) || isNaN(lng)) return 'Sin ubicación';
     if (lat > 19.6) return 'Zona Norte';
@@ -246,10 +251,69 @@ const AnalisisGeografico = () => {
     setAlertaSeleccionada(null);
   };
 
-  // =====================================================
-  // FUNCIONES DE EXPORTACIÓN CON GRÁFICAS
-  // =====================================================
-  
+  const capturarGraficas = async () => {
+    try {
+      const graficas = {};
+      
+      console.log('📸 Capturando elementos:', {
+        mapa: mapaRef.current ? '✅ Sí' : '❌ No',
+        barras: graficaBarrasRef.current ? '✅ Sí' : '❌ No',
+        pastel: graficaPastelRef.current ? '✅ Sí' : '❌ No',
+        tendencias: graficaTendenciasRef.current ? '✅ Sí' : '❌ No',
+        estados: graficaEstadosRef.current ? '✅ Sí' : '❌ No'
+      });
+      
+      if (mapaRef.current) {
+        const canvas = await html2canvas(mapaRef.current, {
+          scale: 1.5,
+          backgroundColor: '#ffffff',
+          logging: false,
+          allowTaint: false,
+          useCORS: true
+        });
+        graficas.mapa = canvas.toDataURL('image/png');
+        console.log('✅ Mapa capturado');
+      }
+      
+      if (graficaBarrasRef.current) {
+        const canvas = await html2canvas(graficaBarrasRef.current, {
+          scale: 2,
+          backgroundColor: '#ffffff'
+        });
+        graficas.barras = canvas.toDataURL('image/png');
+      }
+      
+      if (graficaPastelRef.current) {
+        const canvas = await html2canvas(graficaPastelRef.current, {
+          scale: 2,
+          backgroundColor: '#ffffff'
+        });
+        graficas.pastel = canvas.toDataURL('image/png');
+      }
+      
+      if (graficaTendenciasRef.current) {
+        const canvas = await html2canvas(graficaTendenciasRef.current, {
+          scale: 2,
+          backgroundColor: '#ffffff'
+        });
+        graficas.tendencias = canvas.toDataURL('image/png');
+      }
+      
+      if (graficaEstadosRef.current) {
+        const canvas = await html2canvas(graficaEstadosRef.current, {
+          scale: 2,
+          backgroundColor: '#ffffff'
+        });
+        graficas.estados = canvas.toDataURL('image/png');
+      }
+      
+      return graficas;
+    } catch (error) {
+      console.error('Error capturando gráficas:', error);
+      throw error;
+    }
+  };
+
   const exportarExcel = async () => {
     try {
       setExportando(true);
@@ -271,93 +335,13 @@ const AnalisisGeografico = () => {
     }
   };
 
-  const capturarGraficas = async () => {
-    try {
-      const graficas = {};
-      
-      console.log('📸 Capturando elementos:', {
-        mapa: mapaRef.current ? '✅ Sí' : '❌ No',
-        barras: graficaBarrasRef.current ? '✅ Sí' : '❌ No',
-        pastel: graficaPastelRef.current ? '✅ Sí' : '❌ No',
-        tendencias: graficaTendenciasRef.current ? '✅ Sí' : '❌ No',
-        estados: graficaEstadosRef.current ? '✅ Sí' : '❌ No'
-      });
-      
-      // Capturar MAPA
-      if (mapaRef.current) {
-        console.log('🗺️ Capturando mapa...');
-        const canvas = await html2canvas(mapaRef.current, {
-          scale: 1.5,
-          backgroundColor: '#ffffff',
-          logging: false,
-          allowTaint: false,
-          useCORS: true
-        });
-        graficas.mapa = canvas.toDataURL('image/png');
-        console.log('✅ Mapa capturado');
-      }
-      
-      // Capturar gráfica de barras
-      if (graficaBarrasRef.current) {
-        const canvas = await html2canvas(graficaBarrasRef.current, {
-          scale: 2,
-          backgroundColor: '#ffffff'
-        });
-        graficas.barras = canvas.toDataURL('image/png');
-      }
-      
-      // Capturar gráfica de pastel
-      if (graficaPastelRef.current) {
-        const canvas = await html2canvas(graficaPastelRef.current, {
-          scale: 2,
-          backgroundColor: '#ffffff'
-        });
-        graficas.pastel = canvas.toDataURL('image/png');
-      }
-      
-      // Capturar gráfica de tendencias
-      if (graficaTendenciasRef.current) {
-        const canvas = await html2canvas(graficaTendenciasRef.current, {
-          scale: 2,
-          backgroundColor: '#ffffff'
-        });
-        graficas.tendencias = canvas.toDataURL('image/png');
-      }
-      
-      // Capturar gráfica de estados
-      if (graficaEstadosRef.current) {
-        const canvas = await html2canvas(graficaEstadosRef.current, {
-          scale: 2,
-          backgroundColor: '#ffffff'
-        });
-        graficas.estados = canvas.toDataURL('image/png');
-      }
-      
-      return graficas;
-    } catch (error) {
-      console.error('Error capturando gráficas:', error);
-      throw error;
-    }
-  };
-
   const exportarPDF = async () => {
     try {
       setExportando(true);
       toast.loading('Generando PDF con gráficas...', { id: 'export' });
       
-      // Capturar todas las gráficas
       const graficas = await capturarGraficas();
       
-      // Verificar que las imágenes se capturaron correctamente
-      console.log('✅ Gráficas capturadas:', {
-        mapa: graficas.mapa ? 'OK' : 'No',
-        barras: graficas.barras ? 'OK' : 'No',
-        pastel: graficas.pastel ? 'OK' : 'No',
-        tendencias: graficas.tendencias ? 'OK' : 'No',
-        estados: graficas.estados ? 'OK' : 'No'
-      });
-      
-      // Llamar al servicio especializado con las gráficas
       await reportesGraficasService.generarPDFConGraficas(
         datosFiltrados,
         'alertas',
@@ -392,18 +376,18 @@ const AnalisisGeografico = () => {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         
-        {/* Header con gradiente */}
+        {/* Header con gradiente consistente */}
         <div className="relative mb-8">
           <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl opacity-10"></div>
           <div className="relative flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-6">
             <div className="flex items-center gap-4">
-              <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-4 rounded-2xl shadow-xl shadow-indigo-200">
-                <Globe size={32} className="text-white" />
+              <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-4 rounded-2xl shadow-xl shadow-indigo-200">
+                <IconoEntidad entidad="MAPA" size={32} color="text-white" />
               </div>
               <div>
                 <h1 className="text-3xl md:text-4xl font-bold text-gray-800">Análisis Geográfico</h1>
                 <p className="text-sm text-gray-500 mt-1 flex items-center gap-2">
-                  <MapPin size={14} className="text-indigo-500" />
+                  <IconoEntidad entidad="UBICACION" size={14} />
                   <span>{estadisticas.conUbicacion} ubicaciones en mapa</span>
                   <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
                   <span>{datosPorZona.length} zonas identificadas</span>
@@ -414,8 +398,7 @@ const AnalisisGeografico = () => {
               <button
                 onClick={exportarExcel}
                 disabled={exportando}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-all text-sm shadow-sm hover:shadow disabled:opacity-50"
-                title="Exportar a Excel"
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all text-sm shadow-md disabled:opacity-50"
               >
                 <FileSpreadsheet size={16} />
                 <span className="hidden sm:inline">Excel</span>
@@ -423,15 +406,14 @@ const AnalisisGeografico = () => {
               <button
                 onClick={exportarPDF}
                 disabled={exportando}
-                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-all text-sm shadow-sm hover:shadow disabled:opacity-50"
-                title="Exportar a PDF con gráficas"
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl hover:from-red-700 hover:to-red-800 transition-all text-sm shadow-md disabled:opacity-50"
               >
                 <FilePieChart size={16} />
                 <span className="hidden sm:inline">PDF Gráficas</span>
               </button>
               <button
                 onClick={() => navigate('/admin/dashboard')}
-                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all text-sm shadow-sm hover:shadow"
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all text-sm shadow-sm"
               >
                 <ChevronLeft size={16} />
                 <span className="hidden sm:inline">Dashboard</span>
@@ -528,11 +510,11 @@ const AnalisisGeografico = () => {
           </div>
         </div>
 
-        {/* MAPA PRINCIPAL - CON REF */}
+        {/* MAPA PRINCIPAL */}
         <div className="bg-white rounded-2xl shadow-xl p-6 mb-8 border border-gray-100 overflow-hidden">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl shadow-md">
+              <div className="p-2 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl shadow-md">
                 <Map size={20} className="text-white" />
               </div>
               <h2 className="text-lg font-semibold text-gray-800">Mapa de Incidentes</h2>
@@ -554,7 +536,6 @@ const AnalisisGeografico = () => {
             </div>
           </div>
 
-          {/* 👇 REF DEL MAPA AGREGADA AQUÍ */}
           <div ref={mapaRef} className="h-[500px] w-full rounded-xl overflow-hidden border border-gray-200 shadow-inner">
             <MapaMultiAlertas 
               alertas={datosFiltrados.filter(a => a.lat && a.lng)}
@@ -569,31 +550,24 @@ const AnalisisGeografico = () => {
                   <div className={`p-2 rounded-lg ${
                     alertaSeleccionada.tipo === 'panico' ? 'bg-red-100' : 'bg-green-100'
                   }`}>
-                    {alertaSeleccionada.tipo === 'panico' 
-                      ? <AlertTriangle size={16} className="text-red-600" />
-                      : <Heart size={16} className="text-green-600" />
-                    }
+                    <IconoEntidad 
+                      entidad={alertaSeleccionada.tipo === 'panico' ? 'ALERTA_PANICO' : 'ALERTA_MEDICA'} 
+                      size={16}
+                    />
                   </div>
                   <div>
                     <div className="flex items-center gap-2 mb-1">
                       <h3 className="font-semibold text-gray-800">
                         Alerta #{alertaSeleccionada.id}
                       </h3>
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${
-                        alertaSeleccionada.estado === 'activa' ? 'bg-blue-100 text-blue-700' :
-                        alertaSeleccionada.estado === 'cerrada' ? 'bg-purple-100 text-purple-700' :
-                        alertaSeleccionada.estado === 'expirada' ? 'bg-gray-100 text-gray-700' :
-                        'bg-amber-100 text-amber-700'
-                      }`}>
-                        {alertaSeleccionada.estado}
-                      </span>
+                      <BadgeTipoAlerta tipo={alertaSeleccionada.tipo} size={12} />
                     </div>
                     <p className="text-sm text-gray-600 mb-2">
                       {alertaSeleccionada.ciudadano?.nombre || 'Ciudadano desconocido'}
                     </p>
                     <div className="flex items-center gap-4 text-xs text-gray-500">
                       <span className="flex items-center gap-1">
-                        <MapPin size={12} />
+                        <IconoEntidad entidad="UBICACION" size={12} />
                         {alertaSeleccionada.lat?.toFixed(4)}, {alertaSeleccionada.lng?.toFixed(4)}
                       </span>
                       <span className="flex items-center gap-1">
@@ -614,7 +588,7 @@ const AnalisisGeografico = () => {
           )}
         </div>
 
-        {/* Tarjetas de resumen */}
+        {/* Tarjetas de resumen - con colores consistentes */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-3 mb-8">
           <ResumenCardAvanzado 
             label="Total Alertas" 
@@ -669,7 +643,7 @@ const AnalisisGeografico = () => {
           />
         </div>
 
-        {/* Gráficas - CON REFS PARA CAPTURAR */}
+        {/* Gráficas - CON REFS */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
           {/* Gráfica de barras */}
           <div ref={graficaBarrasRef} className="lg:col-span-2 bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
@@ -824,10 +798,10 @@ const AnalisisGeografico = () => {
                   <Tooltip contentStyle={{ fontSize: '11px' }} />
                   <Bar dataKey="valor" fill="#8b5cf6" radius={[0, 4, 4, 0]}>
                     {[
-                      { fill: '#3b82f6' },
-                      { fill: '#f59e0b' },
-                      { fill: '#8b5cf6' },
-                      { fill: '#6b7280' }
+                      { fill: COLORS.activa },
+                      { fill: COLORS.proceso },
+                      { fill: COLORS.cerrada },
+                      { fill: COLORS.expirada }
                     ].map((entry, index) => (
                       <Cell key={`cell-${index}`} {...entry} />
                     ))}
