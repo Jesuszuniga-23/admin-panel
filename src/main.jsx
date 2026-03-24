@@ -8,7 +8,7 @@ import AppRouter from './routes/AppRouter';
 import './index.css';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-
+console.log("🔥 main.jsx ejecutándose");
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>

@@ -26,8 +26,9 @@ import AlertasCerradas from '../pages/admin/alertas/AlertasCerradas';
 import AlertaPanelDetail from '../pages/admin/alertas/AlertaPanelDetail';
 import AnalisisGeografico from '../pages/admin/analisis/AnalisisGeografico';
 import AlertaExpiradaDetail from '../pages/admin/alertas/AlertaExpiradaDetail';
-
+console.log("🔥 AppRouter cargado");
 const AppRouter = () => {
+   console.log("🔥 AppRouter renderizando - ruta:", window.location.pathname);
   return (
     <Routes>
       <Route path="/" element={<Home />} />
