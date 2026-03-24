@@ -19,7 +19,7 @@ const Verificar2FA = () => {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const email = params.get('email');
-    const token = localStorage.getItem('pending_2fa_token');
+    const token = params.get('token');
     
     if (email) {
       setEmailOfuscado(email);
