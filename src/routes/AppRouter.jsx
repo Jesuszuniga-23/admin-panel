@@ -1,6 +1,5 @@
 // src/routes/AppRouter.jsx
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { GoogleOAuthProvider } from '@react-oauth/google';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import Home from '../pages/Home';
 import Login from '../pages/auth/Login';
 import Verificar2FA from '../pages/auth/Verificar2FA';
@@ -28,59 +27,53 @@ import AlertaPanelDetail from '../pages/admin/alertas/AlertaPanelDetail';
 import AnalisisGeografico from '../pages/admin/analisis/AnalisisGeografico';
 import AlertaExpiradaDetail from '../pages/admin/alertas/AlertaExpiradaDetail';
 
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-
 const AppRouter = () => {
   return (
-    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/verificar-2fa" element={<Verificar2FA />} />
+    <Routes>
+      <Route path="/" element={<Home />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/verificar-2fa" element={<Verificar2FA />} />
 
-          <Route path="/admin" element={
-            <PrivateRoute allowedRoles={['admin', 'superadmin', 'operador_tecnico', 'operador_policial', 'operador_medico', 'operador_general']}>
-              <AdminLayout />
-            </PrivateRoute>
-          }>
-            <Route path="dashboard" element={<Dashboard />} />
-            <Route path="perfil" element={<Perfil />} />
-            <Route path="personal" element={<PersonalList />} />
-            <Route path="personal/crear" element={<PersonalForm />} />
-            <Route path="personal/editar/:id" element={<PersonalForm />} />
-            <Route path="personal/:id" element={<PersonalDetail />} />
-            <Route path="alertas/activas" element={<AlertasActivas />} />
-            <Route path="alertas/en-proceso" element={<AlertasEnProceso />} />
-            <Route path="alertas/cerradas" element={<AlertasCerradas />} />
-            <Route path="alertas/:id" element={<AlertaPanelDetail />} />
-            <Route path="alertas/expiradas" element={<AlertasExpiradas />} />
-            <Route path="alertas/cerradas-manual" element={<AlertasCerradasManual />} />
-            <Route path="recuperaciones/pendientes" element={<RecuperacionesPendientes />} />
-            <Route path="unidades" element={<UnidadesList />} />
-            <Route path="unidades/crear" element={<UnidadForm />} />
-            <Route path="unidades/editar/:id" element={<UnidadForm />} />
-            <Route path="unidades/:id" element={<UnidadDetail />} />
-            <Route path="reasignaciones/pendientes" element={<ReasignacionesPendientes />} />
-            <Route path="reportes" element={<ReportesMenu />} />
-            <Route path="reportes/:tipo" element={<GeneradorReporte />} />
-            <Route path="analisis/geografico" element={<AnalisisGeografico />} />
-            <Route index element={<Navigate to="/admin/dashboard" />} />
-          </Route>
+      <Route path="/admin" element={
+        <PrivateRoute allowedRoles={['admin', 'superadmin', 'operador_tecnico', 'operador_policial', 'operador_medico', 'operador_general']}>
+          <AdminLayout />
+        </PrivateRoute>
+      }>
+        <Route path="dashboard" element={<Dashboard />} />
+        <Route path="perfil" element={<Perfil />} />
+        <Route path="personal" element={<PersonalList />} />
+        <Route path="personal/crear" element={<PersonalForm />} />
+        <Route path="personal/editar/:id" element={<PersonalForm />} />
+        <Route path="personal/:id" element={<PersonalDetail />} />
+        <Route path="alertas/activas" element={<AlertasActivas />} />
+        <Route path="alertas/en-proceso" element={<AlertasEnProceso />} />
+        <Route path="alertas/cerradas" element={<AlertasCerradas />} />
+        <Route path="alertas/:id" element={<AlertaPanelDetail />} />
+        <Route path="alertas/expiradas" element={<AlertasExpiradas />} />
+        <Route path="alertas/cerradas-manual" element={<AlertasCerradasManual />} />
+        <Route path="recuperaciones/pendientes" element={<RecuperacionesPendientes />} />
+        <Route path="unidades" element={<UnidadesList />} />
+        <Route path="unidades/crear" element={<UnidadForm />} />
+        <Route path="unidades/editar/:id" element={<UnidadForm />} />
+        <Route path="unidades/:id" element={<UnidadDetail />} />
+        <Route path="reasignaciones/pendientes" element={<ReasignacionesPendientes />} />
+        <Route path="reportes" element={<ReportesMenu />} />
+        <Route path="reportes/:tipo" element={<GeneradorReporte />} />
+        <Route path="analisis/geografico" element={<AnalisisGeografico />} />
+        <Route index element={<Navigate to="/admin/dashboard" />} />
+      </Route>
 
-          <Route path="/superadmin" element={
-            <PrivateRoute allowedRoles={['superadmin']}>
-              <AdminLayout />
-            </PrivateRoute>
-          }>
-            <Route path="dashboard" element={<Dashboard />} />
-            <Route index element={<Navigate to="/superadmin/dashboard" />} />
-          </Route>
+      <Route path="/superadmin" element={
+        <PrivateRoute allowedRoles={['superadmin']}>
+          <AdminLayout />
+        </PrivateRoute>
+      }>
+        <Route path="dashboard" element={<Dashboard />} />
+        <Route index element={<Navigate to="/superadmin/dashboard" />} />
+      </Route>
 
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
-    </GoogleOAuthProvider>
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 };
 
