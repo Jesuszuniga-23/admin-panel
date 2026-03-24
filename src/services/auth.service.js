@@ -1,67 +1,119 @@
+// src/services/auth.service.js
 import axiosInstance from './api/axiosConfig';
 import { ENDPOINTS } from './api/endpoints';
 
 class AuthService {
   #currentUser = null;
 
+  // =====================================================
+  // LOGIN CON GOOGLE (INICIA FLUJO OAuth)
+  // =====================================================
   async loginWithGoogle(token) {
-  try {
-    if (!token) {
-      throw new Error('No se recibió el token de Google');
-    }
+    try {
+      if (!token) {
+        throw new Error('No se recibió el token de Google');
+      }
 
-    console.log(" Enviando token al backend...");
-    
-    const response = await axiosInstance.post(ENDPOINTS.AUTH.GOOGLE_ADMIN_LOGIN, {
-      idToken: token
-    });
-    
-    console.log("Respuesta del backend:", response.data);
-    
-    if (response.data?.success) {
-      // Guardar en memoria temporalmente
-      this.#currentUser = response.data.usuario;
+      console.log("📧 Enviando token al backend...");
       
-      // NO guardar en localStorage aquí
-      // El Login.jsx decidirá si guardar o no según el rol
+      // Redirigir al backend para iniciar flujo OAuth
+      window.location.href = `${import.meta.env.VITE_API_URL}/auth/login/google`;
+      
+      return { success: true, redirect: true };
+      
+    } catch (error) {
+      console.error("Error:", error);
+      throw error.response?.data || { error: 'Error de autenticación' };
+    }
+  }
+
+  // =====================================================
+  // VERIFICAR CÓDIGO 2FA Y COMPLETAR LOGIN
+  // =====================================================
+  async verificar2FA(codigo, pendingToken) {
+    try {
+      const response = await axiosInstance.post(ENDPOINTS.AUTH.VERIFY_2FA, {
+        codigo,
+        pending_token: pendingToken
+      });
       
       return response.data;
-    } else {
-      throw new Error(response.data?.error || 'Error en la respuesta del servidor');
+    } catch (error) {
+      console.error("Error verificando 2FA:", error);
+      throw error.response?.data || { error: 'Error al verificar código' };
     }
-  } catch (error) {
-    console.error(" Error:", error);
-    throw error.response?.data || { error: 'Error de autenticación' };
   }
-}
 
- async logout() {
-  try {
-    await axiosInstance.post(ENDPOINTS.AUTH.LOGOUT);
-  } catch (error) {
-    console.error("Error en logout API:", error);
-  } finally {
-    this.#currentUser = null;
-    // Limpiar TODO
-    localStorage.removeItem('user');
-    localStorage.removeItem('auth_timestamp');
-    localStorage.removeItem('auth-storage');
-    sessionStorage.clear();
-    
-    // Redirigir
-    window.location.href = '/login';
+  // =====================================================
+  // REENVIAR CÓDIGO 2FA
+  // =====================================================
+  async reenviarCodigo2FA(pendingToken) {
+    try {
+      const response = await axiosInstance.post(ENDPOINTS.AUTH.RESEND_2FA, {
+        pending_token: pendingToken
+      });
+      
+      return response.data;
+    } catch (error) {
+      console.error("Error reenviando código:", error);
+      throw error.response?.data || { error: 'Error al reenviar código' };
+    }
   }
-}
+
+  // =====================================================
+  // OBTENER ESTADO DE SESIÓN
+  // =====================================================
+  async obtenerEstadoSesion() {
+    try {
+      const response = await axiosInstance.get(ENDPOINTS.AUTH.SESSION_STATUS);
+      return response.data;
+    } catch (error) {
+      console.error("Error obteniendo estado de sesión:", error);
+      return { activa: false, motivo: 'Error de conexión' };
+    }
+  }
+
+  // =====================================================
+  // REGISTRAR ACTIVIDAD (KEEP ALIVE)
+  // =====================================================
+  async registrarActividad() {
+    try {
+      await axiosInstance.post(ENDPOINTS.AUTH.ACTIVITY);
+    } catch (error) {
+      console.debug("Error registrando actividad:", error);
+    }
+  }
+
+  // =====================================================
+  // LOGOUT
+  // =====================================================
+  async logout() {
+    try {
+      await axiosInstance.post(ENDPOINTS.AUTH.LOGOUT);
+    } catch (error) {
+      console.error("Error en logout API:", error);
+    } finally {
+      this.#currentUser = null;
+      localStorage.removeItem('user');
+      localStorage.removeItem('auth_timestamp');
+      localStorage.removeItem('auth-storage');
+      localStorage.removeItem('pending_2fa_token');
+      sessionStorage.clear();
+      
+      window.location.href = '/login';
+    }
+  }
+
+  // =====================================================
+  // VERIFICAR SESIÓN ACTUAL
+  // =====================================================
   async checkSession() {
     try {
-      // Verificar si hay usuario en localStorage
       const userStr = localStorage.getItem('user');
-      
       if (!userStr) {
         return false;
       }
 
-      // Verificar con backend
       const response = await axiosInstance.get(ENDPOINTS.AUTH.ME);
       
       if (response.data?.user) {
@@ -74,18 +126,18 @@ class AuthService {
       console.error("Error verificando sesión:", error);
       this.#currentUser = null;
       localStorage.removeItem('user');
-      localStorage.removeItem('auth_timestamp');
       return false;
     }
   }
 
+  // =====================================================
+  // GETTERS
+  // =====================================================
   getCurrentUser() {
-    // Si hay en memoria, usarlo
     if (this.#currentUser) {
       return this.#currentUser;
     }
     
-    // Si no, intentar recuperar de localStorage
     const userStr = localStorage.getItem('user');
     if (userStr) {
       try {
@@ -105,12 +157,76 @@ class AuthService {
 
   isAdmin() {
     const user = this.getCurrentUser();
-    return user?.rol === 'admin';
+    return user?.rol === 'admin' || user?.rol === 'superadmin';
   }
 
   isSuperAdmin() {
     const user = this.getCurrentUser();
     return user?.rol === 'superadmin';
+  }
+
+  isOperadorTecnico() {
+    const user = this.getCurrentUser();
+    return user?.rol === 'operador_tecnico';
+  }
+
+  isOperadorPolicial() {
+    const user = this.getCurrentUser();
+    return user?.rol === 'operador_policial';
+  }
+
+  isOperadorMedico() {
+    const user = this.getCurrentUser();
+    return user?.rol === 'operador_medico';
+  }
+
+  isOperadorGeneral() {
+    const user = this.getCurrentUser();
+    return user?.rol === 'operador_general';
+  }
+
+  // =====================================================
+  // OBTENER TIPO DE ALERTA PERMITIDO
+  // =====================================================
+  getTipoAlertaPermitido() {
+    const user = this.getCurrentUser();
+    if (user?.rol === 'operador_policial') return 'panico';
+    if (user?.rol === 'operador_medico') return 'medica';
+    return null; // null = todas
+  }
+
+  // =====================================================
+  // OBTENER ROL DE PERSONAL PERMITIDO
+  // =====================================================
+  getRolPersonalPermitido() {
+    const user = this.getCurrentUser();
+    if (user?.rol === 'operador_policial') return 'policia';
+    if (user?.rol === 'operador_medico') return 'ambulancia';
+    return null; // null = todos
+  }
+
+  // =====================================================
+  // VERIFICAR SI PUEDE MODIFICAR PERSONAL
+  // =====================================================
+  puedeModificarPersonal(rolPersonal) {
+    const user = this.getCurrentUser();
+    if (user?.rol === 'admin' || user?.rol === 'superadmin') return true;
+    if (user?.rol === 'operador_tecnico') return false;
+    if (user?.rol === 'operador_policial') return rolPersonal === 'policia';
+    if (user?.rol === 'operador_medico') return rolPersonal === 'ambulancia';
+    return false;
+  }
+
+  // =====================================================
+  // VERIFICAR SI PUEDE GESTIONAR ALERTA POR TIPO
+  // =====================================================
+  puedeGestionarAlerta(tipoAlerta) {
+    const user = this.getCurrentUser();
+    if (user?.rol === 'admin' || user?.rol === 'superadmin') return true;
+    if (user?.rol === 'operador_tecnico') return true;
+    if (user?.rol === 'operador_policial') return tipoAlerta === 'panico';
+    if (user?.rol === 'operador_medico') return tipoAlerta === 'medica';
+    return false;
   }
 }
 

@@ -1,35 +1,43 @@
+// src/services/admin/dashboard.service.js
 import axiosInstance from '../api/axiosConfig';
 import personalService from './personal.service';
 import unidadService from './unidad.service';
 import alertasService from './alertas.service';
 import alertasPanelService from './alertasPanel.service';
+import authService from '../../services/auth.service';
 
 class DashboardService {
   
   // OBTENER TODAS LAS ESTADÍSTICAS DEL DASHBOARD
-  async obtenerEstadisticas() {
+  async obtenerEstadisticas(filtros = {}) {
     try {
       console.log("Cargando estadísticas del dashboard...");
       
-      // Obtener datos en paralelo (incluyendo los nuevos endpoints)
+      // Obtener filtros según rol
+      const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
+      const rolPersonalPermitido = authService.getRolPersonalPermitido();
+      
+      // Preparar parámetros para cada llamada
+      const personalParams = rolPersonalPermitido ? { rol: rolPersonalPermitido } : {};
+      const alertasParams = tipoAlertaPermitido ? { tipo: tipoAlertaPermitido } : {};
+      
+      // Obtener datos en paralelo
       const [
         personalRes,
         unidadesRes,
         alertasExpiradasRes,
         alertasCerradasManualRes,
-        // NUEVOS ENDPOINTS
         alertasActivasRes,
         alertasEnProcesoRes,
         alertasCerradasRes
       ] = await Promise.allSettled([
-        personalService.listarPersonal({ limite: 1000 }),
+        personalService.listarPersonal({ limite: 1000, ...personalParams }),
         unidadService.listarUnidades({ limite: 1000 }),
-        alertasService.obtenerExpiradas({ limite: 1000 }),
-        alertasService.obtenerCerradasManual({ limite: 1000 }),
-        // NUEVAS LLAMADAS
-        alertasPanelService.obtenerActivas({ limite: 1000 }),
-        alertasPanelService.obtenerEnProceso({ limite: 1000 }),
-        alertasPanelService.obtenerCerradas({ limite: 1000 })
+        alertasService.obtenerExpiradas({ limite: 1000, ...alertasParams }),
+        alertasService.obtenerCerradasManual({ limite: 1000, ...alertasParams }),
+        alertasPanelService.obtenerActivas({ limite: 1000, ...alertasParams }),
+        alertasPanelService.obtenerEnProceso({ limite: 1000, ...alertasParams }),
+        alertasPanelService.obtenerCerradas({ limite: 1000, ...alertasParams })
       ]);
 
       // Procesar personal
@@ -44,7 +52,6 @@ class DashboardService {
       // Procesar alertas cerradas manualmente
       const alertasCerradasManual = alertasCerradasManualRes.status === 'fulfilled' ? alertasCerradasManualRes.value.data || [] : [];
 
-      // ===== NUEVOS DATOS =====
       // Procesar alertas activas
       const alertasActivas = alertasActivasRes.status === 'fulfilled' ? alertasActivasRes.value.data || [] : [];
       
@@ -82,24 +89,20 @@ class DashboardService {
         }
       };
 
-      // Calcular estadísticas de alertas (MEJORADO)
+      // Calcular estadísticas de alertas
       const alertasStats = {
         expiradas: alertasExpiradas.length,
         cerradasManual: alertasCerradasManual.length,
         totalAlertas: alertasExpiradas.length + alertasCerradasManual.length,
-        // NUEVOS CAMPOS
         activas: alertasActivas.length,
         enProceso: alertasEnProceso.length,
         cerradasTotales: alertasCerradas.length
       };
 
-      //  CÁLCULO DE KPIs CON DATOS REALES 
-      
-      // Obtener datos del período anterior (para calcular variación)
+      // Calcular KPIs
       const mesActual = new Date().getMonth();
       const mesAnterior = mesActual === 0 ? 11 : mesActual - 1;
       
-      // Filtrar alertas del mes actual y anterior
       const alertasMesActual = alertasCerradas.filter(a => {
         const fecha = new Date(a.fecha_cierre || a.fecha_creacion);
         return fecha.getMonth() === mesActual;
@@ -110,7 +113,6 @@ class DashboardService {
         return fecha.getMonth() === mesAnterior;
       }).length;
 
-      // Calcular variación para alertas
       let alertasVariacion = '0%';
       let alertasTendencia = 'stable';
       
@@ -120,7 +122,6 @@ class DashboardService {
         alertasTendencia = diff > 0 ? 'up' : diff < 0 ? 'down' : 'stable';
       }
 
-      // Variación para personal (comparando con mes anterior)
       const personalNuevos = personalData.filter(p => {
         const fecha = new Date(p.creado_en);
         return fecha.getMonth() === mesActual;
@@ -129,7 +130,6 @@ class DashboardService {
       const personalVariacion = personalNuevos > 0 ? `+${personalNuevos}` : '0';
       const personalTendencia = personalNuevos > 0 ? 'up' : 'stable';
 
-      // Variación para unidades
       const unidadesNuevas = unidadesData.filter(u => {
         const fecha = new Date(u.creado_en);
         return fecha.getMonth() === mesActual;
@@ -138,7 +138,6 @@ class DashboardService {
       const unidadesVariacion = unidadesNuevas > 0 ? `+${unidadesNuevas}` : '0';
       const unidadesTendencia = unidadesNuevas > 0 ? 'up' : 'stable';
 
-      // Calcular KPIs con datos reales
       const kpis = {
         personal: {
           total: personalStats.total,
@@ -174,12 +173,15 @@ class DashboardService {
     }
   }
 
-  // Obtener alertas por hora (sin cambios)
-  async obtenerAlertasPorHora() {
+  // Obtener alertas por hora
+  async obtenerAlertasPorHora(filtros = {}) {
     try {
+      const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
+      const alertasParams = tipoAlertaPermitido ? { tipo: tipoAlertaPermitido } : {};
+      
       const [expiradasRes, cerradasRes] = await Promise.allSettled([
-        alertasService.obtenerExpiradas({ limite: 500 }),
-        alertasService.obtenerCerradasManual({ limite: 500 })
+        alertasService.obtenerExpiradas({ limite: 500, ...alertasParams, ...filtros }),
+        alertasService.obtenerCerradasManual({ limite: 500, ...alertasParams, ...filtros })
       ]);
 
       const expiradas = expiradasRes.status === 'fulfilled' ? expiradasRes.value.data || [] : [];
@@ -214,14 +216,20 @@ class DashboardService {
     }
   }
 
-  // Obtener actividad reciente (MEJORADO)
-  async obtenerActividadReciente() {
+  // Obtener actividad reciente
+  async obtenerActividadReciente(filtros = {}) {
     try {
+      const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
+      const rolPersonalPermitido = authService.getRolPersonalPermitido();
+      
+      const personalParams = rolPersonalPermitido ? { rol: rolPersonalPermitido } : {};
+      const alertasParams = tipoAlertaPermitido ? { tipo: tipoAlertaPermitido } : {};
+      
       const [personalRes, unidadesRes, alertasActivasRes, alertasProcesoRes] = await Promise.allSettled([
-        personalService.listarPersonal({ limite: 5, orden: 'DESC', ordenarPor: 'creado_en' }),
+        personalService.listarPersonal({ limite: 5, orden: 'DESC', ordenarPor: 'creado_en', ...personalParams }),
         unidadService.listarUnidades({ limite: 5, orden: 'DESC', ordenarPor: 'creado_en' }),
-        alertasPanelService.obtenerActivas({ limite: 3 }),
-        alertasPanelService.obtenerEnProceso({ limite: 3 })
+        alertasPanelService.obtenerActivas({ limite: 3, ...alertasParams }),
+        alertasPanelService.obtenerEnProceso({ limite: 3, ...alertasParams })
       ]);
 
       const personalReciente = personalRes.status === 'fulfilled' ? personalRes.value.data || [] : [];

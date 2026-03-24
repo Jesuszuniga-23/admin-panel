@@ -1,3 +1,4 @@
+// src/store/authStore.js
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import authService from '../services/auth.service';
@@ -12,8 +13,10 @@ const useAuthStore = create(
         console.log("Store actualizado:", userData?.email);
         set({ user: userData, isLoading: false });
         
-        // 🔥 SOLO guardar en localStorage si es admin o superadmin
-        if (userData && (userData.rol === 'admin' || userData.rol === 'superadmin')) {
+        // 🔥 GUARDAR TODOS LOS ROLES WEB (admin, superadmin, operadores)
+        const rolesWeb = ['admin', 'superadmin', 'operador_tecnico', 'operador_policial', 'operador_medico', 'operador_general'];
+        
+        if (userData && rolesWeb.includes(userData.rol)) {
           localStorage.setItem('user', JSON.stringify(userData));
         } else {
           localStorage.removeItem('user');
@@ -55,7 +58,6 @@ if (typeof window !== 'undefined') {
   window.addEventListener('storage', (e) => {
     if (e.key === 'user' && !e.newValue) {
       console.log(" Logout detectado en otra pestaña");
-      // Alguien hizo logout, redirigir inmediatamente
       window.location.href = '/login';
     }
   });

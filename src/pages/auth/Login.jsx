@@ -1,3 +1,4 @@
+// src/pages/auth/Login.jsx
 import { GoogleLogin } from '@react-oauth/google';
 import { Shield } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -13,12 +14,13 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // SOLO redirigir si hay usuario autorizado
   useEffect(() => {
     if (user) {
       if (user.rol === 'superadmin') {
         navigate('/superadmin/dashboard', { replace: true });
       } else if (user.rol === 'admin') {
+        navigate('/admin/dashboard', { replace: true });
+      } else if (['operador_tecnico', 'operador_policial', 'operador_medico', 'operador_general'].includes(user.rol)) {
         navigate('/admin/dashboard', { replace: true });
       }
     }
@@ -29,50 +31,14 @@ const Login = () => {
 
     try {
       setIsLoading(true);
-      toast.loading('Verificando credenciales...', { id: 'login' });
+      toast.loading('Iniciando sesión...', { id: 'login' });
 
-      const result = await authService.loginWithGoogle(credentialResponse.credential);
+      window.location.href = `${import.meta.env.VITE_API_URL}/auth/login/google`;
 
-      toast.dismiss('login');
-      console.log("Login exitoso:", result);
-
-      if (result?.success) {
-        // Verificar si el usuario tiene rol admin o superadmin
-        if (result.usuario?.rol === 'admin' || result.usuario?.rol === 'superadmin') {
-          // Usuario autorizado
-          setUser(result.usuario);
-          toast.success(`Bienvenido ${result.usuario?.nombre || result.usuario?.email}`);
-          // El useEffect redirige
-        } else {
-          // Usuario NO autorizado
-          console.log("Usuario no autorizado - rol:", result.usuario?.rol);
-
-          setUser(null);
-          localStorage.removeItem('user');
-          localStorage.removeItem('auth_token');
-          localStorage.removeItem('auth-storage');
-
-          window.location.href = '/?error=unauthorized&message=' +
-            encodeURIComponent('Acceso restringido: Solo personal administrativo autorizado');
-        }
-      }
     } catch (error) {
       toast.dismiss('login');
-      console.error(" Error:", error);
-
-      if (error.response?.status === 403 || error.error === 'Usuario no autorizado') {
-        console.log(" Usuario no autorizado (error 403)");
-
-        setUser(null);
-        localStorage.removeItem('user');
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('auth-storage');
-
-        window.location.href = '/?error=unauthorized&message=' +
-          encodeURIComponent('Acceso restringido: Solo personal administrativo autorizado');
-      } else {
-        toast.error(error?.error || 'Error al iniciar sesión');
-      }
+      console.error("Error:", error);
+      toast.error(error?.error || 'Error al iniciar sesión');
     } finally {
       setIsLoading(false);
     }
@@ -86,6 +52,7 @@ const Login = () => {
   const handleCancel = () => {
     setIsLoading(false);
     setErrorMessage('Proceso cancelado por el usuario');
+    toast.dismiss('login');
   };
 
   return (
@@ -93,7 +60,6 @@ const Login = () => {
       <div className="relative w-full max-w-md">
         <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl overflow-hidden">
 
-          {/* Header */}
           <div className="bg-gradient-to-r from-blue-600 to-blue-800 px-8 py-6 text-center">
             <div className="flex justify-center mb-3">
               <Shield size={48} className="text-white/90" />
@@ -106,7 +72,6 @@ const Login = () => {
             </p>
           </div>
 
-          {/* Contenido principal */}
           <div className="p-8">
             <div className="mb-6 text-center">
               <p className="text-gray-600 text-sm">
@@ -119,11 +84,10 @@ const Login = () => {
 
             <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
               <p className="text-sm text-yellow-700">
-                Acceso exclusivo para administradores y superadministradores
+                Acceso exclusivo para personal autorizado
               </p>
             </div>
 
-            {/* Indicador de carga */}
             {isLoading && (
               <div className="mb-6 p-3 bg-blue-50 rounded-lg border border-blue-200">
                 <div className="flex items-center justify-center gap-3">
@@ -139,6 +103,12 @@ const Login = () => {
                 >
                   Cancelar proceso
                 </button>
+              </div>
+            )}
+
+            {errorMessage && (
+              <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-700">{errorMessage}</p>
               </div>
             )}
 

@@ -1,10 +1,12 @@
+// src/pages/admin/alertas/AlertasExpiradas.jsx
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  ChevronLeft, ChevronRight, Filter, Search, Calendar, User, Clock, X,AlertTriangle 
+  ChevronLeft, ChevronRight, Filter, Search, Calendar, User, Clock, X, AlertTriangle 
 } from 'lucide-react';
 import alertasService from '../../../services/admin/alertas.service';
 import { BadgeTipoAlerta, BotonMapa, ModalMapa } from '../../../components/ui/IconoEntidad';
+import authService from '../../../services/auth.service';
 
 // Función para normalizar texto
 const normalizarTexto = (texto) => {
@@ -40,6 +42,10 @@ const formatearNombre = (nombre) => {
 
 const AlertasExpiradas = () => {
   const navigate = useNavigate();
+  
+  // Obtener tipo de alerta permitido según rol
+  const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
+  
   const [alertas, setAlertas] = useState([]);
   const [alertasOriginal, setAlertasOriginal] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -115,7 +121,11 @@ const AlertasExpiradas = () => {
   const cargarAlertas = async () => {
     setCargando(true);
     try {
-      const resultado = await alertasService.obtenerExpiradas({ limite: 1000 });
+      const params = {};
+      if (tipoAlertaPermitido) {
+        params.tipo = tipoAlertaPermitido;
+      }
+      const resultado = await alertasService.obtenerExpiradas({ limite: 1000, ...params });
       const alertasFormateadas = (resultado.data || []).map(alerta => ({
         ...alerta,
         ciudadano: alerta.ciudadano ? {
@@ -245,7 +255,10 @@ const AlertasExpiradas = () => {
             </div>
             <div>
               <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Alertas Expiradas</h1>
-              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Alertas que no fueron atendidas a tiempo</p>
+              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
+                Alertas que no fueron atendidas a tiempo
+                {tipoAlertaPermitido && ` (${tipoAlertaPermitido === 'panico' ? 'Solo Pánico' : 'Solo Médicas'})`}
+              </p>
             </div>
           </div>
           
@@ -354,7 +367,10 @@ const AlertasExpiradas = () => {
                 <AlertTriangle size={24} className="md:w-7 md:h-7 text-slate-400" />
               </div>
               <h3 className="text-sm md:text-base font-medium text-slate-700 mb-1">No hay alertas expiradas</h3>
-              <p className="text-xs text-slate-400">Todas las alertas han sido atendidas a tiempo</p>
+              <p className="text-xs text-slate-400">
+                Todas las alertas han sido atendidas a tiempo
+                {tipoAlertaPermitido && ` (Filtro: ${tipoAlertaPermitido === 'panico' ? 'Solo Pánico' : 'Solo Médicas'})`}
+              </p>
             </div>
           ) : (
             <>

@@ -1,15 +1,19 @@
+// src/services/admin/reasignacion.service.js
 import axiosInstance from '../api/axiosConfig';
 import { ENDPOINTS } from '../api/endpoints';
 
 class ReasignacionService {
   
   // OBTENER ALERTAS PENDIENTES DE REASIGNACIÓN >5 min
-  // GET /api/admin/reasignaciones/pendientes
-  async obtenerPendientes() {
+  async obtenerPendientes(filtros = {}) {
     try {
       console.log(" Obteniendo alertas pendientes de reasignación...");
       
-      const response = await axiosInstance.get(ENDPOINTS.REASIGNACIONES.PENDIENTES);
+      const params = new URLSearchParams();
+      if (filtros.tipo) params.append('tipo', filtros.tipo); // 🔥 NUEVO: filtrar por tipo
+      
+      const url = `${ENDPOINTS.REASIGNACIONES.PENDIENTES}?${params.toString()}`;
+      const response = await axiosInstance.get(url);
       
       console.log(" Respuesta pendientes:", response.data);
       return response.data;
@@ -21,7 +25,6 @@ class ReasignacionService {
   }
 
   // OBTENER UNIDADES DISPONIBLES PARA UNA ALERTA
-  // GET /api/admin/reasignaciones/:alertaId/disponibles
   async obtenerUnidadesDisponibles(alertaId) {
     try {
       console.log(` Obteniendo unidades disponibles para alerta ${alertaId}...`);
@@ -38,7 +41,6 @@ class ReasignacionService {
   }
 
   // REASIGNAR ALERTA A OTRA UNIDAD
-  // POST /api/admin/reasignaciones/:alertaId
   async reasignarAlerta(alertaId, unidadId, motivo = '') {
     try {
       console.log(` Reasignando alerta ${alertaId} a unidad ${unidadId}...`);

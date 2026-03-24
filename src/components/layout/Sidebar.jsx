@@ -1,3 +1,4 @@
+// src/components/layout/Sidebar.jsx
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -17,11 +18,24 @@ import {
   Key,
   Activity,
   Globe,
-  HelpCircle
+  HelpCircle,
+  Shield
 } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
 import authService from '../../services/auth.service';
 import toast from 'react-hot-toast';
+
+// Texto legible para roles
+const rolTexto = {
+  admin: 'Administrador',
+  superadmin: 'Super Administrador',
+  policia: 'Policía',
+  ambulancia: 'Ambulancia',
+  operador_tecnico: 'Operador Técnico',
+  operador_policial: 'Operador Policial',
+  operador_medico: 'Operador Médico',
+  operador_general: 'Operador General'
+};
 
 // Componente Modal de Confirmación con z-index más alto
 const ConfirmacionModal = ({ isOpen, onClose, onConfirm, onCancel }) => {
@@ -101,6 +115,35 @@ const Sidebar = () => {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isPersonalFormActive, setIsPersonalFormActive] = useState(false);
 
+  // Obtener rol del usuario
+  const rol = user?.rol;
+
+  // Definir permisos según rol
+  const esAdmin = rol === 'admin' || rol === 'superadmin';
+  const esOperadorTecnico = rol === 'operador_tecnico';
+  const esOperadorPolicial = rol === 'operador_policial';
+  const esOperadorMedico = rol === 'operador_medico';
+  const esOperadorGeneral = rol === 'operador_general';
+
+  // Puede ver personal (solo su tipo si es operador)
+  const puedeVerPersonal = esAdmin || esOperadorTecnico || esOperadorPolicial || esOperadorMedico || esOperadorGeneral;
+  // Puede gestionar personal (crear/editar/eliminar)
+  const puedeGestionarPersonal = esAdmin || esOperadorPolicial || esOperadorMedico;
+  // Puede ver unidades
+  const puedeVerUnidades = esAdmin || esOperadorTecnico || esOperadorPolicial || esOperadorMedico;
+  // Puede gestionar unidades
+  const puedeGestionarUnidades = esAdmin || esOperadorTecnico;
+  // Puede ver reasignaciones
+  const puedeVerReasignaciones = esAdmin || esOperadorTecnico || esOperadorPolicial || esOperadorMedico;
+  // Puede gestionar reasignaciones (cerrar/reasignar)
+  const puedeGestionarReasignaciones = esAdmin || esOperadorTecnico || esOperadorPolicial || esOperadorMedico;
+  // Puede ver reportes
+  const puedeVerReportes = true; // Todos pueden ver reportes (con filtros según rol)
+  // Puede ver análisis geográfico
+  const puedeVerAnalisis = esAdmin || esOperadorTecnico || esOperadorPolicial || esOperadorMedico;
+  // Puede ver recuperaciones (solo admin y técnico)
+  const puedeVerRecuperaciones = esAdmin || esOperadorTecnico;
+
   // Escuchar eventos de cambios sin guardar
   useEffect(() => {
     const handleUnsavedStatus = (event) => {
@@ -146,7 +189,6 @@ const Sidebar = () => {
   };
 
   const handleNavigation = (path) => {
-    // Solo mostrar modal si hay cambios y estamos en el formulario de personal
     if (hasUnsavedChanges && isPersonalFormActive && path !== location.pathname) {
       setPendingPath(path);
       setShowConfirmModal(true);
@@ -177,7 +219,6 @@ const Sidebar = () => {
     const discardEvent = new CustomEvent('discardFormProgress');
     window.dispatchEvent(discardEvent);
     
-    // Resetear estado local
     setHasUnsavedChanges(false);
     setIsPersonalFormActive(false);
     
@@ -204,6 +245,7 @@ const Sidebar = () => {
   if (!user) return null;
 
   const nombreFormateado = formatearNombre(user.nombre);
+  const rolFormateado = rolTexto[rol] || rol;
 
   return (
     <>
@@ -213,11 +255,17 @@ const Sidebar = () => {
           <p className="text-xs text-gray-500 mt-1">
             Administración Sistema Central
           </p>
+          {!esAdmin && (
+            <div className="mt-2 flex items-center gap-1 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-full">
+              <Shield size={12} />
+              <span>Rol: {rolFormateado}</span>
+            </div>
+          )}
         </div>
 
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
 
-          {/* DASHBOARD */}
+          {/* DASHBOARD - Todos pueden ver */}
           <button
             onClick={() => handleNavigation("/admin/dashboard")}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
@@ -230,7 +278,7 @@ const Sidebar = () => {
             <span>Dashboard</span>
           </button>
 
-          {/* PERFIL */}
+          {/* PERFIL - Todos pueden ver */}
           <button
             onClick={() => handleNavigation("/admin/perfil")}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
@@ -243,153 +291,164 @@ const Sidebar = () => {
             <span>Perfil</span>
           </button>
 
-          {/* ALERTAS (MENÚ PRINCIPAL) */}
-          <div className="border-t pt-2 mt-2">
+          {/* ALERTAS - Solo visible para roles que pueden ver alertas */}
+          {(esAdmin || esOperadorTecnico || esOperadorPolicial || esOperadorMedico) && (
+            <div className="border-t pt-2 mt-2">
+              <button
+                onClick={() => toggleMenu('alertas')}
+                className="w-full flex items-center justify-between px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg transition-all"
+              >
+                <div className="flex items-center gap-3">
+                  <Bell size={18} className="text-gray-500" />
+                  <span className="font-medium">Alertas</span>
+                </div>
+                {openMenus.alertas ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+              </button>
+
+              {openMenus.alertas && (
+                <div className="ml-4 mt-1 space-y-1 pl-4 border-l-2 border-gray-100">
+                  <button
+                    onClick={() => handleNavigation("/admin/alertas/activas")}
+                    className={`w-full flex items-center gap-3 px-4 py-2 text-sm rounded-lg transition-all ${
+                      location.pathname === "/admin/alertas/activas"
+                        ? 'bg-blue-50 text-blue-600 font-semibold'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
+                    }`}
+                  >
+                    <Bell size={16} />
+                    <span>Activas</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleNavigation("/admin/alertas/en-proceso")}
+                    className={`w-full flex items-center gap-3 px-4 py-2 text-sm rounded-lg transition-all ${
+                      location.pathname === "/admin/alertas/en-proceso"
+                        ? 'bg-blue-50 text-blue-600 font-semibold'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
+                    }`}
+                  >
+                    <Activity size={16} />
+                    <span>En Proceso</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleNavigation("/admin/alertas/cerradas")}
+                    className={`w-full flex items-center gap-3 px-4 py-2 text-sm rounded-lg transition-all ${
+                      location.pathname === "/admin/alertas/cerradas"
+                        ? 'bg-blue-50 text-blue-600 font-semibold'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
+                    }`}
+                  >
+                    <CheckCircle size={16} />
+                    <span>Cerradas</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleNavigation("/admin/alertas/expiradas")}
+                    className={`w-full flex items-center gap-3 px-4 py-2 text-sm rounded-lg transition-all ${
+                      location.pathname === "/admin/alertas/expiradas"
+                        ? 'bg-blue-50 text-blue-600 font-semibold'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
+                    }`}
+                  >
+                    <Clock size={16} />
+                    <span>Expiradas</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleNavigation("/admin/alertas/cerradas-manual")}
+                    className={`w-full flex items-center gap-3 px-4 py-2 text-sm rounded-lg transition-all ${
+                      location.pathname === "/admin/alertas/cerradas-manual"
+                        ? 'bg-blue-50 text-blue-600 font-semibold'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
+                    }`}
+                  >
+                    <CheckCircle size={16} />
+                    <span>Cerradas Manualmente</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* REASIGNACIONES - Solo visible para roles que pueden gestionar alertas */}
+          {puedeVerReasignaciones && (
             <button
-              onClick={() => toggleMenu('alertas')}
-              className="w-full flex items-center justify-between px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg transition-all"
+              onClick={() => handleNavigation("/admin/reasignaciones/pendientes")}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                location.pathname === "/admin/reasignaciones/pendientes"
+                  ? 'bg-blue-50 text-blue-600 font-semibold border-l-4 border-blue-600'
+                  : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600'
+              }`}
             >
-              <div className="flex items-center gap-3">
-                <Bell size={18} className="text-gray-500" />
-                <span className="font-medium">Alertas</span>
-              </div>
-              {openMenus.alertas ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+              <RefreshCw size={18} />
+              <span>Reasignaciones</span>
             </button>
+          )}
 
-            {openMenus.alertas && (
-              <div className="ml-4 mt-1 space-y-1 pl-4 border-l-2 border-gray-100">
-                <button
-                  onClick={() => handleNavigation("/admin/alertas/activas")}
-                  className={`w-full flex items-center gap-3 px-4 py-2 text-sm rounded-lg transition-all ${
-                    location.pathname === "/admin/alertas/activas"
-                      ? 'bg-blue-50 text-blue-600 font-semibold'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
-                  }`}
-                >
-                  <Bell size={16} />
-                  <span>Activas</span>
-                </button>
+          {/* GESTIÓN DE USUARIOS - Solo visible si puede ver personal */}
+          {puedeVerPersonal && (
+            <div className="border-t pt-2 mt-2">
+              <button
+                onClick={() => toggleMenu('usuarios')}
+                className="w-full flex items-center justify-between px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg transition-all"
+              >
+                <div className="flex items-center gap-3">
+                  <Users size={18} className="text-gray-500" />
+                  <span className="font-medium">Gestión de Usuarios</span>
+                </div>
+                {openMenus.usuarios ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+              </button>
 
-                <button
-                  onClick={() => handleNavigation("/admin/alertas/en-proceso")}
-                  className={`w-full flex items-center gap-3 px-4 py-2 text-sm rounded-lg transition-all ${
-                    location.pathname === "/admin/alertas/en-proceso"
-                      ? 'bg-blue-50 text-blue-600 font-semibold'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
-                  }`}
-                >
-                  <Activity size={16} />
-                  <span>En Proceso</span>
-                </button>
+              {openMenus.usuarios && (
+                <div className="ml-4 mt-1 space-y-1 pl-4 border-l-2 border-gray-100">
+                  <button
+                    onClick={() => handleNavigation("/admin/personal")}
+                    className={`w-full flex items-center gap-3 px-4 py-2 text-sm rounded-lg transition-all ${
+                      location.pathname === "/admin/personal"
+                        ? 'bg-blue-50 text-blue-600 font-semibold'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
+                    }`}
+                  >
+                    <UserPlus size={16} />
+                    <span>Personal</span>
+                  </button>
 
-                <button
-                  onClick={() => handleNavigation("/admin/alertas/cerradas")}
-                  className={`w-full flex items-center gap-3 px-4 py-2 text-sm rounded-lg transition-all ${
-                    location.pathname === "/admin/alertas/cerradas"
-                      ? 'bg-blue-50 text-blue-600 font-semibold'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
-                  }`}
-                >
-                  <CheckCircle size={16} />
-                  <span>Cerradas</span>
-                </button>
+                  {/* Recuperaciones - Solo admin y técnico */}
+                  {puedeVerRecuperaciones && (
+                    <button
+                      onClick={() => handleNavigation("/admin/recuperaciones/pendientes")}
+                      className={`w-full flex items-center gap-3 px-4 py-2 text-sm rounded-lg transition-all ${
+                        location.pathname === "/admin/recuperaciones/pendientes"
+                          ? 'bg-blue-50 text-blue-600 font-semibold'
+                          : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
+                      }`}
+                    >
+                      <Key size={16} />
+                      <span>Recuperaciones</span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
-                <button
-                  onClick={() => handleNavigation("/admin/alertas/expiradas")}
-                  className={`w-full flex items-center gap-3 px-4 py-2 text-sm rounded-lg transition-all ${
-                    location.pathname === "/admin/alertas/expiradas"
-                      ? 'bg-blue-50 text-blue-600 font-semibold'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
-                  }`}
-                >
-                  <Clock size={16} />
-                  <span>Expiradas</span>
-                </button>
-
-                <button
-                  onClick={() => handleNavigation("/admin/alertas/cerradas-manual")}
-                  className={`w-full flex items-center gap-3 px-4 py-2 text-sm rounded-lg transition-all ${
-                    location.pathname === "/admin/alertas/cerradas-manual"
-                      ? 'bg-blue-50 text-blue-600 font-semibold'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
-                  }`}
-                >
-                  <CheckCircle size={16} />
-                  <span>Cerradas Manualmente</span>
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* REASIGNACIONES */}
-          <button
-            onClick={() => handleNavigation("/admin/reasignaciones/pendientes")}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
-              location.pathname === "/admin/reasignaciones/pendientes"
-                ? 'bg-blue-50 text-blue-600 font-semibold border-l-4 border-blue-600'
-                : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600'
-            }`}
-          >
-            <RefreshCw size={18} />
-            <span>Reasignaciones</span>
-          </button>
-
-          {/* GESTIÓN DE USUARIOS */}
-          <div className="border-t pt-2 mt-2">
+          {/* UNIDADES - Solo visible si puede ver unidades */}
+          {puedeVerUnidades && (
             <button
-              onClick={() => toggleMenu('usuarios')}
-              className="w-full flex items-center justify-between px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg transition-all"
+              onClick={() => handleNavigation("/admin/unidades")}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                location.pathname === "/admin/unidades"
+                  ? 'bg-blue-50 text-blue-600 font-semibold border-l-4 border-blue-600'
+                  : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600'
+              }`}
             >
-              <div className="flex items-center gap-3">
-                <Users size={18} className="text-gray-500" />
-                <span className="font-medium">Gestión de Usuarios</span>
-              </div>
-              {openMenus.usuarios ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+              <Truck size={18} />
+              <span>Unidades</span>
             </button>
+          )}
 
-            {openMenus.usuarios && (
-              <div className="ml-4 mt-1 space-y-1 pl-4 border-l-2 border-gray-100">
-                <button
-                  onClick={() => handleNavigation("/admin/personal")}
-                  className={`w-full flex items-center gap-3 px-4 py-2 text-sm rounded-lg transition-all ${
-                    location.pathname === "/admin/personal"
-                      ? 'bg-blue-50 text-blue-600 font-semibold'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
-                  }`}
-                >
-                  <UserPlus size={16} />
-                  <span>Personal</span>
-                </button>
-
-                <button
-                  onClick={() => handleNavigation("/admin/recuperaciones/pendientes")}
-                  className={`w-full flex items-center gap-3 px-4 py-2 text-sm rounded-lg transition-all ${
-                    location.pathname === "/admin/recuperaciones/pendientes"
-                      ? 'bg-blue-50 text-blue-600 font-semibold'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
-                  }`}
-                >
-                  <Key size={16} />
-                  <span>Recuperaciones</span>
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* UNIDADES */}
-          <button
-            onClick={() => handleNavigation("/admin/unidades")}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
-              location.pathname === "/admin/unidades"
-                ? 'bg-blue-50 text-blue-600 font-semibold border-l-4 border-blue-600'
-                : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600'
-            }`}
-          >
-            <Truck size={18} />
-            <span>Unidades</span>
-          </button>
-
-          {/* CENTRO DE REPORTES */}
+          {/* CENTRO DE REPORTES - Todos pueden ver */}
           <button
             onClick={() => handleNavigation("/admin/reportes")}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
@@ -402,18 +461,20 @@ const Sidebar = () => {
             <span>Centro de Reportes</span>
           </button>
 
-          {/* ANÁLISIS GEOGRÁFICO */}
-          <button
-            onClick={() => handleNavigation("/admin/analisis/geografico")}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
-              location.pathname === "/admin/analisis/geografico"
-                ? 'bg-indigo-50 text-indigo-600 font-semibold border-l-4 border-indigo-600'
-                : 'text-gray-700 hover:bg-gray-50 hover:text-indigo-600'
-            }`}
-          >
-            <Globe size={18} />
-            <span>Análisis Geográfico</span>
-          </button>
+          {/* ANÁLISIS GEOGRÁFICO - Solo admin, técnico, policial, médico */}
+          {puedeVerAnalisis && (
+            <button
+              onClick={() => handleNavigation("/admin/analisis/geografico")}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                location.pathname === "/admin/analisis/geografico"
+                  ? 'bg-indigo-50 text-indigo-600 font-semibold border-l-4 border-indigo-600'
+                  : 'text-gray-700 hover:bg-gray-50 hover:text-indigo-600'
+              }`}
+            >
+              <Globe size={18} />
+              <span>Análisis Geográfico</span>
+            </button>
+          )}
           
         </nav>
 
@@ -425,7 +486,7 @@ const Sidebar = () => {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-gray-800 truncate">{nombreFormateado}</p>
-              <p className="text-xs text-gray-500 truncate capitalize">{user.rol}</p>
+              <p className="text-xs text-gray-500 truncate capitalize">{rolFormateado}</p>
             </div>
           </div>
 

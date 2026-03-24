@@ -1,13 +1,16 @@
+// src/components/layout/AdminLayout.jsx
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import { Toaster } from 'react-hot-toast';
 import useAuthStore from '../../store/authStore';
 import RateLimitBanner from "../common/RateLimitBanner";
+import SessionMonitor from '../common/SessionMonitor';
+import SecurityGuard from '../common/SecurityGuard';
+
 const AdminLayout = () => {
   const { user, isLoading } = useAuthStore();
 
-  // Mostrar loader mientras carga
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -19,16 +22,15 @@ const AdminLayout = () => {
     );
   }
 
-  // Si no hay usuario, no renderizar nada (PrivateRoute ya redirige)
   if (!user) {
     return null;
   }
 
   return (
     <div className="flex h-screen bg-gray-100">
-      
+      <SecurityGuard />
+      <SessionMonitor />
       <Sidebar />
-      
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 p-6">

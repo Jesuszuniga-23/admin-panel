@@ -1,3 +1,4 @@
+// src/pages/admin/alertas/AlertasEnProceso.jsx
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -8,6 +9,7 @@ import alertasPanelService from '../../../services/admin/alertasPanel.service';
 import Loader from '../../../components/common/Loader';
 import { BadgeTipoAlerta, BotonMapa, ModalMapa } from '../../../components/ui/IconoEntidad';
 import toast from 'react-hot-toast';
+import authService from '../../../services/auth.service';
 
 // Función para normalizar texto
 const normalizarTexto = (texto) => {
@@ -45,7 +47,9 @@ const AlertasEnProceso = () => {
   const [alertasOriginal, setAlertasOriginal] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // Estado para el modal del mapa
+  // Obtener tipo de alerta permitido según rol
+  const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
+  
   const [mapaModal, setMapaModal] = useState({
     abierto: false,
     lat: null,
@@ -55,9 +59,8 @@ const AlertasEnProceso = () => {
     tipo: null
   });
   
-  // Filtros
   const [filtros, setFiltros] = useState({
-    tipo: 'todos',
+    tipo: tipoAlertaPermitido || 'todos',
     unidad: 'todas',
     desde: '',
     hasta: '',
@@ -81,7 +84,12 @@ const AlertasEnProceso = () => {
   const cargarAlertas = async () => {
     try {
       setLoading(true);
-      const response = await alertasPanelService.obtenerEnProceso({ limite: 1000 });
+      const params = {};
+      if (tipoAlertaPermitido) {
+        params.tipo = tipoAlertaPermitido;
+      }
+      
+      const response = await alertasPanelService.obtenerEnProceso({ limite: 1000, ...params });
       
       if (response.success) {
         const alertasFormateadas = (response.data || []).map(alerta => ({
@@ -94,7 +102,6 @@ const AlertasEnProceso = () => {
         
         setAlertasOriginal(alertasFormateadas);
         
-        // Extraer unidades únicas para el filtro
         const unidades = [...new Set(alertasFormateadas
           .filter(a => a.unidad?.codigo)
           .map(a => a.unidad.codigo))];
@@ -113,19 +120,16 @@ const AlertasEnProceso = () => {
     let datosFiltrados = datos;
     let filtrosAplicados = false;
     
-    // Filtro por tipo
-    if (filtros.tipo !== 'todos') {
+    if (filtros.tipo !== 'todos' && filtros.tipo) {
       filtrosAplicados = true;
       datosFiltrados = datosFiltrados.filter(a => a.tipo === filtros.tipo);
     }
     
-    // Filtro por unidad
     if (filtros.unidad !== 'todas') {
       filtrosAplicados = true;
       datosFiltrados = datosFiltrados.filter(a => a.unidad?.codigo === filtros.unidad);
     }
     
-    // Filtro por fecha
     if (filtros.desde && filtros.hasta) {
       filtrosAplicados = true;
       
@@ -175,7 +179,7 @@ const AlertasEnProceso = () => {
 
   const limpiarFiltros = () => {
     setFiltros({
-      tipo: 'todos',
+      tipo: tipoAlertaPermitido || 'todos',
       unidad: 'todas',
       desde: '',
       hasta: '',
@@ -191,7 +195,6 @@ const AlertasEnProceso = () => {
     }
   }, [filtros.tipo, filtros.unidad, filtros.desde, filtros.hasta, filtros.pagina]);
 
-  // Función para abrir modal del mapa
   const abrirMapaModal = (e, alerta) => {
     e.stopPropagation();
     setMapaModal({
@@ -204,7 +207,6 @@ const AlertasEnProceso = () => {
     });
   };
 
-  // Función para cerrar modal
   const cerrarMapaModal = () => {
     setMapaModal({
       abierto: false,
@@ -272,6 +274,7 @@ const AlertasEnProceso = () => {
               <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Alertas en Proceso</h1>
               <p className="text-sm text-gray-500 mt-1">
                 {paginacion.total} {paginacion.total === 1 ? 'alerta siendo' : 'alertas siendo'} atendidas
+                {tipoAlertaPermitido && ` (${tipoAlertaPermitido === 'panico' ? 'Solo Pánico' : 'Solo Médicas'})`}
               </p>
             </div>
           </div>
@@ -298,13 +301,13 @@ const AlertasEnProceso = () => {
           </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-            {/* Filtro por tipo */}
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Tipo de alerta</label>
               <select
                 value={filtros.tipo}
                 onChange={(e) => handleFiltroChange('tipo', e.target.value)}
                 className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-yellow-500/20 focus:border-yellow-500 transition-all text-sm"
+                disabled={!!tipoAlertaPermitido}
               >
                 <option value="todos">Todos los tipos</option>
                 <option value="panico">Pánico</option>
@@ -312,7 +315,6 @@ const AlertasEnProceso = () => {
               </select>
             </div>
 
-            {/* Filtro por unidad */}
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Unidad asignada</label>
               <select
@@ -327,7 +329,6 @@ const AlertasEnProceso = () => {
               </select>
             </div>
 
-            {/* Fecha desde */}
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Desde</label>
               <div className="relative">
@@ -341,7 +342,6 @@ const AlertasEnProceso = () => {
               </div>
             </div>
 
-            {/* Fecha hasta */}
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Hasta</label>
               <div className="relative">
@@ -355,7 +355,6 @@ const AlertasEnProceso = () => {
               </div>
             </div>
 
-            {/* Botón limpiar */}
             <div className="flex items-end">
               <button
                 onClick={limpiarFiltros}
@@ -383,6 +382,7 @@ const AlertasEnProceso = () => {
                 {filtrosActivos
                   ? 'No se encontraron alertas con los filtros seleccionados'
                   : 'Las alertas asignadas aparecerán aquí'}
+                {tipoAlertaPermitido && ` (Filtro: ${tipoAlertaPermitido === 'panico' ? 'Solo Pánico' : 'Solo Médicas'})`}
               </p>
             </div>
           ) : (

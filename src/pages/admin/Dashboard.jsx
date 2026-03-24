@@ -1,3 +1,4 @@
+// src/pages/admin/Dashboard.jsx
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -13,13 +14,18 @@ import useAuthStore from '../../store/authStore';
 import dashboardService from '../../services/admin/dashboard.service';
 import { LineChart, Line, AreaChart, Area, PieChart as RePieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import IconoEntidad, { BadgeIcono } from '../../components/ui/IconoEntidad';
+import authService from '../../services/auth.service';
 
 // Mapeo de roles a entidades para badges
 const rolToEntidad = {
   admin: 'ADMIN',
   superadmin: 'SUPERADMIN',
   policia: 'POLICIA',
-  ambulancia: 'PERSONAL_AMBULANCIA'
+  ambulancia: 'PERSONAL_AMBULANCIA',
+  operador_tecnico: 'OPERADOR_TECNICO',
+  operador_policial: 'OPERADOR_POLICIAL',
+  operador_medico: 'OPERADOR_MEDICO',
+  operador_general: 'OPERADOR_GENERAL'
 };
 
 // Función para formatear nombres
@@ -53,15 +59,24 @@ const Dashboard = () => {
   const [alertasPorHora, setAlertasPorHora] = useState([]);
   const [actividadReciente, setActividadReciente] = useState({ personal: [], unidades: [], alertas: [] });
   const navigate = useNavigate();
+  
+  // Obtener filtros según rol
+  const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
+  const rolPersonalPermitido = authService.getRolPersonalPermitido();
 
   useEffect(() => {
     const cargarDatosDashboard = async () => {
       setCargando(true);
       try {
+        // Enviar filtros al backend si es necesario
+        const params = {};
+        if (tipoAlertaPermitido) params.tipo = tipoAlertaPermitido;
+        if (rolPersonalPermitido) params.rol = rolPersonalPermitido;
+        
         const [estadisticas, horas, actividad] = await Promise.all([
-          dashboardService.obtenerEstadisticas(),
-          dashboardService.obtenerAlertasPorHora(),
-          dashboardService.obtenerActividadReciente()
+          dashboardService.obtenerEstadisticas(params),
+          dashboardService.obtenerAlertasPorHora(params),
+          dashboardService.obtenerActividadReciente(params)
         ]);
 
         setStats(estadisticas);
@@ -75,7 +90,7 @@ const Dashboard = () => {
     };
 
     cargarDatosDashboard();
-  }, []);
+  }, [tipoAlertaPermitido, rolPersonalPermitido]);
 
   const getVariacionColor = (tendencia) => {
     switch (tendencia) {
@@ -143,7 +158,10 @@ const Dashboard = () => {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 md:mb-6">
               <div>
                 <h2 className="text-base md:text-lg font-semibold text-slate-800">Actividad de Alertas</h2>
-                <p className="text-xs text-slate-400">Últimas 24 horas</p>
+                <p className="text-xs text-slate-400">
+                  Últimas 24 horas
+                  {tipoAlertaPermitido && ` (${tipoAlertaPermitido === 'panico' ? 'Solo Pánico' : 'Solo Médicas'})`}
+                </p>
               </div>
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
@@ -182,7 +200,10 @@ const Dashboard = () => {
 
           {/* Distribución de Personal */}
           <div className="bg-white rounded-xl md:rounded-2xl shadow-lg shadow-slate-200/50 p-4 md:p-6">
-            <h2 className="text-base md:text-lg font-semibold text-slate-800 mb-4 md:mb-6">Distribución de Personal</h2>
+            <h2 className="text-base md:text-lg font-semibold text-slate-800 mb-4 md:mb-6">
+              Distribución de Personal
+              {rolPersonalPermitido && ` (${rolPersonalPermitido === 'policia' ? 'Solo Policía' : 'Solo Ambulancia'})`}
+            </h2>
             <div className="h-36 md:h-48">
               <ResponsiveContainer width="100%" height="100%">
                 <RePieChart>
@@ -297,7 +318,10 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
           {/* Personal Reciente */}
           <div className="bg-white rounded-xl md:rounded-2xl shadow-lg shadow-slate-200/50 p-4 md:p-6">
-            <h2 className="text-base md:text-lg font-semibold text-slate-800 mb-3 md:mb-4">Personal Reciente</h2>
+            <h2 className="text-base md:text-lg font-semibold text-slate-800 mb-3 md:mb-4">
+              Personal Reciente
+              {rolPersonalPermitido && ` (${rolPersonalPermitido === 'policia' ? 'Solo Policía' : 'Solo Ambulancia'})`}
+            </h2>
             <div className="space-y-2 md:space-y-3">
               {actividadReciente.personal.map((p) => (
                 <div key={p.id} className="flex items-center justify-between p-2 md:p-3 bg-slate-50 rounded-lg md:rounded-xl hover:bg-slate-100 transition-colors">

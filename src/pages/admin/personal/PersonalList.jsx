@@ -1,3 +1,4 @@
+// src/pages/admin/personal/PersonalList.jsx
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -8,21 +9,19 @@ import personalService from '../../../services/admin/personal.service';
 import toast from 'react-hot-toast';
 import { useDebounce } from '../../../hooks/useDebounce';
 import IconoEntidad, { BadgeIcono } from '../../../components/ui/IconoEntidad';
+import authService from '../../../services/auth.service';
+import useAuthStore from '../../../store/authStore';
 
-// Función para normalizar texto (corregir acentos y caracteres especiales)
+// Función para normalizar texto
 const normalizarTexto = (texto) => {
   if (!texto) return '';
   
   const reemplazos = [
-    { de: '¡', para: 'í' }, { de: '£', para: 'ú' }, { de: '¤', para: 'ñ' },
-    { de: '€', para: 'e' }, { de: '‚', para: 'é' }, { de: '¢', para: 'o' },
-    { de: 'Ram¡rez', para: 'Ramírez' }, { de: 'Param‚dico', para: 'Paramédico' },
-    { de: 'L¢pez', para: 'López' }, { de: 'Administrad', para: 'Administrador' },
     { de: 'Ã¡', para: 'á' }, { de: 'Ã©', para: 'é' }, { de: 'Ã­', para: 'í' },
-    { de: 'Ã³', para: 'ó' }, { de: 'Ãº', para: 'ú' }, { de: 'Ã�', para: 'Á' },
-    { de: 'Ã‰', para: 'É' }, { de: 'Ã�', para: 'Í' }, { de: 'Ã“', para: 'Ó' },
-    { de: 'Ãš', para: 'Ú' }, { de: 'Ã±', para: 'ñ' }, { de: 'Ã‘', para: 'Ñ' },
-    { de: 'Â¿', para: '¿' }, { de: 'Â¡', para: '¡' }
+    { de: 'Ã³', para: 'ó' }, { de: 'Ãº', para: 'ú' }, { de: 'Ã±', para: 'ñ' },
+    { de: 'Ã�', para: 'Á' }, { de: 'Ã‰', para: 'É' }, { de: 'Ã�', para: 'Í' },
+    { de: 'Ã“', para: 'Ó' }, { de: 'Ãš', para: 'Ú' }, { de: 'Ã‘', para: 'Ñ' },
+    { de: '¡', para: 'í' }, { de: '£', para: 'ú' }, { de: '¤', para: 'ñ' }
   ];
   
   let textoNormalizado = texto;
@@ -65,6 +64,7 @@ const rolToEntidad = {
 
 const PersonalList = () => {
   const navigate = useNavigate();
+  const { user } = useAuthStore();
   const [personal, setPersonal] = useState([]);
   const [personalOriginal, setPersonalOriginal] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -76,8 +76,14 @@ const PersonalList = () => {
     onConfirm: null
   });
   
+  // Obtener permisos según rol
+  const rolPersonalPermitido = authService.getRolPersonalPermitido();
+  const puedeCrear = authService.puedeModificarPersonal(rolPersonalPermitido || '');
+  const puedeEditar = authService.puedeModificarPersonal(rolPersonalPermitido || '');
+  const puedeEliminar = authService.puedeModificarPersonal(rolPersonalPermitido || '');
+  
   const [filtros, setFiltros] = useState({
-    rol: '',
+    rol: rolPersonalPermitido || '',
     activo: '',
     disponible: '',
     search: '',
@@ -127,7 +133,13 @@ const PersonalList = () => {
   const cargarPersonal = async () => {
     setLoading(true);
     try {
-      const response = await personalService.listarPersonal({ limite: 1000 });
+      // Enviar filtro de rol al backend si es necesario
+      const params = {};
+      if (rolPersonalPermitido) {
+        params.rol = rolPersonalPermitido;
+      }
+      
+      const response = await personalService.listarPersonal({ limite: 1000, ...params });
       
       const personalFormateado = (response.data || []).map(p => {
         const nombreCompleto = formatearNombreCompleto(p);
@@ -178,7 +190,7 @@ const PersonalList = () => {
 
   const limpiarFiltros = () => {
     setFiltros({
-      rol: '',
+      rol: rolPersonalPermitido || '',
       activo: '',
       disponible: '',
       search: '',
@@ -207,6 +219,11 @@ const PersonalList = () => {
   }, [filtros.rol, filtros.activo, filtros.disponible, filtros.search, filtros.pagina, personalOriginal]);
 
   const handleEliminar = async (id, nombreCompleto, disponible) => {
+    if (!puedeEliminar) {
+      toast.error('No tienes permisos para eliminar personal');
+      return;
+    }
+    
     if (!disponible) {
       setModalInfo({
         show: true,
@@ -241,6 +258,11 @@ const PersonalList = () => {
   };
 
   const handleToggleActivo = async (id, nombreCompleto, estadoActual, disponible) => {
+    if (!puedeEditar) {
+      toast.error('No tienes permisos para modificar personal');
+      return;
+    }
+    
     if (estadoActual && !disponible) {
       setModalInfo({
         show: true,
@@ -298,16 +320,19 @@ const PersonalList = () => {
               <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Personal</h1>
               <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
                 Gestión de personal operativo y administrativo
+                {rolPersonalPermitido && ` (${rolPersonalPermitido === 'policia' ? 'Solo Policía' : 'Solo Ambulancia'})`}
               </p>
             </div>
           </div>
-          <button
-            onClick={() => navigate('/admin/personal/crear')}
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap"
-          >
-            <Plus size={18} />
-            <span>Nuevo Personal</span>
-          </button>
+          {puedeCrear && (
+            <button
+              onClick={() => navigate('/admin/personal/crear')}
+              className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap"
+            >
+              <Plus size={18} />
+              <span>Nuevo Personal</span>
+            </button>
+          )}
         </div>
 
         {/* Filtros */}
@@ -315,9 +340,6 @@ const PersonalList = () => {
           <div className="flex items-center gap-2 mb-4">
             <Filter size={18} className="text-blue-600" />
             <h2 className="text-sm font-semibold text-gray-700">Filtros</h2>
-            <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full ml-2">
-              Búsqueda instantánea
-            </span>
           </div>
 
           <div className="flex flex-col md:flex-row gap-4">
@@ -344,6 +366,7 @@ const PersonalList = () => {
               value={filtros.rol}
               onChange={(e) => setFiltros(prev => ({ ...prev, rol: e.target.value, pagina: 1 }))}
               className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              disabled={!!rolPersonalPermitido}
             >
               <option value="">Todos los roles</option>
               <option value="admin">Admin</option>
@@ -480,15 +503,17 @@ const PersonalList = () => {
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => handleToggleActivo(persona.id, persona.nombreCompleto, persona.activo, persona.disponible)}
-                              className={`p-1.5 rounded-lg transition-colors ${
-                                persona.activo ? 'hover:bg-yellow-50 text-yellow-600' : 'hover:bg-green-50 text-green-600'
-                              }`}
-                              title={persona.activo ? 'Desactivar' : 'Activar'}
-                            >
-                              <Power size={16} />
-                            </button>
+                            {puedeEditar && (
+                              <button
+                                onClick={() => handleToggleActivo(persona.id, persona.nombreCompleto, persona.activo, persona.disponible)}
+                                className={`p-1.5 rounded-lg transition-colors ${
+                                  persona.activo ? 'hover:bg-yellow-50 text-yellow-600' : 'hover:bg-green-50 text-green-600'
+                                }`}
+                                title={persona.activo ? 'Desactivar' : 'Activar'}
+                              >
+                                <Power size={16} />
+                              </button>
+                            )}
                             <button
                               onClick={() => navigate(`/admin/personal/${persona.id}`)}
                               className="p-1.5 hover:bg-gray-100 rounded-lg"
@@ -496,20 +521,24 @@ const PersonalList = () => {
                             >
                               <Eye size={16} className="text-gray-500" />
                             </button>
-                            <button
-                              onClick={() => navigate(`/admin/personal/editar/${persona.id}`)}
-                              className="p-1.5 hover:bg-gray-100 rounded-lg"
-                              title="Editar"
-                            >
-                              <Edit size={16} className="text-gray-500" />
-                            </button>
-                            <button
-                              onClick={() => handleEliminar(persona.id, persona.nombreCompleto, persona.disponible)}
-                              className="p-1.5 hover:bg-red-50 rounded-lg"
-                              title="Eliminar"
-                            >
-                              <Trash2 size={16} className="text-red-500" />
-                            </button>
+                            {puedeEditar && (
+                              <button
+                                onClick={() => navigate(`/admin/personal/editar/${persona.id}`)}
+                                className="p-1.5 hover:bg-gray-100 rounded-lg"
+                                title="Editar"
+                              >
+                                <Edit size={16} className="text-gray-500" />
+                              </button>
+                            )}
+                            {puedeEliminar && (
+                              <button
+                                onClick={() => handleEliminar(persona.id, persona.nombreCompleto, persona.disponible)}
+                                className="p-1.5 hover:bg-red-50 rounded-lg"
+                                title="Eliminar"
+                              >
+                                <Trash2 size={16} className="text-red-500" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>

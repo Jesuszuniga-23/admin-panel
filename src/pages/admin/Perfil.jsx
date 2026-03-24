@@ -1,13 +1,15 @@
+// src/pages/admin/Perfil.jsx
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   User, Mail, Shield, Hash, Phone,
   Calendar, LogOut, ChevronLeft,
-  Loader, CheckCircle, XCircle
+  Loader, CheckCircle, XCircle, Lock
 } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
 import toast from 'react-hot-toast';
 import AlertasService from '../../services/admin/alertas.service';
+import authService from '../../services/auth.service';
 
 // Función para formatear nombres
 const formatearNombre = (nombre) => {
@@ -74,6 +76,9 @@ const Perfil = () => {
   const [cargandoEstadisticas, setCargandoEstadisticas] = useState(true);
 
   const nombreFormateado = user?.nombre ? formatearNombre(user.nombre) : '';
+  
+  // Obtener tipo de alerta permitido según rol
+  const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
 
   // Cargar total de alertas cerradas manualmente por este usuario
   useEffect(() => {
@@ -83,16 +88,20 @@ const Perfil = () => {
         
         console.log('Cargando total de alertas cerradas por usuario:', user.id);
         
-        // Obtener todas las alertas cerradas manualmente por este admin
+        const params = {};
+        if (tipoAlertaPermitido) {
+          params.tipo = tipoAlertaPermitido;
+        }
+        
         const response = await AlertasService.obtenerCerradasManual({ 
           admin_id: user.id,
-          limite: 1000 // Obtener todas para contar
+          limite: 1000,
+          ...params
         });
         
         console.log('Respuesta:', response);
         
         if (response && response.data) {
-          // Contar el total
           const total = response.data.length;
           setTotalCerradasManual(total);
         } else {
@@ -109,7 +118,7 @@ const Perfil = () => {
     if (user?.id) {
       cargarTotalCerradasManual();
     }
-  }, [user]);
+  }, [user, tipoAlertaPermitido]);
 
   const handleLogout = async () => {
     setLoading(true);
@@ -124,6 +133,18 @@ const Perfil = () => {
     }
   };
 
+  // Texto legible para roles
+  const rolDisplay = {
+    superadmin: 'Super Administrador',
+    admin: 'Administrador',
+    policia: 'Policía',
+    ambulancia: 'Ambulancia',
+    operador_tecnico: 'Operador Técnico',
+    operador_policial: 'Operador Policial',
+    operador_medico: 'Operador Médico',
+    operador_general: 'Operador General'
+  };
+
   if (!user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
@@ -134,13 +155,6 @@ const Perfil = () => {
       </div>
     );
   }
-
-  const rolDisplay = {
-    superadmin: 'Super Administrador',
-    admin: 'Administrador',
-    policia: 'Policía',
-    ambulancia: 'Ambulancia'
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -161,8 +175,17 @@ const Perfil = () => {
 
         {/* Tarjeta de perfil */}
         <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 overflow-hidden mb-6">
-          {/* Cabecera */}
-          <div className="bg-gradient-to-r from-blue-600 to-indigo-700 px-6 py-8 text-center">
+          {/* Cabecera con gradiente según rol */}
+          <div className={`bg-gradient-to-r ${
+            user.rol === 'policia' ? 'from-blue-600 to-blue-700' :
+            user.rol === 'ambulancia' ? 'from-green-600 to-emerald-700' :
+            user.rol === 'admin' ? 'from-purple-600 to-indigo-700' :
+            user.rol === 'superadmin' ? 'from-red-600 to-rose-700' :
+            user.rol === 'operador_tecnico' ? 'from-cyan-600 to-teal-700' :
+            user.rol === 'operador_policial' ? 'from-indigo-600 to-blue-700' :
+            user.rol === 'operador_medico' ? 'from-emerald-600 to-green-700' :
+            'from-gray-600 to-gray-700'
+          } px-6 py-8 text-center`}>
             <div className="w-24 h-24 bg-white rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg">
               <span className="text-3xl font-bold text-blue-600">
                 {nombreFormateado?.charAt(0).toUpperCase()}
@@ -170,6 +193,12 @@ const Perfil = () => {
             </div>
             <h2 className="text-xl font-bold text-white">{nombreFormateado}</h2>
             <p className="text-blue-100 text-sm mt-1 capitalize">{rolDisplay[user.rol] || user.rol}</p>
+            {user.rol !== 'admin' && user.rol !== 'superadmin' && (
+              <div className="mt-2 inline-flex items-center gap-1 px-2 py-1 bg-white/20 rounded-full text-xs text-white">
+                <Lock size={12} />
+                <span>Permisos limitados según rol</span>
+              </div>
+            )}
           </div>
 
           {/* Información personal */}
@@ -192,7 +221,10 @@ const Perfil = () => {
               <CheckCircle size={20} className="text-green-600" />
               <h3 className="text-lg font-semibold text-gray-800">Mi actividad</h3>
             </div>
-            <p className="text-xs text-gray-500 mt-1">Resumen de alertas gestionadas</p>
+            <p className="text-xs text-gray-500 mt-1">
+              Resumen de alertas gestionadas
+              {tipoAlertaPermitido && ` (${tipoAlertaPermitido === 'panico' ? 'Solo Pánico' : 'Solo Médicas'})`}
+            </p>
           </div>
           
           <div className="p-6">
@@ -209,7 +241,6 @@ const Perfil = () => {
                   icon={CheckCircle}
                   color="green"
                 />
-                
               </div>
             )}
           </div>

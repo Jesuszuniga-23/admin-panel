@@ -1,3 +1,4 @@
+// src/pages/admin/personal/PersonalForm.jsx
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
@@ -9,13 +10,41 @@ import {
 import personalService from '../../../services/admin/personal.service';
 import toast from 'react-hot-toast';
 import IconoEntidad, { BadgeIcono } from '../../../components/ui/IconoEntidad';
+import authService from '../../../services/auth.service';
+import useAuthStore from '../../../store/authStore';
 
 // Mapeo de roles a entidades para iconos consistentes
 const rolToEntidad = {
   admin: 'ADMIN',
   superadmin: 'SUPERADMIN',
   policia: 'POLICIA',
-  ambulancia: 'PERSONAL_AMBULANCIA'
+  ambulancia: 'PERSONAL_AMBULANCIA',
+  operador_tecnico: 'OPERADOR_TECNICO',
+  operador_policial: 'OPERADOR_POLICIAL',
+  operador_medico: 'OPERADOR_MEDICO',
+  operador_general: 'OPERADOR_GENERAL'
+};
+
+// Texto legible para roles
+const rolTexto = {
+  admin: 'Administrador',
+  superadmin: 'Super Administrador',
+  policia: 'Policía',
+  ambulancia: 'Ambulancia',
+  operador_tecnico: 'Operador Técnico',
+  operador_policial: 'Operador Policial',
+  operador_medico: 'Operador Médico',
+  operador_general: 'Operador General'
+};
+
+// Roles disponibles para crear según el rol del usuario actual
+const rolesDisponiblesPorUsuario = {
+  admin: ['policia', 'ambulancia', 'admin'],
+  superadmin: ['policia', 'ambulancia', 'admin', 'superadmin', 'operador_tecnico', 'operador_policial', 'operador_medico', 'operador_general'],
+  operador_policial: ['policia'],
+  operador_medico: ['ambulancia'],
+  operador_tecnico: [], // No puede crear personal
+  operador_general: []  // No puede crear personal
 };
 
 // Función para corregir caracteres mal codificados
@@ -66,11 +95,17 @@ const PersonalForm = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams();
+  const { user: currentUser } = useAuthStore();
   const isEditing = !!id;
   const storageKey = isEditing ? `personal_form_edit_${id}` : 'personal_form_new';
 
   const [loading, setLoading] = useState(false);
   const [cargandoDatos, setCargandoDatos] = useState(isEditing);
+  
+  // Obtener permisos según rol del usuario actual
+  const puedeCrear = authService.puedeModificarPersonal(null);
+  const puedeEditar = authService.puedeModificarPersonal(null);
+  const rolesPermitidos = rolesDisponiblesPorUsuario[currentUser?.rol] || [];
   
   const [formData, setFormData] = useState(() => {
     const savedData = sessionStorage.getItem(storageKey);
@@ -89,7 +124,7 @@ const PersonalForm = () => {
       email: '',
       telefono: '',
       placa: '',
-      rol: 'policia',
+      rol: rolesPermitidos[0] || 'policia',
       disponible: true,
       activo: true
     };
@@ -171,7 +206,6 @@ const PersonalForm = () => {
   // Limpiar estado cuando el componente se desmonta
   useEffect(() => {
     return () => {
-      // Cuando el componente se desmonta, asegurar que el sidebar sepa que ya no hay cambios
       const event = new CustomEvent('formUnsavedStatus', { 
         detail: { 
           hasUnsaved: false,
@@ -248,7 +282,6 @@ const PersonalForm = () => {
   }, [isEditing]);
 
   useEffect(() => {
-    // Auto-guardado cada 30 segundos si hay cambios
     const autoSaveInterval = setInterval(() => {
       if (hasUnsavedChanges() && !isEditing) {
         sessionStorage.setItem(storageKey, JSON.stringify(formData));
@@ -494,15 +527,22 @@ const PersonalForm = () => {
 
   const getRolPreview = () => {
     const entidad = rolToEntidad[formData.rol] || 'ADMIN';
-    const texto = formData.rol === 'policia' ? 'Policía' :
-                  formData.rol === 'ambulancia' ? 'Ambulancia' :
-                  formData.rol === 'admin' ? 'Administrador' :
-                  formData.rol === 'superadmin' ? 'Super Administrador' : formData.rol;
+    const texto = rolTexto[formData.rol] || formData.rol;
     return { entidad, texto };
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (!puedeCrear && !isEditing) {
+      toast.error('No tienes permisos para crear personal');
+      return;
+    }
+    
+    if (!puedeEditar && isEditing) {
+      toast.error('No tienes permisos para editar personal');
+      return;
+    }
     
     const newErrors = {
       nombre: validarCampo('nombre', formData.nombre),
@@ -590,14 +630,12 @@ const PersonalForm = () => {
   };
 
   const handleCancel = () => {
-    // Resetear el estado original al estado actual ANTES de navegar
     if (originalFormData && !isEditing) {
       setOriginalFormData(JSON.parse(JSON.stringify(formData)));
     }
     
     if (!isEditing) limpiarProgreso();
     
-    // Emitir que ya no hay cambios activos
     const event = new CustomEvent('formUnsavedStatus', { 
       detail: { 
         hasUnsaved: false,
@@ -646,7 +684,6 @@ const PersonalForm = () => {
             </div>
           </div>
           
-          {/* Indicador de cambios no guardados */}
           {!isEditing && hasUnsavedChanges() && (
             <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
               <AlertTriangle size={14} className="text-amber-600" />
@@ -886,13 +923,12 @@ const PersonalForm = () => {
                         name="rol"
                         value={formData.rol}
                         onChange={handleChange}
-                        disabled={isEditing}
-                        className={`w-full pl-10 pr-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 transition-all appearance-none ${getBorderColor('rol')} ${isEditing ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'} focus:ring-blue-500 focus:border-blue-500`}
+                        disabled={isEditing || rolesPermitidos.length === 0}
+                        className={`w-full pl-10 pr-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 transition-all appearance-none ${getBorderColor('rol')} ${(isEditing || rolesPermitidos.length === 0) ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'} focus:ring-blue-500 focus:border-blue-500`}
                       >
-                        <option value="policia">Policía</option>
-                        <option value="ambulancia">Ambulancia</option>
-                        <option value="admin">Administrador</option>
-                        <option value="superadmin">Super Admin</option>
+                        {rolesPermitidos.map(rol => (
+                          <option key={rol} value={rol}>{rolTexto[rol] || rol}</option>
+                        ))}
                       </select>
                     </div>
                     <div className="mt-2">
@@ -901,6 +937,11 @@ const PersonalForm = () => {
                     {isEditing && (
                       <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
                         <Info size={12} /> No se puede modificar
+                      </p>
+                    )}
+                    {!isEditing && rolesPermitidos.length === 0 && (
+                      <p className="text-xs text-red-500 mt-2 flex items-center gap-1">
+                        <AlertCircle size={12} /> No tienes permisos para crear personal
                       </p>
                     )}
                   </div>
@@ -983,7 +1024,7 @@ const PersonalForm = () => {
               </button>
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || (!isEditing && rolesPermitidos.length === 0)}
                 className="px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all disabled:opacity-50 flex items-center gap-2 text-sm font-medium shadow-lg shadow-blue-200"
               >
                 {loading ? <Loader size={18} className="animate-spin" /> : <Save size={18} />}

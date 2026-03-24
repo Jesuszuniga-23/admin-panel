@@ -1,3 +1,4 @@
+// src/components/layout/Header.jsx
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -28,6 +29,18 @@ const formatearNombre = (nombre) => {
     .split(' ')
     .map(palabra => palabra.charAt(0).toUpperCase() + palabra.slice(1))
     .join(' ');
+};
+
+// Texto legible para roles
+const rolTexto = {
+  admin: 'Administrador',
+  superadmin: 'Super Administrador',
+  policia: 'Policía',
+  ambulancia: 'Ambulancia',
+  operador_tecnico: 'Operador Técnico',
+  operador_policial: 'Operador Policial',
+  operador_medico: 'Operador Médico',
+  operador_general: 'Operador General'
 };
 
 // Componente Modal de Confirmación con z-index más alto
@@ -152,7 +165,7 @@ const Header = ({ titulo = 'Panel de Administración', subtitulo = 'Gestión del
 
   const nombreFormateado = user?.nombre ? formatearNombre(user.nombre) : '';
   const emailFormateado = user?.email || '';
-  const rolFormateado = user?.rol || '';
+  const rolFormateado = rolTexto[user?.rol] || user?.rol || '';
 
   return (
     <>

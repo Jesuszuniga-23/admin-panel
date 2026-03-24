@@ -1,3 +1,4 @@
+// src/pages/admin/alertas/AlertasActivas.jsx
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -8,6 +9,8 @@ import alertasPanelService from '../../../services/admin/alertasPanel.service';
 import Loader from '../../../components/common/Loader';
 import { BadgeTipoAlerta, BotonMapa, ModalMapa } from '../../../components/ui/IconoEntidad';
 import toast from 'react-hot-toast';
+import authService from '../../../services/auth.service';
+import useAuthStore from '../../../store/authStore';
 
 // Función para normalizar texto
 const normalizarTexto = (texto) => {
@@ -41,11 +44,15 @@ const formatearNombre = (nombre) => {
 
 const AlertasActivas = () => {
   const navigate = useNavigate();
+  const { user } = useAuthStore();
   const [alertas, setAlertas] = useState([]);
   const [alertasOriginal, setAlertasOriginal] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // Estado para el modal del mapa
+  // Obtener tipo de alerta permitido según rol
+  const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
+  const puedeGestionar = authService.puedeGestionarAlerta(tipoAlertaPermitido || '');
+  
   const [mapaModal, setMapaModal] = useState({
     abierto: false,
     lat: null,
@@ -74,7 +81,13 @@ const AlertasActivas = () => {
   const cargarAlertas = async () => {
     try {
       setLoading(true);
-      const response = await alertasPanelService.obtenerActivas({ limite: 1000 });
+      // Enviar filtro de tipo al backend
+      const params = {};
+      if (tipoAlertaPermitido) {
+        params.tipo = tipoAlertaPermitido;
+      }
+      
+      const response = await alertasPanelService.listarActivas({ limite: 1000, ...params });
       
       if (response.success) {
         const alertasFormateadas = (response.data || []).map(alerta => ({
@@ -163,7 +176,6 @@ const AlertasActivas = () => {
     }
   }, [filtros.desde, filtros.hasta, filtros.pagina]);
 
-  // Función para abrir modal del mapa
   const abrirMapaModal = (e, alerta) => {
     e.stopPropagation();
     setMapaModal({
@@ -176,7 +188,6 @@ const AlertasActivas = () => {
     });
   };
 
-  // Función para cerrar modal
   const cerrarMapaModal = () => {
     setMapaModal({
       abierto: false,
@@ -234,6 +245,7 @@ const AlertasActivas = () => {
               <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Alertas Activas</h1>
               <p className="text-sm text-gray-500 mt-1">
                 {paginacion.total} {paginacion.total === 1 ? 'alerta espera' : 'alertas esperan'} ser atendidas
+                {tipoAlertaPermitido && ` (${tipoAlertaPermitido === 'panico' ? 'Solo Pánico' : 'Solo Médicas'})`}
               </p>
             </div>
           </div>
@@ -311,6 +323,7 @@ const AlertasActivas = () => {
                 {filtros.desde || filtros.hasta
                   ? `No se encontraron alertas entre ${formatearFechaCorta(filtros.desde)} y ${formatearFechaCorta(filtros.hasta)}`
                   : 'Todas las alertas han sido atendidas o asignadas'}
+                {tipoAlertaPermitido && ` (Filtro: ${tipoAlertaPermitido === 'panico' ? 'Solo Pánico' : 'Solo Médicas'})`}
               </p>
             </div>
           ) : (

@@ -1,7 +1,9 @@
+// src/routes/AppRouter.jsx
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import Home from '../pages/Home';
 import Login from '../pages/auth/Login';
+import Verificar2FA from '../pages/auth/Verificar2FA';
 import AdminLayout from '../components/layout/AdminLayout';
 import Dashboard from '../pages/admin/Dashboard';
 import PersonalList from '../pages/admin/personal/PersonalList';
@@ -33,15 +35,12 @@ const AppRouter = () => {
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
       <BrowserRouter>
         <Routes>
-          {/*  pantalla principal de web */}
           <Route path="/" element={<Home />} />
-
-          {/*  ruta del login */}
           <Route path="/login" element={<Login />} />
+          <Route path="/verificar-2fa" element={<Verificar2FA />} />
 
-          {/* rutas protegias del rol admin*/}
           <Route path="/admin" element={
-            <PrivateRoute allowedRoles={['admin', 'superadmin']}>
+            <PrivateRoute allowedRoles={['admin', 'superadmin', 'operador_tecnico', 'operador_policial', 'operador_medico', 'operador_general']}>
               <AdminLayout />
             </PrivateRoute>
           }>
@@ -62,17 +61,13 @@ const AppRouter = () => {
             <Route path="unidades/crear" element={<UnidadForm />} />
             <Route path="unidades/editar/:id" element={<UnidadForm />} />
             <Route path="unidades/:id" element={<UnidadDetail />} />
-            <Route path="alertas/:id" element={<AlertaDetail />} />
-            <Route path="alertas/expiradas/:id" element={<AlertaExpiradaDetail />} />
             <Route path="reasignaciones/pendientes" element={<ReasignacionesPendientes />} />
             <Route path="reportes" element={<ReportesMenu />} />
             <Route path="reportes/:tipo" element={<GeneradorReporte />} />
             <Route path="analisis/geografico" element={<AnalisisGeografico />} />
-            
             <Route index element={<Navigate to="/admin/dashboard" />} />
           </Route>
 
-          {/* rutas protegidas del superadmin-NOSOTROS-(PASARELAS DE PAGOS, ALTA DE MUNICIPIOS) */}
           <Route path="/superadmin" element={
             <PrivateRoute allowedRoles={['superadmin']}>
               <AdminLayout />
@@ -82,7 +77,6 @@ const AppRouter = () => {
             <Route index element={<Navigate to="/superadmin/dashboard" />} />
           </Route>
 
-          {/* retorno a pantalla principal si no encuntra la ruta */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>

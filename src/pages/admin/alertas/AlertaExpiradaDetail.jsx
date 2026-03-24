@@ -1,3 +1,4 @@
+// src/pages/admin/alertas/AlertaExpiradaDetail.jsx
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
@@ -9,6 +10,7 @@ import alertasService from '../../../services/admin/alertas.service';
 import toast from 'react-hot-toast';
 import IconoEntidad, { BadgeTipoAlerta, ModalMapa } from '../../../components/ui/IconoEntidad';
 import BotonUbicacion from '../../../components/ui/BotonUbicacion';
+import authService from '../../../services/auth.service';
 
 // Función para normalizar texto
 const normalizarTexto = (texto) => {
@@ -49,6 +51,9 @@ const AlertaExpiradaDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
+  // Obtener tipo de alerta permitido según rol (para validar acceso)
+  const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
+  
   // Estado para modal de mapa expandido
   const [mapaModal, setMapaModal] = useState({
     abierto: false,
@@ -70,6 +75,14 @@ const AlertaExpiradaDetail = () => {
       
       const response = await alertasService.obtenerExpiradas({ limite: 100 });
       const encontrada = (response.data || []).find(a => a.id === parseInt(id));
+      
+      // Verificar si el rol tiene acceso a este tipo de alerta
+      if (encontrada && tipoAlertaPermitido && encontrada.tipo !== tipoAlertaPermitido) {
+        setError(`No tienes permiso para ver alertas de tipo ${encontrada.tipo === 'panico' ? 'Pánico' : 'Médica'}`);
+        setAlerta(null);
+        setLoading(false);
+        return;
+      }
       
       if (encontrada) {
         const alertaFormateada = {

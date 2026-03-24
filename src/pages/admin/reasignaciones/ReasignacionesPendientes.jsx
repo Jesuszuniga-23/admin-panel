@@ -1,19 +1,23 @@
+// src/pages/admin/reasignaciones/ReasignacionesPendientes.jsx
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle, Clock, MapPin, User, Calendar,
   ChevronLeft, RefreshCw, Truck, XCircle, CheckCircle,
   Loader, AlertCircle, Phone, Shield, X, Bell, BellRing,
-  Mail, MapPinned, Navigation, Copy, Eye, Filter, Search,Heart
+  Mail, MapPinned, Navigation, Copy, Eye, Filter, Search, Heart
 } from 'lucide-react';
 import reasignacionService from '../../../services/admin/reasignacion.service';
 import alertasService from '../../../services/admin/alertas.service';
 import MapaConDireccion from '../../../components/maps/MapaConDireccion';
 import toast from 'react-hot-toast';
 import IconoEntidad, { BadgeTipoAlerta, ModalMapa, BotonMapa } from '../../../components/ui/IconoEntidad';
+import authService from '../../../services/auth.service';
+import useAuthStore from '../../../store/authStore';
 
 const ReasignacionesPendientes = () => {
   const navigate = useNavigate();
+  const { user } = useAuthStore();
   const [alertas, setAlertas] = useState([]);
   const [alertasFiltradas, setAlertasFiltradas] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -27,8 +31,12 @@ const ReasignacionesPendientes = () => {
   const [motivoCierre, setMotivoCierre] = useState('');
   const [ultimaActualizacion, setUltimaActualizacion] = useState(new Date());
   
+  // Obtener tipo de alerta permitido según rol
+  const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
+  const puedeReasignar = authService.puedeGestionarAlerta(tipoAlertaPermitido || '');
+  
   // Filtro por tipo de alerta
-  const [filtroTipo, setFiltroTipo] = useState('todos');
+  const [filtroTipo, setFiltroTipo] = useState(tipoAlertaPermitido || 'todos');
 
   // Estado para el modal del mapa
   const [mapaModal, setMapaModal] = useState({
@@ -65,7 +73,11 @@ const ReasignacionesPendientes = () => {
   const cargarPendientes = async (silencioso = false) => {
     if (!silencioso) setCargando(true);
     try {
-      const response = await reasignacionService.obtenerPendientes();
+      const params = {};
+      if (tipoAlertaPermitido) {
+        params.tipo = tipoAlertaPermitido;
+      }
+      const response = await reasignacionService.obtenerPendientes(params);
       setAlertas(response.data || []);
       setAlertasFiltradas(response.data || []);
       setUltimaActualizacion(new Date());
@@ -85,6 +97,11 @@ const ReasignacionesPendientes = () => {
   };
 
   const handleVerUnidades = async (alerta) => {
+    if (!puedeReasignar) {
+      toast.error('No tienes permisos para reasignar alertas');
+      return;
+    }
+    
     try {
       setAlertaSeleccionada(alerta);
       const response = await reasignacionService.obtenerUnidadesDisponibles(alerta.id);
@@ -126,6 +143,11 @@ const ReasignacionesPendientes = () => {
   };
 
   const handleCerrarManual = async () => {
+    if (!puedeReasignar) {
+      toast.error('No tienes permisos para cerrar alertas');
+      return;
+    }
+    
     if (!motivoCierre.trim()) {
       toast.error('Debes proporcionar un motivo');
       return;
@@ -229,6 +251,7 @@ const ReasignacionesPendientes = () => {
             </div>
             <p className="text-sm text-gray-500 mt-1">
               Alertas activas sin asignar por más de 5 minutos
+              {tipoAlertaPermitido && ` (${tipoAlertaPermitido === 'panico' ? 'Solo Pánico' : 'Solo Médicas'})`}
             </p>
             <p className="text-xs text-gray-400 mt-1">
               Última actualización: {ultimaActualizacion.toLocaleTimeString()}
@@ -266,6 +289,7 @@ const ReasignacionesPendientes = () => {
                   ? 'bg-blue-600 text-white shadow-md'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
+              disabled={!!tipoAlertaPermitido}
             >
               Todos
             </button>
@@ -276,6 +300,7 @@ const ReasignacionesPendientes = () => {
                   ? 'bg-red-600 text-white shadow-md'
                   : 'bg-red-50 text-red-700 hover:bg-red-100'
               }`}
+              disabled={!!tipoAlertaPermitido && tipoAlertaPermitido !== 'panico'}
             >
               <AlertTriangle size={14} />
               Pánico
@@ -287,6 +312,7 @@ const ReasignacionesPendientes = () => {
                   ? 'bg-green-600 text-white shadow-md'
                   : 'bg-green-50 text-green-700 hover:bg-green-100'
               }`}
+              disabled={!!tipoAlertaPermitido && tipoAlertaPermitido !== 'medica'}
             >
               <Heart size={14} />
               Médica
@@ -306,6 +332,7 @@ const ReasignacionesPendientes = () => {
               {filtroTipo !== 'todos' 
                 ? `No hay alertas de tipo ${filtroTipo === 'panico' ? 'Pánico' : 'Médica'} pendientes de reasignación`
                 : 'No hay alertas pendientes de reasignación'}
+              {tipoAlertaPermitido && ` (Filtro: ${tipoAlertaPermitido === 'panico' ? 'Solo Pánico' : 'Solo Médicas'})`}
             </p>
           </div>
         ) : (
@@ -320,7 +347,7 @@ const ReasignacionesPendientes = () => {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">UBICACIÓN</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">FECHA</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">ACCIONES</th>
-                  </tr>
+                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {alertasFiltradas.map((alerta) => (
@@ -369,29 +396,33 @@ const ReasignacionesPendientes = () => {
                       </td>
                       <td className="px-4 py-3 text-center">
                         <div className="flex items-center justify-center gap-2">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleVerUnidades(alerta);
-                            }}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all text-xs font-medium shadow-md"
-                            title="Reasignar alerta"
-                          >
-                            <Truck size={14} />
-                            <span>Reasignar</span>
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setAlertaSeleccionada(alerta);
-                              setMostrarModalCierre(true);
-                            }}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-red-200 text-red-600 rounded-lg hover:bg-red-50 hover:border-red-300 transition-all text-xs font-medium"
-                            title="Cerrar manualmente"
-                          >
-                            <XCircle size={14} />
-                            <span>Cerrar</span>
-                          </button>
+                          {puedeReasignar && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleVerUnidades(alerta);
+                              }}
+                              className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all text-xs font-medium shadow-md"
+                              title="Reasignar alerta"
+                            >
+                              <Truck size={14} />
+                              <span>Reasignar</span>
+                            </button>
+                          )}
+                          {puedeReasignar && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setAlertaSeleccionada(alerta);
+                                setMostrarModalCierre(true);
+                              }}
+                              className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-red-200 text-red-600 rounded-lg hover:bg-red-50 hover:border-red-300 transition-all text-xs font-medium"
+                              title="Cerrar manualmente"
+                            >
+                              <XCircle size={14} />
+                              <span>Cerrar</span>
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

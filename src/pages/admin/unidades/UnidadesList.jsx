@@ -1,3 +1,4 @@
+// src/pages/admin/unidades/UnidadesList.jsx
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -10,6 +11,7 @@ import toast from 'react-hot-toast';
 import { useDebounce } from '../../../hooks/useDebounce';
 import reportesService from '../../../services/admin/reportes.service';
 import useAuthStore from '../../../store/authStore';
+import authService from '../../../services/auth.service';
 import IconoEntidad, { BadgeIcono } from '../../../components/ui/IconoEntidad';
 
 const capitalizar = (texto) => {
@@ -17,7 +19,6 @@ const capitalizar = (texto) => {
   return texto.charAt(0).toUpperCase() + texto.slice(1).toLowerCase();
 };
 
-// Mapeo de tipos a entidades para iconos consistentes
 const tipoToEntidad = {
   policia: 'PATRULLA',
   ambulancia: 'AMBULANCIA'
@@ -135,6 +136,11 @@ const UnidadesList = () => {
   const [loading, setLoading] = useState(true);
   const [exportando, setExportando] = useState(false);
   
+  // Obtener tipo de unidad permitido según rol (operadores solo ven su tipo)
+  const tipoUnidadPermitido = authService.getRolPersonalPermitido(); // 'policia' o 'ambulancia'
+  const puedeGestionar = tipoUnidadPermitido ? 
+    (tipoUnidadPermitido === 'policia' || tipoUnidadPermitido === 'ambulancia') : true;
+  
   const [modalInfo, setModalInfo] = useState({ show: false, mensaje: '' });
   const [modalConfirmacion, setModalConfirmacion] = useState({
     show: false,
@@ -153,7 +159,7 @@ const UnidadesList = () => {
   });
 
   const [filtros, setFiltros] = useState({
-    tipo: '',
+    tipo: tipoUnidadPermitido || '',
     estado: '',
     search: '',
     pagina: 1,
@@ -211,7 +217,9 @@ const UnidadesList = () => {
     try {
       setExportando(true);
       toast.loading('Generando reporte de Excel...', { id: 'export' });
-      const response = await unidadService.listarUnidades({ limite: 1000 });
+      const params = {};
+      if (tipoUnidadPermitido) params.tipo = tipoUnidadPermitido;
+      const response = await unidadService.listarUnidades({ limite: 1000, ...params });
       const todasUnidades = response.data || [];
       await reportesService.generarExcelPersonalizado(todasUnidades, 'unidades', filtros, user);
       toast.success('Reporte de Excel generado correctamente', { id: 'export' });
@@ -227,7 +235,9 @@ const UnidadesList = () => {
     try {
       setExportando(true);
       toast.loading('Generando reporte PDF...', { id: 'export' });
-      const response = await unidadService.listarUnidades({ limite: 1000 });
+      const params = {};
+      if (tipoUnidadPermitido) params.tipo = tipoUnidadPermitido;
+      const response = await unidadService.listarUnidades({ limite: 1000, ...params });
       const todasUnidades = response.data || [];
       reportesService.generarPDFPersonalizado(todasUnidades, 'unidades', filtros, user);
       toast.success('Reporte PDF generado correctamente', { id: 'export' });
@@ -240,6 +250,14 @@ const UnidadesList = () => {
   };
 
   const handleToggleActivo = async (id, codigo, unidad) => {
+    if (!puedeGestionar) {
+      setModalInfo({
+        show: true,
+        mensaje: `No tienes permisos para modificar unidades.`
+      });
+      return;
+    }
+    
     if (isUnidadOcupada(unidad)) {
       setModalInfo({
         show: true,
@@ -305,6 +323,14 @@ const UnidadesList = () => {
   };
 
   const handleEliminar = async (id, codigo, unidad) => {
+    if (!puedeGestionar) {
+      setModalInfo({
+        show: true,
+        mensaje: `No tienes permisos para eliminar unidades.`
+      });
+      return;
+    }
+    
     if (isUnidadOcupada(unidad)) {
       setModalInfo({
         show: true,
@@ -344,6 +370,14 @@ const UnidadesList = () => {
   };
 
   const handleEditar = (id, unidad) => {
+    if (!puedeGestionar) {
+      setModalInfo({
+        show: true,
+        mensaje: `No tienes permisos para editar unidades.`
+      });
+      return;
+    }
+    
     if (isUnidadOcupada(unidad)) {
       setModalInfo({
         show: true,
@@ -356,7 +390,7 @@ const UnidadesList = () => {
 
   const limpiarFiltros = () => {
     setFiltros({
-      tipo: '',
+      tipo: tipoUnidadPermitido || '',
       estado: '',
       search: '',
       pagina: 1,
@@ -402,7 +436,10 @@ const UnidadesList = () => {
           </div>
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Unidades</h1>
-            <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Gestión de unidades operativas</p>
+            <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
+              Gestión de unidades operativas
+              {tipoUnidadPermitido && ` (${tipoUnidadPermitido === 'policia' ? 'Solo Policía' : 'Solo Ambulancia'})`}
+            </p>
           </div>
         </div>
         <div className="flex gap-2 w-full sm:w-auto">
@@ -424,14 +461,16 @@ const UnidadesList = () => {
             <span className="sm:hidden">PDF</span>
             <span className="hidden sm:inline">PDF</span>
           </button>
-          <button
-            onClick={() => navigate('/admin/unidades/crear')}
-            className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-blue-600 text-white px-3 sm:px-4 py-2 text-sm sm:text-base rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <Plus size={16} />
-            <span className="sm:hidden">Nueva</span>
-            <span className="hidden sm:inline">Nueva Unidad</span>
-          </button>
+          {puedeGestionar && (
+            <button
+              onClick={() => navigate('/admin/unidades/crear')}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-blue-600 text-white px-3 sm:px-4 py-2 text-sm sm:text-base rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Plus size={16} />
+              <span className="sm:hidden">Nueva</span>
+              <span className="hidden sm:inline">Nueva Unidad</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -466,6 +505,7 @@ const UnidadesList = () => {
             value={filtros.tipo}
             onChange={(e) => setFiltros(prev => ({ ...prev, tipo: e.target.value, pagina: 1 }))}
             className="px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            disabled={!!tipoUnidadPermitido}
           >
             <option value="">Todos los tipos</option>
             <option value="policia">Policía</option>
@@ -512,14 +552,20 @@ const UnidadesList = () => {
           <div className="p-8 sm:p-12 text-center">
             <Truck size={36} className="sm:w-12 sm:h-12 text-gray-300 mx-auto mb-3 sm:mb-4" />
             <h3 className="text-sm sm:text-base font-medium text-gray-800 mb-1 sm:mb-2">No hay unidades registradas</h3>
-            <p className="text-xs sm:text-sm text-gray-500 mb-3 sm:mb-4">Comienza creando una nueva unidad</p>
-            <button
-              onClick={() => navigate('/admin/unidades/crear')}
-              className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-600 text-white text-xs sm:text-sm rounded-lg hover:bg-blue-700"
-            >
-              <Plus size={14} className="sm:w-4 sm:h-4" />
-              Nueva Unidad
-            </button>
+            <p className="text-xs sm:text-sm text-gray-500 mb-3 sm:mb-4">
+              {tipoUnidadPermitido 
+                ? `No hay unidades de tipo ${tipoUnidadPermitido === 'policia' ? 'Policía' : 'Ambulancia'} registradas`
+                : 'Comienza creando una nueva unidad'}
+            </p>
+            {puedeGestionar && !tipoUnidadPermitido && (
+              <button
+                onClick={() => navigate('/admin/unidades/crear')}
+                className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-600 text-white text-xs sm:text-sm rounded-lg hover:bg-blue-700"
+              >
+                <Plus size={14} className="sm:w-4 sm:h-4" />
+                Nueva Unidad
+              </button>
+            )}
           </div>
         ) : (
           <>
@@ -532,7 +578,7 @@ const UnidadesList = () => {
                     <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
                     <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase">Personal</th>
                     <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
-                  </tr>
+                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {unidades.map((unidad) => (
@@ -574,15 +620,17 @@ const UnidadesList = () => {
                       </td>
                       <td className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 lg:py-4 text-right">
                         <div className="flex items-center justify-end gap-1 sm:gap-1.5 lg:gap-2">
-                          <button
-                            onClick={() => handleToggleActivo(unidad.id, unidad.codigo, unidad)}
-                            className={`p-1 rounded-lg transition-colors ${
-                              unidad.activa ? 'hover:bg-yellow-50 text-yellow-600' : 'hover:bg-green-50 text-green-600'
-                            }`}
-                            title={unidad.activa ? 'Desactivar' : 'Activar'}
-                          >
-                            <Power size={14} className="sm:w-4 sm:h-4" />
-                          </button>
+                          {puedeGestionar && (
+                            <button
+                              onClick={() => handleToggleActivo(unidad.id, unidad.codigo, unidad)}
+                              className={`p-1 rounded-lg transition-colors ${
+                                unidad.activa ? 'hover:bg-yellow-50 text-yellow-600' : 'hover:bg-green-50 text-green-600'
+                              }`}
+                              title={unidad.activa ? 'Desactivar' : 'Activar'}
+                            >
+                              <Power size={14} className="sm:w-4 sm:h-4" />
+                            </button>
+                          )}
                           <button
                             onClick={() => handleVerDetalle(unidad.id)}
                             className="p-1 hover:bg-gray-100 rounded-lg"
@@ -590,20 +638,24 @@ const UnidadesList = () => {
                           >
                             <Eye size={14} className="text-gray-500" />
                           </button>
-                          <button
-                            onClick={() => handleEditar(unidad.id, unidad)}
-                            className="p-1 hover:bg-gray-100 rounded-lg"
-                            title="Editar"
-                          >
-                            <Edit size={14} className="text-gray-500" />
-                          </button>
-                          <button
-                            onClick={() => handleEliminar(unidad.id, unidad.codigo, unidad)}
-                            className="p-1 hover:bg-red-50 rounded-lg"
-                            title="Eliminar"
-                          >
-                            <Trash2 size={14} className="text-red-500" />
-                          </button>
+                          {puedeGestionar && (
+                            <button
+                              onClick={() => handleEditar(unidad.id, unidad)}
+                              className="p-1 hover:bg-gray-100 rounded-lg"
+                              title="Editar"
+                            >
+                              <Edit size={14} className="text-gray-500" />
+                            </button>
+                          )}
+                          {puedeGestionar && (
+                            <button
+                              onClick={() => handleEliminar(unidad.id, unidad.codigo, unidad)}
+                              className="p-1 hover:bg-red-50 rounded-lg"
+                              title="Eliminar"
+                            >
+                              <Trash2 size={14} className="text-red-500" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

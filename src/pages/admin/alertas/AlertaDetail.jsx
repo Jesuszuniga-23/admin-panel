@@ -1,3 +1,4 @@
+// src/pages/admin/alertas/AlertaDetail.jsx
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
@@ -10,6 +11,7 @@ import alertasService from '../../../services/admin/alertas.service';
 import toast from 'react-hot-toast';
 import IconoEntidad, { BadgeTipoAlerta, ModalMapa } from '../../../components/ui/IconoEntidad';
 import BotonUbicacion from '../../../components/ui/BotonUbicacion';
+import authService from '../../../services/auth.service';
 
 // Función para normalizar texto
 const normalizarTexto = (texto) => {
@@ -52,6 +54,9 @@ const AlertaDetail = () => {
   const [mostrarModalCierre, setMostrarModalCierre] = useState(false);
   const [motivoCierre, setMotivoCierre] = useState('');
   const [cerrando, setCerrando] = useState(false);
+  
+  // Obtener permisos según rol
+  const puedeCerrarAlerta = authService.puedeGestionarAlerta(alerta?.tipo);
   
   // Estado para modal de mapa
   const [mapaModal, setMapaModal] = useState({
@@ -105,6 +110,11 @@ const AlertaDetail = () => {
   };
 
   const handleCerrarManual = async () => {
+    if (!puedeCerrarAlerta) {
+      toast.error('No tienes permisos para cerrar esta alerta');
+      return;
+    }
+    
     if (!motivoCierre.trim()) {
       toast.error('Debes proporcionar un motivo para el cierre');
       return;
@@ -242,7 +252,7 @@ const AlertaDetail = () => {
                alerta.estado === 'expirada' ? 'EXPIRADA' : 'CERRADA'}
             </span>
             
-            {alerta.estado !== 'cerrada' && alerta.estado !== 'cancelada' && (
+            {alerta.estado !== 'cerrada' && alerta.estado !== 'cancelada' && puedeCerrarAlerta && (
               <button
                 onClick={() => setMostrarModalCierre(true)}
                 className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-xl hover:bg-amber-700 transition-colors shadow-lg shadow-amber-200"

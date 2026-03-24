@@ -1,3 +1,4 @@
+// src/pages/admin/unidades/UnidadDetail.jsx
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
@@ -5,12 +6,14 @@ import {
   ChevronLeft, Loader, AlertCircle, Users,
   Shield, Ambulance, Calendar, User, Mail, Phone,
   X, Check, Plus, FileText, UserMinus, UserPlus,
-  Clock, AlertTriangle, CheckCircle, XCircle
+  Clock, AlertTriangle, CheckCircle, XCircle, Lock
 } from 'lucide-react';
 import unidadService from '../../../services/admin/unidad.service';
 import personalService from '../../../services/admin/personal.service';
 import toast from 'react-hot-toast';
 import IconoEntidad, { BadgeIcono } from '../../../components/ui/IconoEntidad';
+import authService from '../../../services/auth.service';
+import useAuthStore from '../../../store/authStore';
 
 // Mapeo de tipos a entidades para iconos consistentes
 const tipoToEntidad = {
@@ -170,6 +173,7 @@ const ModalConfirmacion = ({
 const UnidadDetail = () => {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { user: currentUser } = useAuthStore();
   const [unidad, setUnidad] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -177,6 +181,10 @@ const UnidadDetail = () => {
   const [mostrarAsignacion, setMostrarAsignacion] = useState(false);
   const [personalSeleccionado, setPersonalSeleccionado] = useState('');
   const [cargandoPersonal, setCargandoPersonal] = useState(false);
+  
+  // Obtener permisos según rol
+  const puedeGestionar = authService.getRolPersonalPermitido() ? 
+    (authService.getRolPersonalPermitido() === unidad?.tipo) : true;
   
   const [modalInfo, setModalInfo] = useState({ show: false, mensaje: '' });
   const [modalConfirmacion, setModalConfirmacion] = useState({
@@ -231,6 +239,11 @@ const UnidadDetail = () => {
   };
 
   const cargarPersonalDisponible = async () => {
+    if (!puedeGestionar) {
+      toast.error('No tienes permisos para asignar personal a esta unidad');
+      return;
+    }
+    
     try {
       setCargandoPersonal(true);
       const response = await unidadService.personalDisponible(id, unidad?.tipo);
@@ -283,6 +296,11 @@ const UnidadDetail = () => {
   };
 
   const handleRemover = async (personalId, nombre) => {
+    if (!puedeGestionar) {
+      toast.error('No tienes permisos para remover personal de esta unidad');
+      return;
+    }
+    
     if (unidad.estado === 'ocupada') {
       setModalInfo({
         show: true,
@@ -321,6 +339,11 @@ const UnidadDetail = () => {
   };
 
   const handleToggleActiva = async () => {
+    if (!puedeGestionar) {
+      toast.error('No tienes permisos para modificar esta unidad');
+      return;
+    }
+    
     if (unidad.estado === 'ocupada') {
       setModalInfo({
         show: true,
@@ -367,6 +390,11 @@ const UnidadDetail = () => {
   };
 
   const handleEliminar = async () => {
+    if (!puedeGestionar) {
+      toast.error('No tienes permisos para eliminar esta unidad');
+      return;
+    }
+    
     if (unidad.estado === 'ocupada') {
       setModalInfo({
         show: true,
@@ -403,6 +431,11 @@ const UnidadDetail = () => {
   };
 
   const handleEditar = () => {
+    if (!puedeGestionar) {
+      toast.error('No tienes permisos para editar esta unidad');
+      return;
+    }
+    
     if (unidad.estado === 'ocupada') {
       setModalInfo({
         show: true,
@@ -571,13 +604,15 @@ const UnidadDetail = () => {
                 <Users size={20} />
                 Personal asignado ({unidad.personal_asignado?.length || 0})
               </h3>
-              <button
-                onClick={cargarPersonalDisponible}
-                className="flex items-center gap-2 px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
-              >
-                <Plus size={16} />
-                Asignar personal
-              </button>
+              {puedeGestionar && (
+                <button
+                  onClick={cargarPersonalDisponible}
+                  className="flex items-center gap-2 px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                >
+                  <Plus size={16} />
+                  Asignar personal
+                </button>
+              )}
             </div>
 
             {mostrarAsignacion && (
@@ -643,13 +678,15 @@ const UnidadDetail = () => {
                         </p>
                       </div>
                     </div>
-                    <button
-                      onClick={() => handleRemover(persona.id, persona.nombre)}
-                      className="p-1 hover:bg-red-100 rounded-lg transition-colors"
-                      title="Remover"
-                    >
-                      <X size={16} className="text-red-500" />
-                    </button>
+                    {puedeGestionar && (
+                      <button
+                        onClick={() => handleRemover(persona.id, persona.nombre)}
+                        className="p-1 hover:bg-red-100 rounded-lg transition-colors"
+                        title="Remover"
+                      >
+                        <X size={16} className="text-red-500" />
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -688,33 +725,44 @@ const UnidadDetail = () => {
 
         {/* Botones de acción */}
         <div className="border-t px-6 py-4 bg-gray-50 flex justify-end gap-3">
-          <button
-            onClick={handleToggleActiva}
-            className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${
-              unidad.activa
-                ? 'bg-yellow-600 text-white hover:bg-yellow-700'
-                : 'bg-green-600 text-white hover:bg-green-700'
-            }`}
-          >
-            <Power size={18} />
-            {unidad.activa ? 'Desactivar' : 'Activar'}
-          </button>
+          {puedeGestionar && (
+            <>
+              <button
+                onClick={handleToggleActiva}
+                className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${
+                  unidad.activa
+                    ? 'bg-yellow-600 text-white hover:bg-yellow-700'
+                    : 'bg-green-600 text-white hover:bg-green-700'
+                }`}
+              >
+                <Power size={18} />
+                {unidad.activa ? 'Desactivar' : 'Activar'}
+              </button>
 
-          <button
-            onClick={handleEditar}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-          >
-            <Edit size={18} />
-            Editar
-          </button>
+              <button
+                onClick={handleEditar}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+              >
+                <Edit size={18} />
+                Editar
+              </button>
 
-          <button
-            onClick={handleEliminar}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"
-          >
-            <Trash2 size={18} />
-            Eliminar
-          </button>
+              <button
+                onClick={handleEliminar}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"
+              >
+                <Trash2 size={18} />
+                Eliminar
+              </button>
+            </>
+          )}
+          
+          {!puedeGestionar && (
+            <div className="flex items-center gap-2 text-gray-400 text-sm">
+              <Lock size={14} />
+              No tienes permisos para modificar esta unidad
+            </div>
+          )}
         </div>
       </div>
     </div>

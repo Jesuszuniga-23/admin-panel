@@ -1,12 +1,18 @@
+// src/pages/admin/reportes/ReportesMenu.jsx
 import { useNavigate } from 'react-router-dom';
 import { 
   FileText, Users, Truck, Bell, ChevronLeft,
   BarChart3, PieChart, Calendar, Download, FileSpreadsheet, FilePieChart
 } from 'lucide-react';
 import IconoEntidad from '../../../components/ui/IconoEntidad';
+import authService from '../../../services/auth.service';
 
 const ReportesMenu = () => {
   const navigate = useNavigate();
+  
+  // Obtener tipo de alerta permitido según rol (para mostrar solo los reportes relevantes)
+  const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
+  const rolPersonalPermitido = authService.getRolPersonalPermitido();
 
   const opcionesReporte = [
     {
@@ -18,6 +24,7 @@ const ReportesMenu = () => {
       color: 'blue',
       gradient: 'from-blue-600 to-indigo-700',
       stats: ['Total', 'Activos/Inactivos', 'Disponibilidad'],
+      visible: true
     },
     {
       id: 'unidades',
@@ -28,6 +35,7 @@ const ReportesMenu = () => {
       color: 'purple',
       gradient: 'from-purple-600 to-indigo-700',
       stats: ['Activas', 'Disponibles/Ocupadas', 'Personal asignado'],
+      visible: true
     },
     {
       id: 'alertas',
@@ -38,8 +46,22 @@ const ReportesMenu = () => {
       color: 'amber',
       gradient: 'from-amber-600 to-orange-700',
       stats: ['Por mes', 'Tiempo respuesta', 'Motivos cierre'],
+      visible: true
     }
   ];
+
+  // Filtrar opciones según rol (opcional: ocultar reportes que no corresponden)
+  const opcionesFiltradas = opcionesReporte.filter(opcion => {
+    if (opcion.id === 'personal' && rolPersonalPermitido) {
+      // Si es operador policial o médico, solo ve personal de su tipo
+      return true;
+    }
+    if (opcion.id === 'alertas' && tipoAlertaPermitido) {
+      // Si es operador policial o médico, solo ve alertas de su tipo
+      return true;
+    }
+    return true;
+  });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 sm:p-6 max-w-6xl mx-auto">
@@ -55,13 +77,15 @@ const ReportesMenu = () => {
           <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Centro de Reportes</h1>
           <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
             Selecciona el tipo de reporte que deseas generar
+            {tipoAlertaPermitido && ` (Filtro: ${tipoAlertaPermitido === 'panico' ? 'Solo Pánico' : 'Solo Médicas'})`}
+            {rolPersonalPermitido && ` (Personal: ${rolPersonalPermitido === 'policia' ? 'Solo Policía' : 'Solo Ambulancia'})`}
           </p>
         </div>
       </div>
 
       {/* Grid de opciones */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {opcionesReporte.map((opcion) => {
+        {opcionesFiltradas.map((opcion) => {
           return (
             <div
               key={opcion.id}

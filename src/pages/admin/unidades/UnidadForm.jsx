@@ -1,3 +1,4 @@
+// src/pages/admin/unidades/UnidadForm.jsx
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
@@ -5,11 +6,13 @@ import {
   Loader, Shield, Ambulance, Hash, FileText, Info,
   AlertCircle, CheckCircle, XCircle, Clock,
   MapPin, BookOpen, Wrench,
-  Layers, Activity
+  Layers, Activity, Lock
 } from 'lucide-react';
 import unidadService from '../../../services/admin/unidad.service';
 import toast from 'react-hot-toast';
 import IconoEntidad, { BadgeIcono } from '../../../components/ui/IconoEntidad';
+import authService from '../../../services/auth.service';
+import useAuthStore from '../../../store/authStore';
 
 // Mapeo de tipos a entidades para iconos consistentes
 const tipoToEntidad = {
@@ -46,8 +49,14 @@ const UnidadForm = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams();
+  const { user: currentUser } = useAuthStore();
   const isEditing = !!id;
   const storageKey = isEditing ? `unidad_form_edit_${id}` : 'unidad_form_new';
+
+  // Obtener permisos según rol
+  const puedeGestionar = authService.getRolPersonalPermitido() ? 
+    (authService.getRolPersonalPermitido() === 'policia' || authService.getRolPersonalPermitido() === 'ambulancia') : true;
+  const tipoUnidadPermitido = authService.getRolPersonalPermitido(); // 'policia' o 'ambulancia'
 
   const [loading, setLoading] = useState(false);
   const [cargandoDatos, setCargandoDatos] = useState(isEditing);
@@ -72,7 +81,7 @@ const UnidadForm = () => {
     
     return {
       codigo: '',
-      tipo: 'policia',
+      tipo: tipoUnidadPermitido || 'policia',
       descripcion: '',
       estado: 'disponible',
       activa: true
@@ -312,6 +321,9 @@ const UnidadForm = () => {
         }, 500);
       }
     }
+    else if (name === 'tipo' && !isEditing) {
+      setFormData(prev => ({ ...prev, tipo: value }));
+    }
     else if (name === 'estado') {
       setFormData(prev => ({
         ...prev,
@@ -360,6 +372,12 @@ const UnidadForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    
+    if (!puedeGestionar) {
+      toast.error('No tienes permisos para crear/modificar unidades');
+      setLoading(false);
+      return;
+    }
 
     try {
       if (!isEditing && !codigoValido) {
@@ -448,15 +466,22 @@ const UnidadForm = () => {
               </h1>
               <p className="text-sm text-gray-500 mt-1">
                 {isEditing ? `Editando unidad: ${formData.codigo}` : 'Ingresa los datos de la nueva unidad'}
+                {tipoUnidadPermitido && ` (Tipo: ${tipoUnidadPermitido === 'policia' ? 'Policía' : 'Ambulancia'})`}
               </p>
             </div>
           </div>
           
-          {/* Indicador de cambios no guardados */}
           {!isEditing && hasUnsavedChanges() && (
             <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
               <AlertCircle size={14} className="text-amber-600" />
               <span className="text-xs text-amber-700">Cambios sin guardar</span>
+            </div>
+          )}
+          
+          {!puedeGestionar && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 border border-gray-200 rounded-lg">
+              <Lock size={14} className="text-gray-500" />
+              <span className="text-xs text-gray-500">No tienes permisos para modificar unidades</span>
             </div>
           )}
         </div>
@@ -498,13 +523,14 @@ const UnidadForm = () => {
                         onBlur={() => handleBlur('codigo')}
                         readOnly={isEditing}
                         required
+                        disabled={!puedeGestionar}
                         className={`w-full pl-10 pr-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 transition-all ${
                           getBorderColor('codigo')
                         } ${
                           isEditing
                             ? 'bg-gray-100 cursor-not-allowed'
                             : 'focus:ring-blue-500 focus:border-blue-500'
-                        }`}
+                        } ${!puedeGestionar ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                         placeholder="Ej: UNI-001"
                       />
                     </div>
@@ -550,12 +576,12 @@ const UnidadForm = () => {
                         name="tipo"
                         value={formData.tipo}
                         onChange={handleChange}
-                        disabled={isEditing}
+                        disabled={isEditing || !!tipoUnidadPermitido || !puedeGestionar}
                         required
                         className={`w-full pl-10 pr-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 transition-all appearance-none ${
                           campoError === 'tipo'
                             ? 'border-red-300 bg-red-50 focus:ring-red-500'
-                            : isEditing
+                            : (isEditing || !!tipoUnidadPermitido || !puedeGestionar)
                               ? 'bg-gray-100 border-gray-200 cursor-not-allowed'
                               : 'border-gray-200 focus:ring-blue-500 focus:border-blue-500 bg-white'
                         }`}
@@ -570,6 +596,11 @@ const UnidadForm = () => {
                     {isEditing && (
                       <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
                         <Info size={12} /> El tipo no se puede modificar
+                      </p>
+                    )}
+                    {tipoUnidadPermitido && !isEditing && (
+                      <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
+                        <Info size={12} /> Solo puedes crear unidades de tipo {tipoUnidadPermitido === 'policia' ? 'Policía' : 'Ambulancia'}
                       </p>
                     )}
                   </div>
@@ -597,7 +628,8 @@ const UnidadForm = () => {
                       value={formData.descripcion}
                       onChange={handleChange}
                       rows="3"
-                      className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                      disabled={!puedeGestionar}
+                      className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all disabled:bg-gray-100"
                       placeholder="Descripción adicional de la unidad (opcional)"
                     />
                   </div>
@@ -622,7 +654,8 @@ const UnidadForm = () => {
                       name="estado"
                       value={formData.estado}
                       onChange={handleChange}
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white"
+                      disabled={!puedeGestionar}
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white disabled:bg-gray-100"
                     >
                       <option value="disponible">Disponible</option>
                       <option value="inactiva">Inactiva</option>
@@ -637,13 +670,14 @@ const UnidadForm = () => {
                       formData.activa
                         ? 'border-blue-200 bg-blue-50 hover:bg-blue-100'
                         : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
-                    }`}>
+                    } ${!puedeGestionar ? 'opacity-50 cursor-not-allowed' : ''}`}>
                       <input
                         type="checkbox"
                         name="activa"
                         checked={formData.activa}
                         onChange={handleChange}
-                        className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+                        disabled={!puedeGestionar}
+                        className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 disabled:opacity-50"
                       />
                       <div>
                         <p className="text-sm font-semibold text-gray-700">Unidad activa</p>
@@ -679,14 +713,16 @@ const UnidadForm = () => {
                 <X size={18} className="text-gray-500 group-hover:text-gray-700" />
                 Cancelar
               </button>
-              <button
-                type="submit"
-                disabled={loading || (!isEditing && !codigoValido)}
-                className="group px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all disabled:opacity-50 flex items-center gap-2 text-sm font-medium shadow-lg shadow-blue-200"
-              >
-                {loading ? <Loader size={18} className="animate-spin" /> : <Save size={18} />}
-                {loading ? 'Guardando...' : (isEditing ? 'Actualizar' : 'Guardar')}
-              </button>
+              {puedeGestionar && (
+                <button
+                  type="submit"
+                  disabled={loading || (!isEditing && !codigoValido)}
+                  className="group px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all disabled:opacity-50 flex items-center gap-2 text-sm font-medium shadow-lg shadow-blue-200"
+                >
+                  {loading ? <Loader size={18} className="animate-spin" /> : <Save size={18} />}
+                  {loading ? 'Guardando...' : (isEditing ? 'Actualizar' : 'Guardar')}
+                </button>
+              )}
             </div>
           </form>
         </div>

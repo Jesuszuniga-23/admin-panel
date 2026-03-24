@@ -1,3 +1,4 @@
+// src/pages/admin/alertas/AlertasCerradasManual.jsx
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -7,6 +8,7 @@ import {
 import alertasService from '../../../services/admin/alertas.service';
 import useAuthStore from '../../../store/authStore';
 import { BadgeTipoAlerta, BotonMapa, ModalMapa } from '../../../components/ui/IconoEntidad';
+import authService from '../../../services/auth.service';
 
 const normalizarTexto = (texto) => {
   if (!texto) return '';
@@ -42,6 +44,9 @@ const formatearNombre = (nombre) => {
 const AlertasCerradasManual = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  
+  // Obtener tipo de alerta permitido según rol
+  const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
   
   const [todasLasAlertas, setTodasLasAlertas] = useState([]);
   const [alertas, setAlertas] = useState([]);
@@ -79,7 +84,11 @@ const AlertasCerradasManual = () => {
   const cargarTodasLasAlertas = async () => {
     setCargando(true);
     try {
-      const resultado = await alertasService.obtenerCerradasManual({ limite: 1000 });
+      const params = {};
+      if (tipoAlertaPermitido) {
+        params.tipo = tipoAlertaPermitido;
+      }
+      const resultado = await alertasService.obtenerCerradasManual({ limite: 1000, ...params });
       const alertasFormateadas = (resultado.data || []).map(alerta => ({
         ...alerta,
         ciudadano: alerta.ciudadano ? {
@@ -227,7 +236,10 @@ const AlertasCerradasManual = () => {
             </div>
             <div>
               <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Alertas Cerradas Manualmente</h1>
-              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Historial de alertas cerradas por administradores</p>
+              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
+                Historial de alertas cerradas por administradores
+                {tipoAlertaPermitido && ` (${tipoAlertaPermitido === 'panico' ? 'Solo Pánico' : 'Solo Médicas'})`}
+              </p>
             </div>
           </div>
           
@@ -334,6 +346,7 @@ const AlertasCerradasManual = () => {
                 {filtros.desde || filtros.hasta || filtros.search
                   ? 'No se encontraron resultados con los filtros aplicados'
                   : 'Las alertas cerradas manualmente aparecerán aquí'}
+                {tipoAlertaPermitido && ` (Filtro: ${tipoAlertaPermitido === 'panico' ? 'Solo Pánico' : 'Solo Médicas'})`}
               </p>
             </div>
           ) : (
@@ -348,7 +361,7 @@ const AlertasCerradasManual = () => {
                       <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-slate-500 uppercase">MOTIVO</th>
                       <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-slate-500 uppercase">FECHA</th>
                       <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-slate-500 uppercase">UBICACIÓN</th>
-                    </tr>
+                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {alertas.map((alerta) => (

@@ -1,3 +1,4 @@
+// src/pages/admin/reportes/GeneradorReporte.jsx
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
@@ -5,7 +6,7 @@ import {
   Loader, Users, Truck, Bell, FileSpreadsheet,
   FilePieChart, Eye, X, RefreshCw, MapPin,
   TrendingUp, Clock, AlertTriangle, CheckCircle,
-  Activity, BarChart3, XCircle,Search
+  Activity, BarChart3, XCircle, Search
 } from 'lucide-react';
 import personalService from '../../../services/admin/personal.service';
 import unidadService from '../../../services/admin/unidad.service';
@@ -14,6 +15,7 @@ import reportesService from '../../../services/admin/reportes.service';
 import toast from 'react-hot-toast';
 import useAuthStore from '../../../store/authStore';
 import IconoEntidad, { BadgeTipoAlerta, BadgeIcono } from '../../../components/ui/IconoEntidad';
+import authService from '../../../services/auth.service';
 
 // Mapeo de roles/tipos a entidades
 const rolToEntidad = {
@@ -33,6 +35,10 @@ const GeneradorReporte = () => {
   const { tipo } = useParams();
   const { user } = useAuthStore();
   
+  // Obtener filtros según rol
+  const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
+  const rolPersonalPermitido = authService.getRolPersonalPermitido();
+  
   const [cargando, setCargando] = useState(true);
   const [datos, setDatos] = useState([]);
   const [datosFiltrados, setDatosFiltrados] = useState([]);
@@ -40,7 +46,7 @@ const GeneradorReporte = () => {
   const [filtros, setFiltros] = useState({
     fechaInicio: '',
     fechaFin: '',
-    tipo: 'todos',
+    tipo: tipoAlertaPermitido || 'todos',
     estado: 'todos',
     zona: 'todas',
     busqueda: ''
@@ -65,7 +71,7 @@ const GeneradorReporte = () => {
         { key: 'creado_en', label: 'Fecha Registro' }
       ],
       filtrosDisponibles: [
-        { tipo: 'rol', opciones: ['policia', 'ambulancia', 'admin', 'superadmin'] },
+        { tipo: 'rol', opciones: rolPersonalPermitido ? [rolPersonalPermitido] : ['policia', 'ambulancia', 'admin', 'superadmin'] },
         { tipo: 'estado', opciones: ['activo', 'inactivo'] }
       ],
       metricas: ['Total', 'Activos', 'Inactivos', 'Disponibles', 'Ocupados']
@@ -108,7 +114,7 @@ const GeneradorReporte = () => {
         { key: 'motivo', label: 'Motivo Cierre' }
       ],
       filtrosDisponibles: [
-        { tipo: 'tipo', opciones: ['panico', 'medica'] },
+        { tipo: 'tipo', opciones: tipoAlertaPermitido ? [tipoAlertaPermitido] : ['panico', 'medica'] },
         { tipo: 'estado', opciones: ['activa', 'asignada', 'atendiendo', 'cerrada', 'expirada'] }
       ],
       metricas: ['Total', 'Activas', 'En Proceso', 'Cerradas', 'Expiradas', 'Tiempo Promedio']
@@ -133,6 +139,14 @@ const GeneradorReporte = () => {
       
       if (filtros.fechaInicio) params.desde = filtros.fechaInicio;
       if (filtros.fechaFin) params.hasta = filtros.fechaFin;
+      
+      // Aplicar filtros según rol
+      if (tipo === 'personal' && rolPersonalPermitido) {
+        params.rol = rolPersonalPermitido;
+      }
+      if (tipo === 'alertas' && tipoAlertaPermitido) {
+        params.tipo = tipoAlertaPermitido;
+      }
       
       if (tipo === 'personal') {
         const res = await personalService.listarPersonal({ limite: 1000, ...params });
@@ -408,6 +422,8 @@ const GeneradorReporte = () => {
             </div>
             <p className="text-sm text-gray-500 mt-1">
               {datosFiltrados.length} registros encontrados
+              {tipo === 'personal' && rolPersonalPermitido && ` (${rolPersonalPermitido === 'policia' ? 'Solo Policía' : 'Solo Ambulancia'})`}
+              {tipo === 'alertas' && tipoAlertaPermitido && ` (${tipoAlertaPermitido === 'panico' ? 'Solo Pánico' : 'Solo Médicas'})`}
             </p>
           </div>
         </div>
@@ -483,7 +499,8 @@ const GeneradorReporte = () => {
             <select
               value={filtros.tipo}
               onChange={(e) => setFiltros(prev => ({ ...prev, tipo: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
+              disabled={(tipo === 'personal' && rolPersonalPermitido) || (tipo === 'alertas' && tipoAlertaPermitido)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white disabled:bg-gray-100"
             >
               <option value="todos">Todos</option>
               {info.filtrosDisponibles[0]?.opciones.map(op => (
@@ -603,7 +620,6 @@ const GeneradorReporte = () => {
                     {info.campos.map(campo => {
                       let valor = renderValorCelda(item, campo);
                       
-                      // Renderizado especial para ciertos campos
                       if (campo.key === 'rol' && tipo === 'personal') {
                         return (
                           <td key={campo.key} className="px-4 py-3">

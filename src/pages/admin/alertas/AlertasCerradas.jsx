@@ -1,3 +1,4 @@
+// src/pages/admin/alertas/AlertasCerradas.jsx
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -8,6 +9,7 @@ import alertasPanelService from '../../../services/admin/alertasPanel.service';
 import Loader from '../../../components/common/Loader';
 import { BadgeTipoAlerta, BotonMapa, ModalMapa } from '../../../components/ui/IconoEntidad';
 import toast from 'react-hot-toast';
+import authService from '../../../services/auth.service';
 
 // Función para normalizar texto
 const normalizarTexto = (texto) => {
@@ -39,7 +41,6 @@ const formatearNombre = (nombre) => {
     .join(' ');
 };
 
-// Función para calcular tiempo de atención en minutos
 const calcularTiempoAtencionMinutos = (creacion, cierre) => {
   if (!creacion || !cierre) return null;
   return Math.round((new Date(cierre) - new Date(creacion)) / 60000);
@@ -64,7 +65,9 @@ const AlertasCerradas = () => {
   const [tiempoMinimo, setTiempoMinimo] = useState('');
   const [tiempoMaximo, setTiempoMaximo] = useState('');
   
-  // Estado para el modal del mapa
+  // Obtener tipo de alerta permitido según rol
+  const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
+  
   const [mapaModal, setMapaModal] = useState({
     abierto: false,
     lat: null,
@@ -93,7 +96,12 @@ const AlertasCerradas = () => {
   const cargarAlertas = async () => {
     try {
       setLoading(true);
-      const response = await alertasPanelService.obtenerCerradas({ limite: 1000 });
+      const params = {};
+      if (tipoAlertaPermitido) {
+        params.tipo = tipoAlertaPermitido;
+      }
+      
+      const response = await alertasPanelService.obtenerCerradas({ limite: 1000, ...params });
 
       if (response.success) {
         const alertasFormateadas = (response.data || []).map(alerta => ({
@@ -121,7 +129,6 @@ const AlertasCerradas = () => {
   const aplicarFiltrosLocal = (datos = alertasOriginal) => {
     let datosFiltrados = datos;
 
-    // Filtro por rango de fechas
     if (filtros.desde && filtros.hasta) {
       datosFiltrados = datosFiltrados.filter(item => {
         const fechaCierre = new Date(item.fecha_cierre);
@@ -147,12 +154,10 @@ const AlertasCerradas = () => {
       });
     }
 
-    // Filtro por tipo de alerta
     if (tipoFiltro !== 'todos') {
       datosFiltrados = datosFiltrados.filter(item => item.tipo === tipoFiltro);
     }
 
-    // Filtro por búsqueda (nombre de ciudadano)
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase().trim();
       datosFiltrados = datosFiltrados.filter(item => 
@@ -161,7 +166,6 @@ const AlertasCerradas = () => {
       );
     }
 
-    // Filtro por tiempo de atención (minutos)
     if (tiempoMinimo) {
       datosFiltrados = datosFiltrados.filter(item => 
         item.tiempoAtencionMinutos !== null && 
@@ -216,7 +220,6 @@ const AlertasCerradas = () => {
     }
   }, [filtros.desde, filtros.hasta, filtros.pagina, searchTerm, tipoFiltro, tiempoMinimo, tiempoMaximo]);
 
-  // Función para abrir modal del mapa
   const abrirMapaModal = (e, alerta) => {
     e.stopPropagation();
     setMapaModal({
@@ -229,7 +232,6 @@ const AlertasCerradas = () => {
     });
   };
 
-  // Función para cerrar modal
   const cerrarMapaModal = () => {
     setMapaModal({
       abierto: false,
@@ -282,6 +284,7 @@ const AlertasCerradas = () => {
               <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Alertas Cerradas</h1>
               <p className="text-sm text-gray-500 mt-1">
                 {paginacion.total} {paginacion.total === 1 ? 'alerta atendida' : 'alertas atendidas'}
+                {tipoAlertaPermitido && ` (${tipoAlertaPermitido === 'panico' ? 'Solo Pánico' : 'Solo Médicas'})`}
               </p>
             </div>
           </div>
@@ -297,7 +300,6 @@ const AlertasCerradas = () => {
 
         {/* Buscador y Filtros Mejorados */}
         <div className="bg-white rounded-xl shadow-lg p-5 mb-6 border border-gray-100">
-          {/* Buscador principal */}
           <div className="relative mb-5">
             <Search size={18} className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <input
@@ -334,6 +336,7 @@ const AlertasCerradas = () => {
                 value={tipoFiltro}
                 onChange={(e) => setTipoFiltro(e.target.value)}
                 className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all text-sm"
+                disabled={!!tipoAlertaPermitido}
               >
                 <option value="todos">Todos</option>
                 <option value="panico">Pánico</option>
@@ -416,6 +419,7 @@ const AlertasCerradas = () => {
                 {tieneFiltrosActivos()
                   ? 'No se encontraron alertas con los filtros seleccionados'
                   : 'Las alertas atendidas aparecerán aquí'}
+                {tipoAlertaPermitido && ` (Filtro: ${tipoAlertaPermitido === 'panico' ? 'Solo Pánico' : 'Solo Médicas'})`}
               </p>
             </div>
           ) : (

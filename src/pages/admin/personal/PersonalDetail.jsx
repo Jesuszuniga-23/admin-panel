@@ -1,20 +1,39 @@
+// src/pages/admin/personal/PersonalDetail.jsx
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   User, Mail, Phone, Shield, Hash, Calendar, Clock,
   ChevronLeft, Edit, Power, Trash2, Smartphone,
-  CheckCircle, XCircle, AlertCircle, Loader
+  CheckCircle, XCircle, AlertCircle, Loader, Lock
 } from 'lucide-react';
 import personalService from '../../../services/admin/personal.service';
 import toast from 'react-hot-toast';
 import IconoEntidad, { BadgeIcono } from '../../../components/ui/IconoEntidad';
+import authService from '../../../services/auth.service';
+import useAuthStore from '../../../store/authStore';
 
 // Mapeo de roles a entidades para iconos consistentes
 const rolToEntidad = {
   admin: 'ADMIN',
   superadmin: 'SUPERADMIN',
   policia: 'POLICIA',
-  ambulancia: 'PERSONAL_AMBULANCIA'
+  ambulancia: 'PERSONAL_AMBULANCIA',
+  operador_tecnico: 'OPERADOR_TECNICO',
+  operador_policial: 'OPERADOR_POLICIAL',
+  operador_medico: 'OPERADOR_MEDICO',
+  operador_general: 'OPERADOR_GENERAL'
+};
+
+// Texto legible para roles
+const rolTexto = {
+  admin: 'Administrador',
+  superadmin: 'Super Administrador',
+  policia: 'Policía',
+  ambulancia: 'Ambulancia',
+  operador_tecnico: 'Operador Técnico',
+  operador_policial: 'Operador Policial',
+  operador_medico: 'Operador Médico',
+  operador_general: 'Operador General'
 };
 
 const getNombreCompleto = (personal) => {
@@ -26,9 +45,19 @@ const getNombreCompleto = (personal) => {
 const PersonalDetail = () => {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { user: currentUser } = useAuthStore();
   const [personal, setPersonal] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Obtener permisos según rol del usuario actual
+  const rolPersonal = personal?.rol;
+  const puedeEditar = authService.puedeModificarPersonal(rolPersonal);
+  const puedeEliminar = authService.puedeModificarPersonal(rolPersonal);
+  const puedeCambiarEstado = authService.puedeModificarPersonal(rolPersonal);
+  
+  // Verificar si es el propio usuario (no puede eliminarse a sí mismo)
+  const esPropioUsuario = currentUser?.id === parseInt(id);
 
   useEffect(() => {
     cargarPersonal();
@@ -49,6 +78,11 @@ const PersonalDetail = () => {
   };
 
   const handleToggleActivo = async () => {
+    if (!puedeCambiarEstado) {
+      toast.error('No tienes permisos para modificar este personal');
+      return;
+    }
+    
     const nuevoEstado = !personal.activo;
     const accion = nuevoEstado ? 'activar' : 'desactivar';
     
@@ -67,7 +101,17 @@ const PersonalDetail = () => {
   };
 
   const handleEliminar = async () => {
-    if (!window.confirm(`¿Estás seguro de eliminar a ${getNombreCompleto(personal)}?`)) {
+    if (!puedeEliminar) {
+      toast.error('No tienes permisos para eliminar este personal');
+      return;
+    }
+    
+    if (esPropioUsuario) {
+      toast.error('No puedes eliminarte a ti mismo');
+      return;
+    }
+    
+    if (!window.confirm(`¿Estás seguro de eliminar a ${getNombreCompleto(personal)}? Esta acción no se puede deshacer.`)) {
       return;
     }
 
@@ -79,6 +123,14 @@ const PersonalDetail = () => {
       console.error("Error eliminando:", error);
       toast.error(error.error || 'Error al eliminar personal');
     }
+  };
+
+  const handleEditar = () => {
+    if (!puedeEditar) {
+      toast.error('No tienes permisos para editar este personal');
+      return;
+    }
+    navigate(`/admin/personal/editar/${id}`);
   };
 
   const formatDate = (dateString) => {
@@ -165,7 +217,11 @@ const PersonalDetail = () => {
           personal.rol === 'policia' ? 'from-blue-600 to-blue-700' :
           personal.rol === 'ambulancia' ? 'from-green-600 to-emerald-700' :
           personal.rol === 'admin' ? 'from-purple-600 to-indigo-700' :
-          'from-red-600 to-rose-700'
+          personal.rol === 'superadmin' ? 'from-red-600 to-rose-700' :
+          personal.rol === 'operador_tecnico' ? 'from-cyan-600 to-teal-700' :
+          personal.rol === 'operador_policial' ? 'from-indigo-600 to-blue-700' :
+          personal.rol === 'operador_medico' ? 'from-emerald-600 to-green-700' :
+          'from-gray-600 to-gray-700'
         } px-6 py-8`}>
           <div className="flex items-center gap-6">
             <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-lg">
@@ -177,6 +233,12 @@ const PersonalDetail = () => {
             </div>
             <div>
               <h2 className="text-2xl font-bold text-white">{getNombreCompleto(personal)}</h2>
+              <BadgeIcono 
+                entidad={rolToEntidad[personal.rol] || 'ADMIN'}
+                texto={rolTexto[personal.rol] || personal.rol}
+                size={12}
+                className="mt-2 bg-white/20 text-white"
+              />
             </div>
           </div>
         </div>
@@ -221,10 +283,7 @@ const PersonalDetail = () => {
               value={
                 <BadgeIcono 
                   entidad={rolToEntidad[personal.rol] || 'ADMIN'}
-                  texto={personal.rol === 'policia' ? 'Policía' :
-                         personal.rol === 'ambulancia' ? 'Ambulancia' :
-                         personal.rol === 'admin' ? 'Admin' :
-                         personal.rol === 'superadmin' ? 'Superadmin' : personal.rol}
+                  texto={rolTexto[personal.rol] || personal.rol}
                   size={12}
                 />
               } 
@@ -299,33 +358,46 @@ const PersonalDetail = () => {
 
         {/* Botones de acción */}
         <div className="border-t px-6 py-4 bg-gray-50 flex justify-end gap-3">
-          <button
-            onClick={handleToggleActivo}
-            className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${
-              personal.activo 
-                ? 'bg-yellow-600 text-white hover:bg-yellow-700' 
-                : 'bg-green-600 text-white hover:bg-green-700'
-            }`}
-          >
-            <Power size={18} />
-            {personal.activo ? 'Desactivar' : 'Activar'}
-          </button>
+          {puedeCambiarEstado && (
+            <button
+              onClick={handleToggleActivo}
+              className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${
+                personal.activo 
+                  ? 'bg-yellow-600 text-white hover:bg-yellow-700' 
+                  : 'bg-green-600 text-white hover:bg-green-700'
+              }`}
+            >
+              <Power size={18} />
+              {personal.activo ? 'Desactivar' : 'Activar'}
+            </button>
+          )}
           
-          <button
-            onClick={() => navigate(`/admin/personal/editar/${id}`)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-          >
-            <Edit size={18} />
-            Editar
-          </button>
+          {puedeEditar && (
+            <button
+              onClick={handleEditar}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+            >
+              <Edit size={18} />
+              Editar
+            </button>
+          )}
           
-          <button
-            onClick={handleEliminar}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"
-          >
-            <Trash2 size={18} />
-            Eliminar
-          </button>
+          {puedeEliminar && !esPropioUsuario && (
+            <button
+              onClick={handleEliminar}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"
+            >
+              <Trash2 size={18} />
+              Eliminar
+            </button>
+          )}
+          
+          {esPropioUsuario && (
+            <div className="flex items-center gap-2 text-gray-400 text-sm">
+              <Lock size={14} />
+              No puedes eliminarte a ti mismo
+            </div>
+          )}
         </div>
       </div>
     </div>
