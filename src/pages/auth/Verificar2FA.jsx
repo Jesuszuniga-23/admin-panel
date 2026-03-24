@@ -55,46 +55,73 @@ const Verificar2FA = () => {
     e.preventDefault();
     
     if (!codigo || codigo.length !== 6) {
-      toast.error('Ingresa el código de 6 dígitos');
-      return;
+        toast.error('Ingresa el código de 6 dígitos');
+        return;
     }
     
     if (!pendingToken) {
-      toast.error('Sesión expirada. Inicia sesión nuevamente.');
-      navigate('/login');
-      return;
+        toast.error('Sesión expirada. Inicia sesión nuevamente.');
+        navigate('/login');
+        return;
     }
     
     setLoading(true);
     setError('');
     
     try {
-      const result = await authService.verificar2FA(codigo, pendingToken);
-      
-      if (result.success) {
-        toast.success('Verificación exitosa');
+        const result = await authService.verificar2FA(codigo, pendingToken);
         
-        const { setUser } = require('../../store/authStore').default;
-        setUser(result.usuario);
+        // 🔥 LOG PARA VER QUÉ RECIBE EL FRONTEND
+        console.log('=== RESPUESTA COMPLETA DEL BACKEND ===');
+        console.log('result:', result);
+        console.log('result.success:', result?.success);
+        console.log('result.usuario:', result?.usuario);
+        console.log('=====================================');
         
-        localStorage.removeItem('pending_2fa_token');
-        
-        if (result.usuario.rol === 'superadmin') {
-          navigate('/superadmin/dashboard');
+        if (result && result.success === true) {
+            toast.success('Verificación exitosa');
+            
+            const { setUser } = require('../../store/authStore').default;
+            setUser(result.usuario);
+            
+            localStorage.removeItem('pending_2fa_token');
+            
+            // Redirigir según rol
+            const rolesAdmin = ['admin', 'superadmin', 'operador_tecnico', 'operador_policial', 'operador_medico', 'operador_general'];
+            if (rolesAdmin.includes(result.usuario?.rol)) {
+                navigate('/admin/dashboard');
+            } else {
+                navigate('/mobile');
+            }
         } else {
-          navigate('/admin/dashboard');
+            // Si la respuesta no tiene success: true
+            const errorMsg = result?.error || result?.message || 'Código inválido';
+            setError(errorMsg);
+            toast.error(errorMsg);
         }
-      } else {
-        setError(result.error || 'Código inválido');
-        toast.error(result.error || 'Código inválido');
-      }
     } catch (error) {
-      setError(error.error || 'Error al verificar código');
-      toast.error(error.error || 'Error al verificar código');
+        console.error('=== ERROR EN VERIFICACIÓN ===');
+        console.error('error:', error);
+        console.error('error.response:', error.response);
+        console.error('error.response?.data:', error.response?.data);
+        console.error('============================');
+        
+        // Intentar extraer mensaje de error de diferentes lugares
+        let errorMsg = 'Error al verificar código';
+        if (error.response?.data?.error) {
+            errorMsg = error.response.data.error;
+        } else if (error.response?.data?.message) {
+            errorMsg = error.response.data.message;
+        } else if (error.error) {
+            errorMsg = error.error;
+        }
+        
+        setError(errorMsg);
+        toast.error(errorMsg);
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
-  };
+};
 
   const handleReenviar = async () => {
     if (!pendingToken) {
