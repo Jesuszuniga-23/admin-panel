@@ -5,8 +5,8 @@ import Header from './Header';
 import { Toaster } from 'react-hot-toast';
 import useAuthStore from '../../store/authStore';
 import RateLimitBanner from "../common/RateLimitBanner";
-import SessionMonitor from '../common/SessionMonitor';
-import SecurityGuard from '../common/SecurityGuard';
+// import SessionMonitor from '../common/SessionMonitor';  // ← COMENTAR TEMPORALMENTE
+// import SecurityGuard from '../common/SecurityGuard';    // ← COMENTAR TEMPORALMENTE
 
 const AdminLayout = () => {
   const { user, isLoading } = useAuthStore();
@@ -28,8 +28,8 @@ const AdminLayout = () => {
 
   return (
     <div className="flex h-screen bg-gray-100">
-      <SecurityGuard />
-      <SessionMonitor />
+      {/* <SecurityGuard /> */}  {/* ← COMENTADO */}
+      {/* <SessionMonitor /> */}   {/* ← COMENTADO */}
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
