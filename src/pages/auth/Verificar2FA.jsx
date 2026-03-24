@@ -4,10 +4,12 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Shield, Mail, RefreshCw, CheckCircle, AlertCircle, ArrowLeft, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import authService from '../../services/auth.service';
+import useAuthStore from '../../store/authStore';  // ← AGREGAR ESTA LÍNEA
 
 const Verificar2FA = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { setUser } = useAuthStore();  // ← OBTENER setUser DEL STORE
   const [codigo, setCodigo] = useState('');
   const [loading, setLoading] = useState(false);
   const [reenviando, setReenviando] = useState(false);
@@ -55,73 +57,70 @@ const Verificar2FA = () => {
     e.preventDefault();
     
     if (!codigo || codigo.length !== 6) {
-        toast.error('Ingresa el código de 6 dígitos');
-        return;
+      toast.error('Ingresa el código de 6 dígitos');
+      return;
     }
     
     if (!pendingToken) {
-        toast.error('Sesión expirada. Inicia sesión nuevamente.');
-        navigate('/login');
-        return;
+      toast.error('Sesión expirada. Inicia sesión nuevamente.');
+      navigate('/login');
+      return;
     }
     
     setLoading(true);
     setError('');
     
     try {
-        const result = await authService.verificar2FA(codigo, pendingToken);
+      const result = await authService.verificar2FA(codigo, pendingToken);
+      
+      console.log('=== RESPUESTA COMPLETA DEL BACKEND ===');
+      console.log('result:', result);
+      console.log('result.success:', result?.success);
+      console.log('result.usuario:', result?.usuario);
+      console.log('=====================================');
+      
+      if (result && result.success === true) {
+        toast.success('Verificación exitosa');
         
-        // 🔥 LOG PARA VER QUÉ RECIBE EL FRONTEND
-        console.log('=== RESPUESTA COMPLETA DEL BACKEND ===');
-        console.log('result:', result);
-        console.log('result.success:', result?.success);
-        console.log('result.usuario:', result?.usuario);
-        console.log('=====================================');
+        // ✅ Usar setUser del store (importado al inicio)
+        setUser(result.usuario);
         
-        if (result && result.success === true) {
-            toast.success('Verificación exitosa');
-            
-            const { setUser } = require('../../store/authStore').default;
-            setUser(result.usuario);
-            
-            localStorage.removeItem('pending_2fa_token');
-            
-            // Redirigir según rol
-            const rolesAdmin = ['admin', 'superadmin', 'operador_tecnico', 'operador_policial', 'operador_medico', 'operador_general'];
-            if (rolesAdmin.includes(result.usuario?.rol)) {
-                navigate('/admin/dashboard');
-            } else {
-                navigate('/mobile');
-            }
+        localStorage.removeItem('pending_2fa_token');
+        
+        // Redirigir según rol
+        const rolesAdmin = ['admin', 'superadmin', 'operador_tecnico', 'operador_policial', 'operador_medico', 'operador_general'];
+        if (rolesAdmin.includes(result.usuario?.rol)) {
+          navigate('/admin/dashboard');
         } else {
-            // Si la respuesta no tiene success: true
-            const errorMsg = result?.error || result?.message || 'Código inválido';
-            setError(errorMsg);
-            toast.error(errorMsg);
+          navigate('/mobile');
         }
-    } catch (error) {
-        console.error('=== ERROR EN VERIFICACIÓN ===');
-        console.error('error:', error);
-        console.error('error.response:', error.response);
-        console.error('error.response?.data:', error.response?.data);
-        console.error('============================');
-        
-        // Intentar extraer mensaje de error de diferentes lugares
-        let errorMsg = 'Error al verificar código';
-        if (error.response?.data?.error) {
-            errorMsg = error.response.data.error;
-        } else if (error.response?.data?.message) {
-            errorMsg = error.response.data.message;
-        } else if (error.error) {
-            errorMsg = error.error;
-        }
-        
+      } else {
+        const errorMsg = result?.error || result?.message || 'Código inválido';
         setError(errorMsg);
         toast.error(errorMsg);
+      }
+    } catch (error) {
+      console.error('=== ERROR EN VERIFICACIÓN ===');
+      console.error('error:', error);
+      console.error('error.response:', error.response);
+      console.error('error.response?.data:', error.response?.data);
+      console.error('============================');
+      
+      let errorMsg = 'Error al verificar código';
+      if (error.response?.data?.error) {
+        errorMsg = error.response.data.error;
+      } else if (error.response?.data?.message) {
+        errorMsg = error.response.data.message;
+      } else if (error.error) {
+        errorMsg = error.error;
+      }
+      
+      setError(errorMsg);
+      toast.error(errorMsg);
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
-};
+  };
 
   const handleReenviar = async () => {
     if (!pendingToken) {
