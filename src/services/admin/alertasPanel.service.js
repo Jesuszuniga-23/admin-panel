@@ -50,6 +50,21 @@ class AlertasPanelService {
     const response = await axiosInstance.post(ENDPOINTS.ALERTAS_PANEL.VERIFICAR_OTP(id), { codigo });
     return response.data;
   }
+
+  // =====================================================
+  // ALIAS PARA COMPATIBILIDAD CON DASHBOARD.SERVICE.JS
+  // =====================================================
+  async obtenerActivas(params = {}) {
+    return this.listarActivas(params);
+  }
+
+  async obtenerEnProceso(params = {}) {
+    return this.listarEnProceso(params);
+  }
+
+  async obtenerCerradas(params = {}) {
+    return this.listarCerradas(params);
+  }
 }
 
 export default new AlertasPanelService();
