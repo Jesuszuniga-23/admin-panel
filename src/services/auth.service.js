@@ -24,11 +24,11 @@ class AuthService {
     }
   }
 
- async verificar2FA(codigo, pendingToken) {
+ async verificar2FA(codigo) {
   try {
     const response = await axiosInstance.post(ENDPOINTS.AUTH.VERIFY_2FA, {
-      codigo,
-      pending_token: pendingToken  // ✅ ENVIAR EN BODY
+      codigo
+      // pending_token NO se envía, está en cookie
     });
     return response.data;
   } catch (error) {
@@ -37,6 +37,17 @@ class AuthService {
   }
 }
 
+async reenviarCodigo2FA() {
+  try {
+    const response = await axiosInstance.post(ENDPOINTS.AUTH.RESEND_2FA, {
+      // No enviamos pending_token, está en cookie
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error reenviando código:", error);
+    throw error.response?.data || { error: 'Error al reenviar código' };
+  }
+}
 async reenviarCodigo2FA(pendingToken) {
   try {
     const response = await axiosInstance.post(ENDPOINTS.AUTH.RESEND_2FA, {

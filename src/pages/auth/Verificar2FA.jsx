@@ -12,31 +12,19 @@ const Verificar2FA = () => {
   const [loading, setLoading] = useState(false);
   const [reenviando, setReenviando] = useState(false);
   const [email, setEmail] = useState('');
-  const [pendingToken, setPendingToken] = useState('');
   const [tiempoEspera, setTiempoEspera] = useState(0);
   const [error, setError] = useState('');
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const emailParam = params.get('email');
-    const tokenParam = params.get('token');
 
-    console.log('📧 Parámetros URL:', { emailParam, tokenParam });
+    console.log('📧 Email de verificación:', emailParam);
 
     if (emailParam) {
       setEmail(decodeURIComponent(emailParam));
     } else {
       setError('No se encontró el email de verificación');
-      setTimeout(() => navigate('/login'), 3000);
-    }
-
-    if (tokenParam) {
-      const token = decodeURIComponent(tokenParam);
-      setPendingToken(token);
-      console.log('✅ Token pendiente guardado:', token.substring(0, 20) + '...');
-    } else {
-      console.warn('⚠️ No hay token pendiente en la URL');
-      setError('No hay sesión de verificación activa');
       setTimeout(() => navigate('/login'), 3000);
     }
   }, [location, navigate]);
@@ -55,25 +43,19 @@ const Verificar2FA = () => {
       return;
     }
 
-    if (!pendingToken) {
-      toast.error('No hay sesión de verificación activa');
-      navigate('/login');
-      return;
-    }
-
     setLoading(true);
     try {
-      console.log('🔐 Verificando código 2FA con token:', pendingToken.substring(0, 20) + '...');
-      const response = await authService.verificar2FA(codigo, pendingToken);
+      console.log('🔐 Verificando código 2FA...');
+      const response = await authService.verificar2FA(codigo);
       
       if (response.success) {
         toast.success('Verificación exitosa');
         
         const rolesAdmin = ['superadmin', 'admin', 'operador_tecnico', 'operador_policial', 'operador_medico', 'operador_general'];
         if (rolesAdmin.includes(response.usuario?.rol)) {
-          navigate('/admin/dashboard');
+          window.location.href = '/admin/dashboard';
         } else {
-          navigate('/mobile');
+          window.location.href = '/mobile';
         }
       } else {
         toast.error(response.error || 'Código incorrecto');
@@ -90,16 +72,10 @@ const Verificar2FA = () => {
   const handleReenviar = async () => {
     if (tiempoEspera > 0) return;
 
-    if (!pendingToken) {
-      toast.error('No hay sesión de verificación activa');
-      navigate('/login');
-      return;
-    }
-
     setReenviando(true);
     try {
-      console.log('📧 Reenviando código 2FA con token:', pendingToken.substring(0, 20) + '...');
-      const response = await authService.reenviarCodigo2FA(pendingToken);
+      console.log('📧 Reenviando código 2FA...');
+      const response = await authService.reenviarCodigo2FA();
       
       if (response.success) {
         toast.success(response.message || 'Código reenviado correctamente');
