@@ -24,12 +24,12 @@ class AuthService {
     }
   }
 
-  // ✅ MODIFICADO: Ya no recibe pendingToken, el backend lo obtiene de cookie
-  async verificar2FA(codigo) {
+  // ✅ CORREGIDO: Recibe pendingToken y lo envía al backend
+  async verificar2FA(codigo, pendingToken) {
     try {
       const response = await axiosInstance.post(ENDPOINTS.AUTH.VERIFY_2FA, {
-        codigo
-        // pending_token ya no se envía, está en cookie
+        codigo,
+        pending_token: pendingToken
       });
       
       return response.data;
@@ -39,11 +39,11 @@ class AuthService {
     }
   }
 
-  // ✅ MODIFICADO: Ya no recibe pendingToken
-  async reenviarCodigo2FA() {
+  // ✅ CORREGIDO: Recibe pendingToken y lo envía al backend
+  async reenviarCodigo2FA(pendingToken) {
     try {
       const response = await axiosInstance.post(ENDPOINTS.AUTH.RESEND_2FA, {
-        // No enviamos pending_token, está en cookie
+        pending_token: pendingToken
       });
       
       return response.data;
