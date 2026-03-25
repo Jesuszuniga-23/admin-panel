@@ -1,7 +1,7 @@
 // src/pages/auth/Verificar2FA.jsx
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Shield, ArrowLeft, Mail, Clock, Loader, CheckCircle, XCircle } from 'lucide-react';
+import { Shield, ArrowLeft, Mail, Loader, CheckCircle, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import authService from '../../services/auth.service';
 
@@ -17,7 +17,6 @@ const Verificar2FA = () => {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    // Obtener parámetros de la URL
     const params = new URLSearchParams(location.search);
     const emailParam = params.get('email');
     const tokenParam = params.get('token');
@@ -32,8 +31,9 @@ const Verificar2FA = () => {
     }
 
     if (tokenParam) {
-      setPendingToken(decodeURIComponent(tokenParam));
-      console.log('✅ Token pendiente obtenido de URL');
+      const token = decodeURIComponent(tokenParam);
+      setPendingToken(token);
+      console.log('✅ Token pendiente guardado:', token.substring(0, 20) + '...');
     } else {
       console.warn('⚠️ No hay token pendiente en la URL');
       setError('No hay sesión de verificación activa');
@@ -41,7 +41,6 @@ const Verificar2FA = () => {
     }
   }, [location, navigate]);
 
-  // Temporizador para reenvío
   useEffect(() => {
     if (tiempoEspera > 0) {
       const timer = setTimeout(() => setTiempoEspera(tiempoEspera - 1), 1000);
@@ -64,12 +63,12 @@ const Verificar2FA = () => {
 
     setLoading(true);
     try {
-      console.log('🔐 Verificando código 2FA con token:', pendingToken);
+      console.log('🔐 Verificando código 2FA con token:', pendingToken.substring(0, 20) + '...');
       const response = await authService.verificar2FA(codigo, pendingToken);
       
       if (response.success) {
         toast.success('Verificación exitosa');
-        // Redirigir según rol
+        
         const rolesAdmin = ['superadmin', 'admin', 'operador_tecnico', 'operador_policial', 'operador_medico', 'operador_general'];
         if (rolesAdmin.includes(response.usuario?.rol)) {
           navigate('/admin/dashboard');
@@ -99,7 +98,7 @@ const Verificar2FA = () => {
 
     setReenviando(true);
     try {
-      console.log('📧 Reenviando código 2FA con token:', pendingToken);
+      console.log('📧 Reenviando código 2FA con token:', pendingToken.substring(0, 20) + '...');
       const response = await authService.reenviarCodigo2FA(pendingToken);
       
       if (response.success) {

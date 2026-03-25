@@ -24,34 +24,31 @@ class AuthService {
     }
   }
 
-  // ✅ CORREGIDO: Recibe pendingToken y lo envía al backend
-  async verificar2FA(codigo, pendingToken) {
-    try {
-      const response = await axiosInstance.post(ENDPOINTS.AUTH.VERIFY_2FA, {
-        codigo,
-        pending_token: pendingToken
-      });
-      
-      return response.data;
-    } catch (error) {
-      console.error("Error verificando 2FA:", error);
-      throw error.response?.data || { error: 'Error al verificar código' };
-    }
+ async verificar2FA(codigo, pendingToken) {
+  try {
+    const response = await axiosInstance.post(ENDPOINTS.AUTH.VERIFY_2FA, {
+      codigo,
+      pending_token: pendingToken  // ✅ ENVIAR EN BODY
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error verificando 2FA:", error);
+    throw error.response?.data || { error: 'Error al verificar código' };
   }
+}
 
-  // ✅ CORREGIDO: Recibe pendingToken y lo envía al backend
-  async reenviarCodigo2FA(pendingToken) {
-    try {
-      const response = await axiosInstance.post(ENDPOINTS.AUTH.RESEND_2FA, {
-        pending_token: pendingToken
-      });
-      
-      return response.data;
-    } catch (error) {
-      console.error("Error reenviando código:", error);
-      throw error.response?.data || { error: 'Error al reenviar código' };
-    }
+async reenviarCodigo2FA(pendingToken) {
+  try {
+    const response = await axiosInstance.post(ENDPOINTS.AUTH.RESEND_2FA, {
+      pending_token: pendingToken  // ✅ ENVIAR EN BODY
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error reenviando código:", error);
+    throw error.response?.data || { error: 'Error al reenviar código' };
   }
+}
+
 
   async obtenerEstadoSesion() {
     try {
