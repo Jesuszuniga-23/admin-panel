@@ -5,9 +5,10 @@ import {
   AlertTriangle, Clock, MapPin, User, Calendar, ChevronLeft,
   Loader, AlertCircle, CheckCircle, XCircle, FileText,
   Shield, Phone, Mail, MessageSquare, X, MapPinned,
-  PhoneCall, Mail as MailIcon, UserCircle
+  PhoneCall, Mail as MailIcon, UserCircle, Activity
 } from 'lucide-react';
-import alertasService from '../../../services/admin/alertas.service';
+// ✅ IMPORTACIÓN CORREGIDA - Usar alertasPanelService
+import alertasPanelService from '../../../services/admin/alertasPanel.service';
 import toast from 'react-hot-toast';
 import IconoEntidad, { BadgeTipoAlerta, ModalMapa } from '../../../components/ui/IconoEntidad';
 import BotonUbicacion from '../../../components/ui/BotonUbicacion';
@@ -18,13 +19,12 @@ const normalizarTexto = (texto) => {
   if (!texto) return '';
   
   const reemplazos = [
-    { de: '¡', para: 'í' }, { de: '£', para: 'ú' }, { de: '¤', para: 'ñ' },
-    { de: '€', para: 'e' }, { de: '‚', para: 'é' }, { de: '¢', para: 'o' },
     { de: 'Ã¡', para: 'á' }, { de: 'Ã©', para: 'é' }, { de: 'Ã­', para: 'í' },
-    { de: 'Ã³', para: 'ó' }, { de: 'Ãº', para: 'ú' }, { de: 'Ã�', para: 'Á' },
-    { de: 'Ã‰', para: 'É' }, { de: 'Ã�', para: 'Í' }, { de: 'Ã“', para: 'Ó' },
-    { de: 'Ãš', para: 'Ú' }, { de: 'Ã±', para: 'ñ' }, { de: 'Ã‘', para: 'Ñ' },
-    { de: 'Â¿', para: '¿' }, { de: 'Â¡', para: '¡' }
+    { de: 'Ã³', para: 'ó' }, { de: 'Ãº', para: 'ú' }, { de: 'Ã±', para: 'ñ' },
+    { de: 'Ã�', para: 'Á' }, { de: 'Ã‰', para: 'É' }, { de: 'Ã�', para: 'Í' },
+    { de: 'Ã“', para: 'Ó' }, { de: 'Ãš', para: 'Ú' }, { de: 'Ã‘', para: 'Ñ' },
+    { de: 'Â¿', para: '¿' }, { de: 'Â¡', para: '¡' },
+    { de: '£', para: 'ú' }, { de: '¤', para: 'ñ' }
   ];
   
   let textoNormalizado = texto;
@@ -45,6 +45,59 @@ const formatearNombre = (nombre) => {
     .join(' ');
 };
 
+const InfoCard = ({ icon: Icon, label, value, color = 'blue' }) => {
+  const colorClasses = {
+    blue: 'bg-blue-50 border-blue-100',
+    amber: 'bg-amber-50 border-amber-100',
+    green: 'bg-green-50 border-green-100',
+    purple: 'bg-purple-50 border-purple-100'
+  };
+
+  const iconColors = {
+    blue: 'text-blue-600',
+    amber: 'text-amber-600',
+    green: 'text-green-600',
+    purple: 'text-purple-600'
+  };
+
+  return (
+    <div className={`p-4 rounded-xl border ${colorClasses[color]}`}>
+      <div className="flex items-start gap-3">
+        <div className={`p-2 bg-white rounded-lg`}>
+          <Icon size={18} className={iconColors[color]} />
+        </div>
+        <div>
+          <p className="text-xs text-gray-500 uppercase tracking-wider">{label}</p>
+          <p className="text-sm font-medium text-gray-800 mt-1">{value}</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ContactCard = ({ icon: Icon, label, value, action, actionIcon: ActionIcon }) => (
+  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-200">
+    <div className="flex items-center gap-3">
+      <div className="p-2 bg-white rounded-lg">
+        <Icon size={16} className="text-gray-600" />
+      </div>
+      <div>
+        <p className="text-xs text-gray-500">{label}</p>
+        <p className="text-sm font-medium text-gray-800">{value}</p>
+      </div>
+    </div>
+    {action && ActionIcon && (
+      <button
+        onClick={action}
+        className="p-2 hover:bg-white rounded-lg transition-colors"
+        title={`Llamar a ${value}`}
+      >
+        <ActionIcon size={16} className="text-blue-600" />
+      </button>
+    )}
+  </div>
+);
+
 const AlertaDetail = () => {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -55,10 +108,8 @@ const AlertaDetail = () => {
   const [motivoCierre, setMotivoCierre] = useState('');
   const [cerrando, setCerrando] = useState(false);
   
-  // Obtener permisos según rol
   const puedeCerrarAlerta = authService.puedeGestionarAlerta(alerta?.tipo);
   
-  // Estado para modal de mapa
   const [mapaModal, setMapaModal] = useState({
     abierto: false,
     lat: null,
@@ -72,38 +123,33 @@ const AlertaDetail = () => {
     cargarAlerta();
   }, [id]);
 
+  // ✅ CORRECCIÓN: Usar alertasPanelService.obtenerDetalle()
   const cargarAlerta = async () => {
     try {
       setLoading(true);
       console.log("Cargando alerta ID:", id);
       
-      const [expiradasRes, cerradasRes] = await Promise.allSettled([
-        alertasService.obtenerExpiradas({ limite: 100 }),
-        alertasService.obtenerCerradasManual({ limite: 100 })
-      ]);
-
-      const expiradas = expiradasRes.status === 'fulfilled' ? expiradasRes.value.data || [] : [];
-      const cerradas = cerradasRes.status === 'fulfilled' ? cerradasRes.value.data || [] : [];
+      const response = await alertasPanelService.obtenerDetalle(id);
+      console.log("Respuesta del backend:", response);
       
-      const encontrada = [...expiradas, ...cerradas].find(a => a.id === parseInt(id));
-      
-      if (encontrada) {
+      if (response.success && response.data) {
         const alertaFormateada = {
-          ...encontrada,
-          ciudadano: encontrada.ciudadano ? {
-            ...encontrada.ciudadano,
-            nombre: formatearNombre(encontrada.ciudadano.nombre)
+          ...response.data,
+          ciudadano: response.data.ciudadano ? {
+            ...response.data.ciudadano,
+            nombre: formatearNombre(response.data.ciudadano.nombre)
           } : null
         };
-        console.log("Alerta encontrada:", alertaFormateada);
         setAlerta(alertaFormateada);
       } else {
         setError('Alerta no encontrada');
+        toast.error('Alerta no encontrada');
       }
-      
     } catch (error) {
-      console.error("Error cargando alerta:", error);
-      setError('Error al cargar la alerta');
+      console.error('Error cargando alerta:', error);
+      const errorMsg = error.response?.data?.error || error.message || 'Error al cargar los detalles de la alerta';
+      setError(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -122,25 +168,18 @@ const AlertaDetail = () => {
 
     setCerrando(true);
     try {
+      const { default: alertasService } = await import('../../../services/admin/alertas.service');
       const response = await alertasService.cerrarManual(id, motivoCierre);
       
       if (response.success) {
         toast.success('Alerta cerrada manualmente');
         setMostrarModalCierre(false);
         setMotivoCierre('');
-        
-        setAlerta(prev => ({
-          ...prev,
-          estado: 'cerrada',
-          cerrada_manualmente: true,
-          motivo_cierre_manual: motivoCierre
-        }));
-        
-        setTimeout(() => cargarAlerta(), 2000);
+        await cargarAlerta();
       }
     } catch (error) {
-      console.error("Error cerrando alerta:", error);
-      toast.error(error.error || 'Error al cerrar la alerta');
+      console.error('Error cerrando alerta:', error);
+      toast.error(error.response?.data?.error || 'Error al cerrar la alerta');
     } finally {
       setCerrando(false);
     }
@@ -172,6 +211,8 @@ const AlertaDetail = () => {
   const getEstadoColor = (estado) => {
     switch(estado) {
       case 'activa': return 'bg-red-100 text-red-700 border-red-200';
+      case 'asignada': return 'bg-blue-100 text-blue-700 border-blue-200';
+      case 'atendiendo': return 'bg-purple-100 text-purple-700 border-purple-200';
       case 'expirada': return 'bg-gray-100 text-gray-700 border-gray-200';
       case 'cerrada': return 'bg-green-100 text-green-700 border-green-200';
       default: return 'bg-yellow-100 text-yellow-700 border-yellow-200';
@@ -181,6 +222,8 @@ const AlertaDetail = () => {
   const getEstadoIcon = (estado) => {
     switch(estado) {
       case 'activa': return <AlertTriangle size={16} />;
+      case 'asignada': return <Shield size={16} />;
+      case 'atendiendo': return <Activity size={16} />;
       case 'expirada': return <Clock size={16} />;
       case 'cerrada': return <CheckCircle size={16} />;
       default: return <AlertCircle size={16} />;
@@ -215,10 +258,10 @@ const AlertaDetail = () => {
             <h2 className="text-2xl font-bold text-red-800 mb-2">Error</h2>
             <p className="text-red-600 mb-6">{error || 'No se encontró la alerta'}</p>
             <button
-              onClick={() => navigate('/admin/alertas/expiradas')}
+              onClick={() => navigate(-1)}
               className="px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors font-medium"
             >
-              Volver a alertas
+              Volver
             </button>
           </div>
         </div>
@@ -233,7 +276,7 @@ const AlertaDetail = () => {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => navigate('/admin/alertas/expiradas')}
+              onClick={() => navigate(-1)}
               className="p-2 hover:bg-white rounded-xl transition-colors"
               title="Volver"
             >
@@ -249,7 +292,10 @@ const AlertaDetail = () => {
             <span className={`px-4 py-2 rounded-full text-sm flex items-center gap-2 font-medium ${getEstadoColor(alerta.estado)}`}>
               {getEstadoIcon(alerta.estado)}
               {alerta.estado === 'activa' ? 'ACTIVA' : 
-               alerta.estado === 'expirada' ? 'EXPIRADA' : 'CERRADA'}
+               alerta.estado === 'asignada' ? 'ASIGNADA' :
+               alerta.estado === 'atendiendo' ? 'ATENDIENDO' :
+               alerta.estado === 'expirada' ? 'EXPIRADA' : 
+               alerta.estado === 'cerrada' ? 'CERRADA' : alerta.estado.toUpperCase()}
             </span>
             
             {alerta.estado !== 'cerrada' && alerta.estado !== 'cancelada' && puedeCerrarAlerta && (
@@ -265,13 +311,10 @@ const AlertaDetail = () => {
           </div>
         </div>
 
-        {/* Contenido principal - Grid de 2 columnas */}
+        {/* Contenido principal */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Columna izquierda: Información de la alerta (2 columnas en lg) */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Tarjeta principal de la alerta */}
             <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100">
-              {/* Cabecera con gradiente según tipo */}
               <div className={`bg-gradient-to-r ${getTipoGradient(alerta.tipo)} px-6 py-4`}>
                 <div className="flex items-center gap-4">
                   <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
@@ -295,7 +338,6 @@ const AlertaDetail = () => {
               </div>
 
               <div className="p-6">
-                {/* Grid de información temporal */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                   <InfoCard
                     icon={Calendar}
@@ -303,6 +345,15 @@ const AlertaDetail = () => {
                     value={new Date(alerta.fecha_creacion).toLocaleString('es-MX')}
                     color="blue"
                   />
+                  
+                  {alerta.fecha_asignacion && (
+                    <InfoCard
+                      icon={Clock}
+                      label="Fecha de asignación"
+                      value={new Date(alerta.fecha_asignacion).toLocaleString('es-MX')}
+                      color="amber"
+                    />
+                  )}
                   
                   {alerta.fecha_expiracion && (
                     <InfoCard
@@ -321,9 +372,17 @@ const AlertaDetail = () => {
                       color="green"
                     />
                   )}
+                  
+                  {alerta.unidad && (
+                    <InfoCard
+                      icon={Shield}
+                      label="Unidad asignada"
+                      value={`${alerta.unidad.codigo} (${alerta.unidad.tipo === 'policia' ? 'Policía' : 'Ambulancia'})`}
+                      color="purple"
+                    />
+                  )}
                 </div>
 
-                {/* Información del ciudadano */}
                 {alerta.ciudadano && (
                   <div className="border-t border-gray-100 pt-6">
                     <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
@@ -361,7 +420,6 @@ const AlertaDetail = () => {
                   </div>
                 )}
 
-                {/* Motivo de cierre manual */}
                 {alerta.cerrada_manualmente && (
                   <div className="border-t border-gray-100 pt-6 mt-6">
                     <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
@@ -375,13 +433,40 @@ const AlertaDetail = () => {
                     </div>
                   </div>
                 )}
+
+                {alerta.reporte && (
+                  <div className="border-t border-gray-100 pt-6 mt-6">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                      <FileText size={20} className="text-blue-600" />
+                      Reporte de atención
+                    </h3>
+                    <div className="p-5 bg-gray-50 rounded-xl border border-gray-200">
+                      <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
+                        {alerta.reporte.descripcion || 'Sin reporte'}
+                      </p>
+                      {alerta.reporte.fotos && alerta.reporte.fotos.length > 0 && (
+                        <div className="mt-4 flex gap-2 flex-wrap">
+                          {alerta.reporte.fotos.map((foto, idx) => (
+                            <a
+                              key={idx}
+                              href={foto.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-blue-600 hover:underline"
+                            >
+                              Ver foto {idx + 1}
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Columna derecha: Mapa y ubicación */}
           <div className="lg:col-span-1 space-y-6">
-            {/* Tarjeta de ubicación con botón profesional */}
             <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100">
               <div className={`bg-gradient-to-r ${getTipoGradient(alerta.tipo)} px-6 py-4`}>
                 <div className="flex items-center justify-between">
@@ -397,7 +482,6 @@ const AlertaDetail = () => {
               <div className="p-5">
                 {alerta.lat && alerta.lng ? (
                   <>
-                    {/* Coordenadas */}
                     <div className="mb-4 p-3 bg-gray-50 rounded-xl border border-gray-200">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
@@ -410,7 +494,6 @@ const AlertaDetail = () => {
                       </div>
                     </div>
 
-                    {/* Botón de ubicación profesional */}
                     <BotonUbicacion
                       lat={alerta.lat}
                       lng={alerta.lng}
@@ -419,7 +502,6 @@ const AlertaDetail = () => {
                       altura="280px"
                     />
 
-                    {/* Botón para abrir en Google Maps */}
                     <div className="mt-4">
                       <a
                         href={`https://www.google.com/maps?q=${alerta.lat},${alerta.lng}`}
@@ -436,27 +518,6 @@ const AlertaDetail = () => {
                   <div className="h-[200px] bg-gray-100 rounded-xl flex flex-col items-center justify-center text-gray-400">
                     <MapPin size={32} className="mb-2 opacity-30" />
                     <p className="text-sm">Coordenadas no disponibles</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Información adicional */}
-            <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
-              <h4 className="text-sm font-semibold text-gray-700 mb-4">Información adicional</h4>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                  <span className="text-xs text-gray-500">ID de alerta</span>
-                  <span className="text-sm font-mono font-medium text-gray-800">#{alerta.id}</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                  <span className="text-xs text-gray-500">Tipo</span>
-                  <BadgeTipoAlerta tipo={alerta.tipo} size={12} />
-                </div>
-                {alerta.ciudadano && (
-                  <div className="flex justify-between items-center py-2">
-                    <span className="text-xs text-gray-500">Ciudadano ID</span>
-                    <span className="text-sm font-mono text-gray-800">#{alerta.ciudadano.id}</span>
                   </div>
                 )}
               </div>
@@ -530,58 +591,5 @@ const AlertaDetail = () => {
     </div>
   );
 };
-
-// Componente para tarjetas de información
-const InfoCard = ({ icon: Icon, label, value, color = 'blue' }) => {
-  const colorClasses = {
-    blue: 'bg-blue-50 border-blue-100',
-    amber: 'bg-amber-50 border-amber-100',
-    green: 'bg-green-50 border-green-100'
-  };
-
-  const iconColors = {
-    blue: 'text-blue-600',
-    amber: 'text-amber-600',
-    green: 'text-green-600'
-  };
-
-  return (
-    <div className={`p-4 rounded-xl border ${colorClasses[color]}`}>
-      <div className="flex items-start gap-3">
-        <div className={`p-2 bg-white rounded-lg`}>
-          <Icon size={18} className={iconColors[color]} />
-        </div>
-        <div>
-          <p className="text-xs text-gray-500 uppercase tracking-wider">{label}</p>
-          <p className="text-sm font-medium text-gray-800 mt-1">{value}</p>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Componente para contactos con acción
-const ContactCard = ({ icon: Icon, label, value, action, actionIcon: ActionIcon }) => (
-  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-200">
-    <div className="flex items-center gap-3">
-      <div className="p-2 bg-white rounded-lg">
-        <Icon size={16} className="text-gray-600" />
-      </div>
-      <div>
-        <p className="text-xs text-gray-500">{label}</p>
-        <p className="text-sm font-medium text-gray-800">{value}</p>
-      </div>
-    </div>
-    {action && ActionIcon && (
-      <button
-        onClick={action}
-        className="p-2 hover:bg-white rounded-lg transition-colors"
-        title={`Llamar a ${value}`}
-      >
-        <ActionIcon size={16} className="text-blue-600" />
-      </button>
-    )}
-  </div>
-);
 
 export default AlertaDetail;

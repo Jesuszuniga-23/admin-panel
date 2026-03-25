@@ -6,7 +6,8 @@ import {
   Loader, AlertCircle, X, MapPinned,
   Phone, Mail, PhoneCall, Mail as MailIcon, UserCircle
 } from 'lucide-react';
-import alertasService from '../../../services/admin/alertas.service';
+// ✅ IMPORTACIÓN CORREGIDA - Usar alertasPanelService
+import alertasPanelService from '../../../services/admin/alertasPanel.service';
 import toast from 'react-hot-toast';
 import IconoEntidad, { BadgeTipoAlerta, ModalMapa } from '../../../components/ui/IconoEntidad';
 import BotonUbicacion from '../../../components/ui/BotonUbicacion';
@@ -68,39 +69,41 @@ const AlertaExpiradaDetail = () => {
     cargarAlerta();
   }, [id]);
 
+  // ✅ CORRECCIÓN: Usar alertasPanelService.obtenerDetalle()
   const cargarAlerta = async () => {
     try {
       setLoading(true);
       console.log("Cargando alerta expirada ID:", id);
       
-      const response = await alertasService.obtenerExpiradas({ limite: 100 });
-      const encontrada = (response.data || []).find(a => a.id === parseInt(id));
+      const response = await alertasPanelService.obtenerDetalle(id);
+      console.log("Respuesta del backend:", response);
       
-      // Verificar si el rol tiene acceso a este tipo de alerta
-      if (encontrada && tipoAlertaPermitido && encontrada.tipo !== tipoAlertaPermitido) {
-        setError(`No tienes permiso para ver alertas de tipo ${encontrada.tipo === 'panico' ? 'Pánico' : 'Médica'}`);
-        setAlerta(null);
-        setLoading(false);
-        return;
-      }
-      
-      if (encontrada) {
+      if (response.success && response.data) {
+        // Verificar si el rol tiene acceso a este tipo de alerta
+        if (tipoAlertaPermitido && response.data.tipo !== tipoAlertaPermitido) {
+          setError(`No tienes permiso para ver alertas de tipo ${response.data.tipo === 'panico' ? 'Pánico' : 'Médica'}`);
+          setAlerta(null);
+          setLoading(false);
+          return;
+        }
+        
         const alertaFormateada = {
-          ...encontrada,
-          ciudadano: encontrada.ciudadano ? {
-            ...encontrada.ciudadano,
-            nombre: formatearNombre(encontrada.ciudadano.nombre)
+          ...response.data,
+          ciudadano: response.data.ciudadano ? {
+            ...response.data.ciudadano,
+            nombre: formatearNombre(response.data.ciudadano.nombre)
           } : null
         };
-        console.log("Alerta expirada encontrada:", alertaFormateada);
         setAlerta(alertaFormateada);
       } else {
         setError('Alerta expirada no encontrada');
+        toast.error('Alerta no encontrada');
       }
-      
     } catch (error) {
       console.error("Error cargando alerta:", error);
-      setError('Error al cargar la alerta');
+      const errorMsg = error.response?.data?.error || error.message || 'Error al cargar la alerta';
+      setError(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -200,9 +203,7 @@ const AlertaExpiradaDetail = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Columna izquierda: Información de la alerta */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Tarjeta principal */}
             <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100">
-              {/* Cabecera con gradiente según tipo */}
               <div className={`bg-gradient-to-r ${getTipoGradient(alerta.tipo)} px-6 py-4`}>
                 <div className="flex items-center gap-4">
                   <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
@@ -226,7 +227,6 @@ const AlertaExpiradaDetail = () => {
               </div>
 
               <div className="p-6">
-                {/* Grid de información temporal */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                   <InfoCard
                     icon={Calendar}
@@ -245,7 +245,6 @@ const AlertaExpiradaDetail = () => {
                   )}
                 </div>
 
-                {/* Información del ciudadano */}
                 {alerta.ciudadano && (
                   <div className="border-t border-gray-100 pt-6">
                     <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
@@ -288,7 +287,6 @@ const AlertaExpiradaDetail = () => {
 
           {/* Columna derecha: Mapa y ubicación */}
           <div className="lg:col-span-1 space-y-6">
-            {/* Tarjeta de ubicación con botón profesional */}
             <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100">
               <div className={`bg-gradient-to-r ${getTipoGradient(alerta.tipo)} px-6 py-4`}>
                 <div className="flex items-center justify-between">
@@ -304,7 +302,6 @@ const AlertaExpiradaDetail = () => {
               <div className="p-5">
                 {alerta.lat && alerta.lng ? (
                   <>
-                    {/* Coordenadas */}
                     <div className="mb-4 p-3 bg-gray-50 rounded-xl border border-gray-200">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
@@ -317,7 +314,6 @@ const AlertaExpiradaDetail = () => {
                       </div>
                     </div>
 
-                    {/* Botón de ubicación profesional */}
                     <BotonUbicacion
                       lat={alerta.lat}
                       lng={alerta.lng}
@@ -335,7 +331,6 @@ const AlertaExpiradaDetail = () => {
               </div>
             </div>
 
-            {/* Información adicional */}
             <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
               <h4 className="text-sm font-semibold text-gray-700 mb-4">Información de expiración</h4>
               <div className="space-y-3">

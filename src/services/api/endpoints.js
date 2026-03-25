@@ -17,7 +17,7 @@ export const ENDPOINTS = {
   
   PERSONAL: {
     LIST: `${BASE_URL}/admin/personal`,
-    GET: (id) => `${BASE_URL}/admin/personal/${id}`,           
+    GET: (id) => `${BASE_URL}/admin/personal/${id}`,
     CREATE: `${BASE_URL}/admin/personal`,
     UPDATE: (id) => `${BASE_URL}/admin/personal/${id}`,
     PATCH: (id) => `${BASE_URL}/admin/personal/${id}`,
@@ -28,7 +28,7 @@ export const ENDPOINTS = {
 
   UNIDADES: {
     LIST: `${BASE_URL}/admin/unidades`,
-    GET: (id) => `${BASE_URL}/admin/unidades/${id}`,          
+    GET: (id) => `${BASE_URL}/admin/unidades/${id}`,
     CREATE: `${BASE_URL}/admin/unidades`,
     UPDATE: (id) => `${BASE_URL}/admin/unidades/${id}`,
     DELETE: (id) => `${BASE_URL}/admin/unidades/${id}`,

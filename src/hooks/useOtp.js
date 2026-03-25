@@ -14,12 +14,15 @@ export const useOtp = () => {
     setSolicitando(true);
     try {
       const response = await alertasPanelService.solicitarOtp(alertaId);
-      
+
       if (response.success) {
         setShowModal(true);
         setOtpEmail(response.email_ofuscado);
         setOtpExpiracion(response.expiracion);
-        toast.success(response.message);
+        toast.success(response.message, {
+          icon: '📧',
+          duration: 5000
+        });
         return { success: true, message: response.message };
       } else {
         toast.error(response.error || 'Error al solicitar código');
@@ -40,11 +43,11 @@ export const useOtp = () => {
       toast.error('Ingresa el código de 6 dígitos');
       return { success: false, error: 'Código inválido' };
     }
-    
+
     setVerificando(true);
     try {
       const response = await alertasPanelService.verificarOtp(alertaId, codigo);
-      
+
       if (response.success) {
         setShowModal(false);
         toast.success('Código verificado. Mostrando datos completos.');

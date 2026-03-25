@@ -5,9 +5,6 @@ import { ENDPOINTS } from './api/endpoints';
 class AuthService {
   #currentUser = null;
 
-  // =====================================================
-  // LOGIN CON GOOGLE (INICIA FLUJO OAuth)
-  // =====================================================
   async loginWithGoogle(token) {
     try {
       if (!token) {
@@ -16,25 +13,23 @@ class AuthService {
 
       console.log("📧 Enviando token al backend...");
       
-      // Redirigir al backend para iniciar flujo OAuth
-      window.location.href = `${import.meta.env.VITE_API_URL}/auth/login/google`;
+      const response = await axiosInstance.post(ENDPOINTS.AUTH.GOOGLE_ADMIN_LOGIN, {
+        idToken: token
+      });
       
-      return { success: true, redirect: true };
-      
+      return response.data;
     } catch (error) {
       console.error("Error:", error);
       throw error.response?.data || { error: 'Error de autenticación' };
     }
   }
 
-  // =====================================================
-  // VERIFICAR CÓDIGO 2FA Y COMPLETAR LOGIN
-  // =====================================================
-  async verificar2FA(codigo, pendingToken) {
+  // ✅ MODIFICADO: Ya no recibe pendingToken, el backend lo obtiene de cookie
+  async verificar2FA(codigo) {
     try {
       const response = await axiosInstance.post(ENDPOINTS.AUTH.VERIFY_2FA, {
-        codigo,
-        pending_token: pendingToken
+        codigo
+        // pending_token ya no se envía, está en cookie
       });
       
       return response.data;
@@ -44,13 +39,11 @@ class AuthService {
     }
   }
 
-  // =====================================================
-  // REENVIAR CÓDIGO 2FA
-  // =====================================================
-  async reenviarCodigo2FA(pendingToken) {
+  // ✅ MODIFICADO: Ya no recibe pendingToken
+  async reenviarCodigo2FA() {
     try {
       const response = await axiosInstance.post(ENDPOINTS.AUTH.RESEND_2FA, {
-        pending_token: pendingToken
+        // No enviamos pending_token, está en cookie
       });
       
       return response.data;
@@ -60,9 +53,6 @@ class AuthService {
     }
   }
 
-  // =====================================================
-  // OBTENER ESTADO DE SESIÓN
-  // =====================================================
   async obtenerEstadoSesion() {
     try {
       const response = await axiosInstance.get(ENDPOINTS.AUTH.SESSION_STATUS);
@@ -73,9 +63,6 @@ class AuthService {
     }
   }
 
-  // =====================================================
-  // REGISTRAR ACTIVIDAD (KEEP ALIVE)
-  // =====================================================
   async registrarActividad() {
     try {
       await axiosInstance.post(ENDPOINTS.AUTH.ACTIVITY);
@@ -84,9 +71,6 @@ class AuthService {
     }
   }
 
-  // =====================================================
-  // LOGOUT
-  // =====================================================
   async logout() {
     try {
       await axiosInstance.post(ENDPOINTS.AUTH.LOGOUT);
@@ -104,9 +88,6 @@ class AuthService {
     }
   }
 
-  // =====================================================
-  // VERIFICAR SESIÓN ACTUAL
-  // =====================================================
   async checkSession() {
     try {
       const userStr = localStorage.getItem('user');
@@ -130,9 +111,6 @@ class AuthService {
     }
   }
 
-  // =====================================================
-  // GETTERS
-  // =====================================================
   getCurrentUser() {
     if (this.#currentUser) {
       return this.#currentUser;
@@ -185,29 +163,20 @@ class AuthService {
     return user?.rol === 'operador_general';
   }
 
-  // =====================================================
-  // OBTENER TIPO DE ALERTA PERMITIDO
-  // =====================================================
   getTipoAlertaPermitido() {
     const user = this.getCurrentUser();
     if (user?.rol === 'operador_policial') return 'panico';
     if (user?.rol === 'operador_medico') return 'medica';
-    return null; // null = todas
+    return null;
   }
 
-  // =====================================================
-  // OBTENER ROL DE PERSONAL PERMITIDO
-  // =====================================================
   getRolPersonalPermitido() {
     const user = this.getCurrentUser();
     if (user?.rol === 'operador_policial') return 'policia';
     if (user?.rol === 'operador_medico') return 'ambulancia';
-    return null; // null = todos
+    return null;
   }
 
-  // =====================================================
-  // VERIFICAR SI PUEDE MODIFICAR PERSONAL
-  // =====================================================
   puedeModificarPersonal(rolPersonal) {
     const user = this.getCurrentUser();
     if (user?.rol === 'admin' || user?.rol === 'superadmin') return true;
@@ -217,9 +186,6 @@ class AuthService {
     return false;
   }
 
-  // =====================================================
-  // VERIFICAR SI PUEDE GESTIONAR ALERTA POR TIPO
-  // =====================================================
   puedeGestionarAlerta(tipoAlerta) {
     const user = this.getCurrentUser();
     if (user?.rol === 'admin' || user?.rol === 'superadmin') return true;

@@ -51,6 +51,7 @@ const AppRouter = () => {
         <Route path="alertas/cerradas" element={<AlertasCerradas />} />
         <Route path="alertas/:id" element={<AlertaPanelDetail />} />
         <Route path="alertas/expiradas" element={<AlertasExpiradas />} />
+        <Route path="alertas/expiradas/:id" element={<AlertaExpiradaDetail />} />
         <Route path="alertas/cerradas-manual" element={<AlertasCerradasManual />} />
         <Route path="recuperaciones/pendientes" element={<RecuperacionesPendientes />} />
         <Route path="unidades" element={<UnidadesList />} />

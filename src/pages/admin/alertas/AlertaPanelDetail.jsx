@@ -1,26 +1,57 @@
 // src/pages/admin/alertas/AlertaPanelDetail.jsx
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { 
-  ArrowLeft, MapPin, Phone, Mail, AlertTriangle, 
-  Shield, Lock, Eye, EyeOff, CheckCircle, XCircle,
+import {
+  ArrowLeft, MapPin, Phone, Mail, AlertTriangle,
+  Shield, Lock, CheckCircle, XCircle,
   Clock, Truck, User, Calendar
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import alertasPanelService from '../../../services/admin/alertasPanel.service';
 import MapaOSM from '../../../components/maps/MapaOSM';
+import { useOtp } from '../../../hooks/useOtp';
+
+// Función para ofuscar datos
+const ofuscarNombre = (nombre) => {
+  if (!nombre) return '***';
+  if (nombre.length <= 2) return nombre[0] + '*';
+  return nombre[0] + '*'.repeat(Math.min(nombre.length - 2, 4)) + nombre.slice(-1);
+};
+
+const ofuscarTelefono = (telefono) => {
+  if (!telefono) return '***';
+  if (telefono.length <= 4) return '*'.repeat(telefono.length);
+  return telefono.slice(0, 3) + '***' + telefono.slice(-2);
+};
+
+const ofuscarEmail = (email) => {
+  if (!email) return '***';
+  const [local, dominio] = email.split('@');
+  if (local.length <= 2) return `${local[0]}***@${dominio}`;
+  return `${local[0]}${'*'.repeat(Math.min(local.length - 2, 4))}${local.slice(-1)}@${dominio}`;
+};
 
 const AlertaPanelDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [alerta, setAlerta] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [solicitandoOtp, setSolicitandoOtp] = useState(false);
-  const [verificandoOtp, setVerificandoOtp] = useState(false);
-  const [showOtpModal, setShowOtpModal] = useState(false);
+  const [requiereOtp, setRequiereOtp] = useState(true);
+  const [datosCompletos, setDatosCompletos] = useState(null);
+
+  // Usar el hook useOtp
+  const {
+    solicitando,
+    verificando,
+    showModal,
+    otpEmail,
+    otpExpiracion,
+    solicitarOtp,
+    verificarOtp,
+    cerrarModal
+  } = useOtp();
+
   const [codigoOtp, setCodigoOtp] = useState('');
-  const [otpEmail, setOtpEmail] = useState('');
-  const [otpExpiracion, setOtpExpiracion] = useState(null);
 
   useEffect(() => {
     cargarAlerta();
@@ -28,11 +59,37 @@ const AlertaPanelDetail = () => {
 
   const cargarAlerta = async () => {
     try {
+      setLoading(true);
       const response = await alertasPanelService.obtenerDetalle(id);
-      setAlerta(response.data);
-      if (response.requiere_otp) {
-        toast.info('Los datos sensibles están ocultos. Solicita un código para verlos.');
+
+      // Guardar datos completos para cuando se verifique OTP
+      setDatosCompletos(response.data);
+      setRequiereOtp(response.requiere_otp);
+
+      // Mostrar datos ofuscados si requiere OTP
+      if (response.requiere_otp && response.data.ciudadano) {
+        const dataOfuscada = {
+          ...response.data,
+          ciudadano: {
+            ...response.data.ciudadano,
+            nombre: ofuscarNombre(response.data.ciudadano.nombre),
+            telefono: ofuscarTelefono(response.data.ciudadano.telefono),
+            email: ofuscarEmail(response.data.ciudadano.email)
+          }
+        };
+        setAlerta(dataOfuscada);
+        toast.custom((t) => (
+          <div className="bg-blue-50 border-l-4 border-blue-500 rounded-lg shadow-lg p-4">
+            <div className="flex items-center gap-2">
+              <Lock size={18} className="text-blue-600" />
+              <p className="text-sm text-blue-800">Los datos sensibles están ocultos. Solicita un código para verlos.</p>
+            </div>
+          </div>
+        ), { duration: 5000 });
+      } else {
+        setAlerta(response.data);
       }
+
     } catch (error) {
       console.error('Error cargando alerta:', error);
       toast.error('Error al cargar los detalles de la alerta');
@@ -43,49 +100,22 @@ const AlertaPanelDetail = () => {
   };
 
   const handleSolicitarOtp = async () => {
-    setSolicitandoOtp(true);
-    try {
-      const response = await alertasPanelService.solicitarOtp(id);
-      
-      if (response.success) {
-        setShowOtpModal(true);
-        setOtpEmail(response.email_ofuscado);
-        setOtpExpiracion(response.expiracion);
-        toast.success(response.message);
-      } else {
-        toast.error(response.error || 'Error al solicitar código');
-      }
-    } catch (error) {
-      console.error('Error solicitando OTP:', error);
-      toast.error(error.response?.data?.error || 'Error al solicitar código');
-    } finally {
-      setSolicitandoOtp(false);
+    const result = await solicitarOtp(id);
+    if (result.success) {
+      // El hook ya maneja el modal
     }
   };
 
   const handleVerificarOtp = async () => {
-    if (!codigoOtp || codigoOtp.length !== 6) {
-      toast.error('Ingresa el código de 6 dígitos');
-      return;
-    }
-    
-    setVerificandoOtp(true);
-    try {
-      const response = await alertasPanelService.verificarOtp(id, codigoOtp);
-      
-      if (response.success) {
-        setShowOtpModal(false);
-        setCodigoOtp('');
-        setAlerta(response.data);
-        toast.success('Código verificado. Mostrando datos completos.');
-      } else {
-        toast.error(response.error || 'Código inválido');
-      }
-    } catch (error) {
-      console.error('Error verificando OTP:', error);
-      toast.error(error.response?.data?.error || 'Error al verificar código');
-    } finally {
-      setVerificandoOtp(false);
+    const result = await verificarOtp(id, codigoOtp);
+    if (result.success) {
+      // Actualizar alerta con datos completos
+      setAlerta({
+        ...datosCompletos,
+        requiere_otp: false
+      });
+      setRequiereOtp(false);
+      setCodigoOtp('');
     }
   };
 
@@ -135,7 +165,7 @@ const AlertaPanelDetail = () => {
           <ArrowLeft size={20} />
           Volver
         </button>
-        
+
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
@@ -150,14 +180,14 @@ const AlertaPanelDetail = () => {
               </span>
             </div>
           </div>
-          
-          {alerta.requiere_otp && (
+
+          {requiereOtp && (
             <button
               onClick={handleSolicitarOtp}
-              disabled={solicitandoOtp}
+              disabled={solicitando}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
             >
-              {solicitandoOtp ? (
+              {solicitando ? (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
                 <Lock size={18} />
@@ -225,7 +255,7 @@ const AlertaPanelDetail = () => {
             <User size={18} />
             Datos del ciudadano
           </h2>
-          
+
           {alerta.ciudadano ? (
             <div className="space-y-4">
               <div>
@@ -248,7 +278,7 @@ const AlertaPanelDetail = () => {
       </div>
 
       {/* Modal OTP */}
-      {showOtpModal && (
+      {showModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl max-w-md w-full p-6">
             <div className="text-center mb-4">
@@ -266,7 +296,7 @@ const AlertaPanelDetail = () => {
                 </p>
               )}
             </div>
-            
+
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Código de 6 dígitos
@@ -280,23 +310,20 @@ const AlertaPanelDetail = () => {
                 autoFocus
               />
             </div>
-            
+
             <div className="flex gap-3">
               <button
-                onClick={() => {
-                  setShowOtpModal(false);
-                  setCodigoOtp('');
-                }}
+                onClick={cerrarModal}
                 className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleVerificarOtp}
-                disabled={verificandoOtp || codigoOtp.length !== 6}
+                disabled={verificando || codigoOtp.length !== 6}
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {verificandoOtp ? (
+                {verificando ? (
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <CheckCircle size={18} />

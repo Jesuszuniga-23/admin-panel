@@ -4,16 +4,15 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Shield, Mail, RefreshCw, CheckCircle, AlertCircle, ArrowLeft, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import authService from '../../services/auth.service';
-import useAuthStore from '../../store/authStore';  // ← AGREGAR ESTA LÍNEA
+import useAuthStore from '../../store/authStore';
 
 const Verificar2FA = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { setUser } = useAuthStore();  // ← OBTENER setUser DEL STORE
+  const { setUser } = useAuthStore();
   const [codigo, setCodigo] = useState('');
   const [loading, setLoading] = useState(false);
   const [reenviando, setReenviando] = useState(false);
-  const [pendingToken, setPendingToken] = useState(null);
   const [emailOfuscado, setEmailOfuscado] = useState('');
   const [tiempoRestante, setTiempoRestante] = useState(300);
   const [error, setError] = useState('');
@@ -21,17 +20,32 @@ const Verificar2FA = () => {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const email = params.get('email');
-    const token = params.get('token');
     
     if (email) {
       setEmailOfuscado(email);
     }
     
-    if (token) {
-      setPendingToken(token);
-    } else {
-      setError('No hay sesión pendiente de verificación');
-    }
+    // ✅ Ya no necesitamos token de URL, el backend lo tiene en cookie
+    // Verificar que exista la cookie de sesión 2FA
+    const check2FASession = async () => {
+      try {
+        // Intentar obtener estado de sesión 2FA
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/session-status`, {
+          credentials: 'include'
+        });
+        const data = await response.json();
+        
+        // Si no hay sesión 2FA activa, redirigir
+        if (!data.tiene_sesion_2fa) {
+          setError('No hay sesión de verificación activa');
+          setTimeout(() => navigate('/login'), 2000);
+        }
+      } catch (error) {
+        console.error('Error verificando sesión 2FA:', error);
+      }
+    };
+    
+    check2FASession();
     
     const timer = setInterval(() => {
       setTiempoRestante(prev => {
@@ -45,7 +59,7 @@ const Verificar2FA = () => {
     }, 1000);
     
     return () => clearInterval(timer);
-  }, [location]);
+  }, [location, navigate]);
 
   const formatearTiempo = (segundos) => {
     const minutos = Math.floor(segundos / 60);
@@ -61,31 +75,20 @@ const Verificar2FA = () => {
       return;
     }
     
-    if (!pendingToken) {
-      toast.error('Sesión expirada. Inicia sesión nuevamente.');
-      navigate('/login');
-      return;
-    }
-    
     setLoading(true);
     setError('');
     
     try {
-      const result = await authService.verificar2FA(codigo, pendingToken);
+      // ✅ Ya no enviamos pending_token, el backend lo obtiene de la cookie
+      const result = await authService.verificar2FA(codigo);
       
       console.log('=== RESPUESTA COMPLETA DEL BACKEND ===');
       console.log('result:', result);
-      console.log('result.success:', result?.success);
-      console.log('result.usuario:', result?.usuario);
-      console.log('=====================================');
       
       if (result && result.success === true) {
         toast.success('Verificación exitosa');
         
-        // ✅ Usar setUser del store (importado al inicio)
         setUser(result.usuario);
-        
-        localStorage.removeItem('pending_2fa_token');
         
         // Redirigir según rol
         const rolesAdmin = ['admin', 'superadmin', 'operador_tecnico', 'operador_policial', 'operador_medico', 'operador_general'];
@@ -102,9 +105,6 @@ const Verificar2FA = () => {
     } catch (error) {
       console.error('=== ERROR EN VERIFICACIÓN ===');
       console.error('error:', error);
-      console.error('error.response:', error.response);
-      console.error('error.response?.data:', error.response?.data);
-      console.error('============================');
       
       let errorMsg = 'Error al verificar código';
       if (error.response?.data?.error) {
@@ -117,22 +117,22 @@ const Verificar2FA = () => {
       
       setError(errorMsg);
       toast.error(errorMsg);
+      
+      // Si el error es de sesión expirada, redirigir
+      if (errorMsg.includes('expirada') || errorMsg.includes('Sesión de verificación')) {
+        setTimeout(() => navigate('/login'), 2000);
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const handleReenviar = async () => {
-    if (!pendingToken) {
-      toast.error('Sesión expirada. Inicia sesión nuevamente.');
-      navigate('/login');
-      return;
-    }
-    
     setReenviando(true);
     
     try {
-      const result = await authService.reenviarCodigo2FA(pendingToken);
+      // ✅ Ya no enviamos pending_token, el backend lo obtiene de la cookie
+      const result = await authService.reenviarCodigo2FA();
       
       if (result.success) {
         toast.success(result.message);
@@ -142,7 +142,8 @@ const Verificar2FA = () => {
         toast.error(result.error || 'Error al reenviar código');
       }
     } catch (error) {
-      toast.error(error.error || 'Error al reenviar código');
+      console.error('Error reenviando:', error);
+      toast.error(error.response?.data?.error || 'Error al reenviar código');
     } finally {
       setReenviando(false);
     }
@@ -240,7 +241,6 @@ const Verificar2FA = () => {
             <div className="mt-8 pt-6 border-t border-gray-100">
               <button
                 onClick={() => {
-                  localStorage.removeItem('pending_2fa_token');
                   navigate('/login');
                 }}
                 className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 mx-auto"
