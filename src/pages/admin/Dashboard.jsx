@@ -52,10 +52,23 @@ const formatearNombre = (nombre) => {
     .join(' ');
 };
 
+// Valores por defecto para cuando no hay datos
+const defaultStats = {
+  personal: { total: 0, activos: 0, inactivos: 0, disponibles: 0, noDisponibles: 0, porRol: { policia: 0, ambulancia: 0, admin: 0, superadmin: 0 } },
+  unidades: { total: 0, activas: 0, inactivas: 0, disponibles: 0, ocupadas: 0, porTipo: { policia: 0, ambulancia: 0 } },
+  alertas: { expiradas: 0, cerradasManual: 0, totalAlertas: 0, activas: 0, enProceso: 0, cerradasTotales: 0 },
+  kpis: {
+    personal: { total: 0, variacion: '0%', tendencia: 'stable' },
+    unidades: { total: 0, variacion: '0%', tendencia: 'stable' },
+    alertas: { total: 0, variacion: '0%', tendencia: 'stable' }
+  }
+};
+
 const Dashboard = () => {
   const { user } = useAuthStore();
   const [cargando, setCargando] = useState(true);
-  const [stats, setStats] = useState(null);
+  const [error, setError] = useState(null);
+  const [stats, setStats] = useState(defaultStats);
   const [alertasPorHora, setAlertasPorHora] = useState([]);
   const [actividadReciente, setActividadReciente] = useState({ personal: [], unidades: [], alertas: [] });
   const navigate = useNavigate();
@@ -67,7 +80,20 @@ const Dashboard = () => {
   useEffect(() => {
     const cargarDatosDashboard = async () => {
       setCargando(true);
+      setError(null);
+      
+      // Timeout de 15 segundos
+      const timeoutId = setTimeout(() => {
+        if (cargando) {
+          setError('El dashboard está tardando en cargar. Verifica tu conexión.');
+          setCargando(false);
+        }
+      }, 15000);
+      
       try {
+        console.log('📊 Cargando datos del dashboard...');
+        console.log('📡 Filtros:', { tipoAlertaPermitido, rolPersonalPermitido });
+        
         // Enviar filtros al backend si es necesario
         const params = {};
         if (tipoAlertaPermitido) params.tipo = tipoAlertaPermitido;
@@ -79,12 +105,25 @@ const Dashboard = () => {
           dashboardService.obtenerActividadReciente(params)
         ]);
 
-        setStats(estadisticas);
-        setAlertasPorHora(horas);
-        setActividadReciente(actividad);
+        console.log('✅ Estadísticas recibidas:', estadisticas);
+        console.log('✅ Horas recibidas:', horas?.length);
+        console.log('✅ Actividad recibida:', actividad);
+        
+        // Establecer datos con valores por defecto si faltan
+        setStats(estadisticas?.success ? estadisticas : defaultStats);
+        setAlertasPorHora(Array.isArray(horas) ? horas : []);
+        setActividadReciente(actividad || { personal: [], unidades: [], alertas: [] });
+        
       } catch (error) {
-        console.error("Error cargando dashboard:", error);
+        console.error("❌ Error cargando dashboard:", error);
+        console.error("❌ Detalle error:", error.response?.data);
+        setError(error.response?.data?.error || error.message || 'Error al cargar el dashboard');
+        // Mantener datos por defecto
+        setStats(defaultStats);
+        setAlertasPorHora([]);
+        setActividadReciente({ personal: [], unidades: [], alertas: [] });
       } finally {
+        clearTimeout(timeoutId);
         setCargando(false);
       }
     };
@@ -109,6 +148,25 @@ const Dashboard = () => {
   };
 
   const COLORS = ['#3b82f6', '#ef4444', '#f59e0b', '#10b981', '#8b5cf6'];
+
+  // Mostrar error si ocurrió
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
+        <div className="bg-red-50 rounded-xl p-6 text-center max-w-md">
+          <AlertCircle className="mx-auto h-12 w-12 text-red-500 mb-4" />
+          <h2 className="text-lg font-semibold text-red-800 mb-2">Error al cargar el dashboard</h2>
+          <p className="text-red-600 mb-4">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+          >
+            Reintentar
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (cargando) {
     return (
@@ -146,7 +204,7 @@ const Dashboard = () => {
               <p className="text-xs md:text-sm text-slate-500 mb-1">
                 {key === 'alertas' ? 'Alertas Cerradas/Expiradas' : key}
               </p>
-              <p className="text-xl md:text-3xl font-bold text-slate-800">{data.total}</p>
+              <p className="text-xl md:text-3xl font-bold text-slate-800">{data.total || 0}</p>
             </div>
           ))}
         </div>
@@ -174,28 +232,34 @@ const Dashboard = () => {
                 </div>
               </div>
             </div>
-            <div className="h-48 md:h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={alertasPorHora}>
-                  <defs>
-                    <linearGradient id="expiradasGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="cerradasGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <XAxis dataKey="hora" tickFormatter={(hora) => `${hora}:00`} tick={{ fontSize: 10 }} />
-                  <YAxis tick={{ fontSize: 10 }} />
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <Tooltip />
-                  <Area type="monotone" dataKey="expiradas" stroke="#3b82f6" fill="url(#expiradasGradient)" strokeWidth={2} />
-                  <Area type="monotone" dataKey="cerradas" stroke="#f59e0b" fill="url(#cerradasGradient)" strokeWidth={2} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+            {alertasPorHora.length > 0 ? (
+              <div className="h-48 md:h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={alertasPorHora}>
+                    <defs>
+                      <linearGradient id="expiradasGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="cerradasGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="hora" tickFormatter={(hora) => `${hora}:00`} tick={{ fontSize: 10 }} />
+                    <YAxis tick={{ fontSize: 10 }} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <Tooltip />
+                    <Area type="monotone" dataKey="expiradas" stroke="#3b82f6" fill="url(#expiradasGradient)" strokeWidth={2} />
+                    <Area type="monotone" dataKey="cerradas" stroke="#f59e0b" fill="url(#cerradasGradient)" strokeWidth={2} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="h-48 flex items-center justify-center text-gray-400">
+                No hay datos disponibles
+              </div>
+            )}
           </div>
 
           {/* Distribución de Personal */}
@@ -322,60 +386,68 @@ const Dashboard = () => {
               Personal Reciente
               {rolPersonalPermitido && ` (${rolPersonalPermitido === 'policia' ? 'Solo Policía' : 'Solo Ambulancia'})`}
             </h2>
-            <div className="space-y-2 md:space-y-3">
-              {actividadReciente.personal.map((p) => (
-                <div key={p.id} className="flex items-center justify-between p-2 md:p-3 bg-slate-50 rounded-lg md:rounded-xl hover:bg-slate-100 transition-colors">
-                  <div className="flex items-center gap-2 md:gap-3 min-w-0">
-                    <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg md:rounded-xl flex items-center justify-center shadow-lg shadow-blue-200 flex-shrink-0">
-                      <span className="text-white text-xs md:text-sm font-semibold">
-                        {p.nombre?.charAt(0).toUpperCase()}
-                      </span>
+            {actividadReciente.personal && actividadReciente.personal.length > 0 ? (
+              <div className="space-y-2 md:space-y-3">
+                {actividadReciente.personal.map((p) => (
+                  <div key={p.id} className="flex items-center justify-between p-2 md:p-3 bg-slate-50 rounded-lg md:rounded-xl hover:bg-slate-100 transition-colors">
+                    <div className="flex items-center gap-2 md:gap-3 min-w-0">
+                      <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg md:rounded-xl flex items-center justify-center shadow-lg shadow-blue-200 flex-shrink-0">
+                        <span className="text-white text-xs md:text-sm font-semibold">
+                          {p.nombre?.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs md:text-sm font-medium text-slate-800 truncate">{formatearNombre(p.nombre)}</p>
+                        <BadgeIcono entidad={rolToEntidad[p.rol] || 'ADMIN'} texto={p.rol} size={10} />
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-xs md:text-sm font-medium text-slate-800 truncate">{formatearNombre(p.nombre)}</p>
-                      <BadgeIcono entidad={rolToEntidad[p.rol] || 'ADMIN'} texto={p.rol} size={10} />
-                    </div>
+                    <span className={`text-xs px-1.5 md:px-2 py-0.5 md:py-1 rounded-full whitespace-nowrap ${
+                      p.disponible ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                    }`}>
+                      {p.disponible ? 'Disponible' : 'Ocupado'}
+                    </span>
                   </div>
-                  <span className={`text-xs px-1.5 md:px-2 py-0.5 md:py-1 rounded-full whitespace-nowrap ${
-                    p.disponible ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                  }`}>
-                    {p.disponible ? 'Disponible' : 'Ocupado'}
-                  </span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-center text-gray-400 py-4">No hay datos recientes</p>
+            )}
           </div>
 
           {/* Unidades Recientes */}
           <div className="bg-white rounded-xl md:rounded-2xl shadow-lg shadow-slate-200/50 p-4 md:p-6">
             <h2 className="text-base md:text-lg font-semibold text-slate-800 mb-3 md:mb-4">Unidades Recientes</h2>
-            <div className="space-y-2 md:space-y-3">
-              {actividadReciente.unidades.map((u) => (
-                <div key={u.id} className="flex items-center justify-between p-2 md:p-3 bg-slate-50 rounded-lg md:rounded-xl hover:bg-slate-100 transition-colors">
-                  <div className="flex items-center gap-2 md:gap-3 min-w-0">
-                    <div className={`w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl flex items-center justify-center flex-shrink-0 ${
-                      u.tipo === 'policia' ? 'bg-blue-100' : 'bg-emerald-100'
+            {actividadReciente.unidades && actividadReciente.unidades.length > 0 ? (
+              <div className="space-y-2 md:space-y-3">
+                {actividadReciente.unidades.map((u) => (
+                  <div key={u.id} className="flex items-center justify-between p-2 md:p-3 bg-slate-50 rounded-lg md:rounded-xl hover:bg-slate-100 transition-colors">
+                    <div className="flex items-center gap-2 md:gap-3 min-w-0">
+                      <div className={`w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl flex items-center justify-center flex-shrink-0 ${
+                        u.tipo === 'policia' ? 'bg-blue-100' : 'bg-emerald-100'
+                      }`}>
+                        <IconoEntidad 
+                          entidad={u.tipo === 'policia' ? 'PATRULLA' : 'AMBULANCIA'} 
+                          size={16} 
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs md:text-sm font-medium text-slate-800 truncate">{u.codigo}</p>
+                        <p className="text-xs text-slate-400 capitalize truncate">{u.tipo}</p>
+                      </div>
+                    </div>
+                    <span className={`text-xs px-1.5 md:px-2 py-0.5 md:py-1 rounded-full whitespace-nowrap ${
+                      u.estado === 'disponible' ? 'bg-emerald-100 text-emerald-700' :
+                      u.estado === 'ocupada' ? 'bg-rose-100 text-rose-700' :
+                      'bg-slate-100 text-slate-700'
                     }`}>
-                      <IconoEntidad 
-                        entidad={u.tipo === 'policia' ? 'PATRULLA' : 'AMBULANCIA'} 
-                        size={16} 
-                      />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs md:text-sm font-medium text-slate-800 truncate">{u.codigo}</p>
-                      <p className="text-xs text-slate-400 capitalize truncate">{u.tipo}</p>
-                    </div>
+                      {u.estado}
+                    </span>
                   </div>
-                  <span className={`text-xs px-1.5 md:px-2 py-0.5 md:py-1 rounded-full whitespace-nowrap ${
-                    u.estado === 'disponible' ? 'bg-emerald-100 text-emerald-700' :
-                    u.estado === 'ocupada' ? 'bg-rose-100 text-rose-700' :
-                    'bg-slate-100 text-slate-700'
-                  }`}>
-                    {u.estado}
-                  </span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-center text-gray-400 py-4">No hay datos recientes</p>
+            )}
           </div>
         </div>
       </main>
@@ -419,7 +491,7 @@ const StatCard = ({ icon, title, value, subtitle, color }) => {
           {icon}
         </div>
         <div className="text-right">
-          <p className="text-lg md:text-2xl font-bold text-slate-800">{value}</p>
+          <p className="text-lg md:text-2xl font-bold text-slate-800">{value || 0}</p>
           <p className="text-xs text-slate-400 truncate max-w-[80px] md:max-w-none">{subtitle}</p>
         </div>
       </div>
