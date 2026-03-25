@@ -1,17 +1,17 @@
 // src/pages/admin/alertas/AlertaExpiradaDetail.jsx
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
   AlertTriangle, Clock, MapPin, User, Calendar, ChevronLeft,
   Loader, AlertCircle, X, MapPinned,
-  Phone, Mail, PhoneCall, Mail as MailIcon, UserCircle
+  Phone, Mail, PhoneCall, Mail as MailIcon, UserCircle, Lock, Shield, CheckCircle
 } from 'lucide-react';
-// ✅ IMPORTACIÓN CORREGIDA - Usar alertasPanelService
 import alertasPanelService from '../../../services/admin/alertasPanel.service';
 import toast from 'react-hot-toast';
 import IconoEntidad, { BadgeTipoAlerta, ModalMapa } from '../../../components/ui/IconoEntidad';
 import BotonUbicacion from '../../../components/ui/BotonUbicacion';
 import authService from '../../../services/auth.service';
+import { useOtp } from '../../../hooks/useOtp';
 
 // Función para normalizar texto
 const normalizarTexto = (texto) => {
@@ -47,13 +47,29 @@ const formatearNombre = (nombre) => {
 
 const AlertaExpiradaDetail = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams();
   const [alerta, setAlerta] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [datosCompletos, setDatosCompletos] = useState(null);
+  const [mostrarModalOtp, setMostrarModalOtp] = useState(false);
+  const [codigoOtp, setCodigoOtp] = useState('');
   
   // Obtener tipo de alerta permitido según rol (para validar acceso)
   const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
+  
+  // Hook OTP
+  const {
+    solicitando,
+    verificando,
+    solicitarOtp,
+    verificarOtp,
+    cerrarModal: cerrarModalOtpHook,
+    showModal: showModalHook,
+    otpEmail,
+    otpExpiracion
+  } = useOtp();
   
   // Estado para modal de mapa expandido
   const [mapaModal, setMapaModal] = useState({
@@ -66,10 +82,18 @@ const AlertaExpiradaDetail = () => {
   });
 
   useEffect(() => {
-    cargarAlerta();
+    // Verificar si hay datos completos pasados desde el listado
+    const state = location.state;
+    if (state?.datosCompletos) {
+      console.log('📦 Datos completos recibidos desde estado de navegación');
+      setDatosCompletos(state.datosCompletos);
+      setAlerta(state.datosCompletos);
+      setLoading(false);
+    } else {
+      cargarAlerta();
+    }
   }, [id]);
 
-  // ✅ CORRECCIÓN: Usar alertasPanelService.obtenerDetalle()
   const cargarAlerta = async () => {
     try {
       setLoading(true);
@@ -79,22 +103,14 @@ const AlertaExpiradaDetail = () => {
       console.log("Respuesta del backend:", response);
       
       if (response.success && response.data) {
-        // Verificar si el rol tiene acceso a este tipo de alerta
-        if (tipoAlertaPermitido && response.data.tipo !== tipoAlertaPermitido) {
-          setError(`No tienes permiso para ver alertas de tipo ${response.data.tipo === 'panico' ? 'Pánico' : 'Médica'}`);
-          setAlerta(null);
-          setLoading(false);
-          return;
-        }
+        setDatosCompletos(response.data);
         
-        const alertaFormateada = {
-          ...response.data,
-          ciudadano: response.data.ciudadano ? {
-            ...response.data.ciudadano,
-            nombre: formatearNombre(response.data.ciudadano.nombre)
-          } : null
-        };
-        setAlerta(alertaFormateada);
+        if (response.requiere_otp) {
+          // Si requiere OTP, mostrar modal para solicitar código
+          setMostrarModalOtp(true);
+        } else {
+          setAlerta(response.data);
+        }
       } else {
         setError('Alerta expirada no encontrada');
         toast.error('Alerta no encontrada');
@@ -106,6 +122,38 @@ const AlertaExpiradaDetail = () => {
       toast.error(errorMsg);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSolicitarOtp = async () => {
+    if (!id) return;
+    const result = await solicitarOtp(id);
+    if (result.success) {
+      setMostrarModalOtp(false);
+    }
+  };
+
+  const handleVerificarOtpYVerDetalle = async () => {
+    if (!id || !codigoOtp) return;
+    const result = await verificarOtp(id, codigoOtp);
+    if (result.success && result.data) {
+      // Verificar si el rol tiene acceso a este tipo de alerta
+      if (tipoAlertaPermitido && result.data.tipo !== tipoAlertaPermitido) {
+        setError(`No tienes permiso para ver alertas de tipo ${result.data.tipo === 'panico' ? 'Pánico' : 'Médica'}`);
+        setAlerta(null);
+        setLoading(false);
+        return;
+      }
+      
+      const alertaFormateada = {
+        ...result.data,
+        ciudadano: result.data.ciudadano ? {
+          ...result.data.ciudadano,
+          nombre: formatearNombre(result.data.ciudadano.nombre)
+        } : null
+      };
+      setAlerta(alertaFormateada);
+      setCodigoOtp('');
     }
   };
 
@@ -196,6 +244,12 @@ const AlertaExpiradaDetail = () => {
               <Clock size={12} />
               EXPIRADA
             </span>
+            {!alerta.requiere_otp && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-green-100 text-green-600">
+                <CheckCircle size={12} />
+                Datos verificados
+              </span>
+            )}
           </div>
         </div>
 
@@ -364,6 +418,108 @@ const AlertaExpiradaDetail = () => {
         alertaId={mapaModal.alertaId}
         tipo={mapaModal.tipo}
       />
+
+      {/* MODAL DE SOLICITUD DE OTP */}
+      {mostrarModalOtp && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl">
+            <div className="text-center mb-4">
+              <Shield className="mx-auto h-12 w-12 text-blue-600" />
+              <h3 className="text-lg font-semibold text-gray-900 mt-2">
+                Verificación de seguridad
+              </h3>
+              <p className="text-sm text-gray-500 mt-2">
+                Para ver los datos completos de esta alerta, necesitas solicitar un código de verificación.
+              </p>
+              <p className="text-xs text-gray-400 mt-1">
+                El código será enviado a tu correo electrónico.
+              </p>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setMostrarModalOtp(false);
+                  navigate('/admin/alertas/expiradas');
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSolicitarOtp}
+                disabled={solicitando}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
+              >
+                {solicitando ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Lock size={18} />
+                )}
+                Solicitar código
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE INGRESO DE OTP */}
+      {showModalHook && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl">
+            <div className="text-center mb-4">
+              <Shield className="mx-auto h-12 w-12 text-blue-600" />
+              <h3 className="text-lg font-semibold text-gray-900 mt-2">
+                Ingresa el código de verificación
+              </h3>
+              <p className="text-sm text-gray-500 mt-1">
+                Se ha enviado un código a:
+              </p>
+              <p className="font-medium text-gray-700">{otpEmail}</p>
+              {otpExpiracion && (
+                <p className="text-xs text-gray-400 mt-1">
+                  Válido hasta: {new Date(otpExpiracion).toLocaleTimeString()}
+                </p>
+              )}
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Código de 6 dígitos
+              </label>
+              <input
+                type="text"
+                value={codigoOtp}
+                onChange={(e) => setCodigoOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="000000"
+                className="w-full text-center text-2xl tracking-widest border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                autoFocus
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={cerrarModalOtpHook}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleVerificarOtpYVerDetalle}
+                disabled={verificando || codigoOtp.length !== 6}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
+              >
+                {verificando ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <CheckCircle size={18} />
+                )}
+                Verificar y ver detalles
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Bell, Filter, Calendar, ChevronLeft, ChevronRight,
-  Eye, Clock, MapPin, User, Phone
+  Eye, Clock, MapPin, User, Phone, Shield, Lock, CheckCircle
 } from 'lucide-react';
 import alertasPanelService from '../../../services/admin/alertasPanel.service';
 import Loader from '../../../components/common/Loader';
@@ -11,6 +11,7 @@ import { BadgeTipoAlerta, BotonMapa, ModalMapa } from '../../../components/ui/Ic
 import toast from 'react-hot-toast';
 import authService from '../../../services/auth.service';
 import useAuthStore from '../../../store/authStore';
+import { useOtp } from '../../../hooks/useOtp';
 
 // Función para normalizar texto
 const normalizarTexto = (texto) => {
@@ -53,6 +54,24 @@ const AlertasActivas = () => {
   const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
   const puedeGestionar = authService.puedeGestionarAlerta(tipoAlertaPermitido || '');
   
+  // Estados para el modal OTP
+  const [alertaSeleccionada, setAlertaSeleccionada] = useState(null);
+  const [mostrarModalOtp, setMostrarModalOtp] = useState(false);
+  const [datosCompletosAlerta, setDatosCompletosAlerta] = useState(null);
+  const [codigoOtp, setCodigoOtp] = useState('');
+  
+  // Hook OTP
+  const {
+    solicitando,
+    verificando,
+    solicitarOtp,
+    verificarOtp,
+    cerrarModal: cerrarModalOtpHook,
+    showModal: showModalHook,
+    otpEmail,
+    otpExpiracion
+  } = useOtp();
+  
   const [mapaModal, setMapaModal] = useState({
     abierto: false,
     lat: null,
@@ -81,7 +100,6 @@ const AlertasActivas = () => {
   const cargarAlertas = async () => {
     try {
       setLoading(true);
-      // Enviar filtro de tipo al backend
       const params = {};
       if (tipoAlertaPermitido) {
         params.tipo = tipoAlertaPermitido;
@@ -176,6 +194,61 @@ const AlertasActivas = () => {
     }
   }, [filtros.desde, filtros.hasta, filtros.pagina]);
 
+  // ✅ NUEVO: Manejar clic en alerta - ABRE MODAL OTP PRIMERO
+  const handleRowClick = async (alerta) => {
+    try {
+      setLoading(true);
+      // Obtener el detalle de la alerta (con ofuscación)
+      const response = await alertasPanelService.obtenerDetalle(alerta.id);
+      
+      if (response.success) {
+        // Guardar datos completos para cuando se verifique OTP
+        setDatosCompletosAlerta(response.data);
+        
+        if (response.requiere_otp) {
+          // Si requiere OTP, mostrar modal para solicitar código
+          setAlertaSeleccionada(alerta);
+          setMostrarModalOtp(true);
+        } else {
+          // Si no requiere OTP, ir directamente al detalle
+          navigate(`/admin/alertas/${alerta.id}`);
+        }
+      } else {
+        toast.error('Error al cargar la alerta');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Error al cargar la alerta');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ✅ NUEVO: Solicitar OTP desde el modal
+  const handleSolicitarOtp = async () => {
+    if (!alertaSeleccionada) return;
+    
+    const result = await solicitarOtp(alertaSeleccionada.id);
+    if (result.success) {
+      // El hook ya maneja el modal de ingreso de código
+      setMostrarModalOtp(false);
+    }
+  };
+
+  // ✅ NUEVO: Verificar OTP y mostrar detalle completo
+  const handleVerificarOtpYVerDetalle = async () => {
+    if (!alertaSeleccionada || !codigoOtp) return;
+    
+    const result = await verificarOtp(alertaSeleccionada.id, codigoOtp);
+    if (result.success && result.data) {
+      // Guardar los datos completos en el estado global o localStorage para el detalle
+      // Por ahora, navegar con los datos completos en el estado
+      navigate(`/admin/alertas/${alertaSeleccionada.id}`, { 
+        state: { datosCompletos: result.data } 
+      });
+    }
+  };
+
   const abrirMapaModal = (e, alerta) => {
     e.stopPropagation();
     setMapaModal({
@@ -197,10 +270,6 @@ const AlertasActivas = () => {
       alertaId: null,
       tipo: null
     });
-  };
-
-  const handleRowClick = (alertaId) => {
-    navigate(`/admin/alertas/${alertaId}`);
   };
 
   const formatearFechaCorta = (fecha) => {
@@ -339,13 +408,13 @@ const AlertasActivas = () => {
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">TIEMPO ESPERA</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">FECHA</th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">ACCIONES</th>
-                    </tr>
+                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {alertas.map((alerta) => (
                       <tr 
                         key={alerta.id}
-                        onClick={() => handleRowClick(alerta.id)}
+                        onClick={() => handleRowClick(alerta)}
                         className="hover:bg-red-50/30 cursor-pointer transition-colors"
                       >
                         <td className="px-4 py-3 text-sm text-gray-600 font-medium">#{alerta.id}</td>
@@ -391,7 +460,7 @@ const AlertasActivas = () => {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleRowClick(alerta.id);
+                              handleRowClick(alerta);
                             }}
                             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                             title="Ver detalle"
@@ -454,6 +523,108 @@ const AlertasActivas = () => {
         alertaId={mapaModal.alertaId}
         tipo={mapaModal.tipo}
       />
+
+      {/* ✅ MODAL DE SOLICITUD DE OTP (primer paso) */}
+      {mostrarModalOtp && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl">
+            <div className="text-center mb-4">
+              <Shield className="mx-auto h-12 w-12 text-blue-600" />
+              <h3 className="text-lg font-semibold text-gray-900 mt-2">
+                Verificación de seguridad
+              </h3>
+              <p className="text-sm text-gray-500 mt-2">
+                Para ver los datos completos de esta alerta, necesitas solicitar un código de verificación.
+              </p>
+              <p className="text-xs text-gray-400 mt-1">
+                El código será enviado a tu correo electrónico.
+              </p>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setMostrarModalOtp(false);
+                  setAlertaSeleccionada(null);
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSolicitarOtp}
+                disabled={solicitando}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
+              >
+                {solicitando ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Lock size={18} />
+                )}
+                Solicitar código
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ MODAL DE INGRESO DE OTP (segundo paso - manejado por useOtp) */}
+      {showModalHook && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl">
+            <div className="text-center mb-4">
+              <Shield className="mx-auto h-12 w-12 text-blue-600" />
+              <h3 className="text-lg font-semibold text-gray-900 mt-2">
+                Ingresa el código de verificación
+              </h3>
+              <p className="text-sm text-gray-500 mt-1">
+                Se ha enviado un código a:
+              </p>
+              <p className="font-medium text-gray-700">{otpEmail}</p>
+              {otpExpiracion && (
+                <p className="text-xs text-gray-400 mt-1">
+                  Válido hasta: {new Date(otpExpiracion).toLocaleTimeString()}
+                </p>
+              )}
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Código de 6 dígitos
+              </label>
+              <input
+                type="text"
+                value={codigoOtp}
+                onChange={(e) => setCodigoOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="000000"
+                className="w-full text-center text-2xl tracking-widest border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                autoFocus
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={cerrarModalOtpHook}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleVerificarOtpYVerDetalle}
+                disabled={verificando || codigoOtp.length !== 6}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
+              >
+                {verificando ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <CheckCircle size={18} />
+                )}
+                Verificar y ver detalles
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
