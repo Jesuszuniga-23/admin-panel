@@ -9,12 +9,13 @@ export const useOtp = () => {
   const [showModal, setShowModal] = useState(false);
   const [otpEmail, setOtpEmail] = useState('');
   const [otpExpiracion, setOtpExpiracion] = useState(null);
+  const [codigoOtp, setCodigoOtp] = useState('');
 
   const solicitarOtp = async (alertaId) => {
     setSolicitando(true);
     try {
       const response = await alertasPanelService.solicitarOtp(alertaId);
-
+      
       if (response.success) {
         setShowModal(true);
         setOtpEmail(response.email_ofuscado);
@@ -43,14 +44,18 @@ export const useOtp = () => {
       toast.error('Ingresa el código de 6 dígitos');
       return { success: false, error: 'Código inválido' };
     }
-
+    
     setVerificando(true);
     try {
       const response = await alertasPanelService.verificarOtp(alertaId, codigo);
-
+      
       if (response.success) {
         setShowModal(false);
-        toast.success('Código verificado. Mostrando datos completos.');
+        setCodigoOtp('');
+        toast.success('Código verificado. Mostrando datos completos.', {
+          icon: '✅',
+          duration: 3000
+        });
         return { success: true, data: response.data };
       } else {
         toast.error(response.error || 'Código inválido');
@@ -70,6 +75,7 @@ export const useOtp = () => {
     setShowModal(false);
     setOtpEmail('');
     setOtpExpiracion(null);
+    setCodigoOtp('');
   };
 
   return {
@@ -78,6 +84,8 @@ export const useOtp = () => {
     showModal,
     otpEmail,
     otpExpiracion,
+    codigoOtp,
+    setCodigoOtp,
     solicitarOtp,
     verificarOtp,
     cerrarModal

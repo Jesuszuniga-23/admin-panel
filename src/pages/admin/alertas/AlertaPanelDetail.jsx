@@ -46,12 +46,12 @@ const AlertaPanelDetail = () => {
     showModal,
     otpEmail,
     otpExpiracion,
+    codigoOtp,
+    setCodigoOtp,
     solicitarOtp,
     verificarOtp,
     cerrarModal
   } = useOtp();
-
-  const [codigoOtp, setCodigoOtp] = useState('');
 
   useEffect(() => {
     cargarAlerta();
@@ -277,10 +277,10 @@ const AlertaPanelDetail = () => {
         </div>
       </div>
 
-      {/* Modal OTP */}
+      {/* Modal OTP - CORREGIDO con z-index alto */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl">
             <div className="text-center mb-4">
               <Shield className="mx-auto h-12 w-12 text-blue-600" />
               <h3 className="text-lg font-semibold text-gray-900 mt-2">
@@ -314,14 +314,14 @@ const AlertaPanelDetail = () => {
             <div className="flex gap-3">
               <button
                 onClick={cerrarModal}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleVerificarOtp}
                 disabled={verificando || codigoOtp.length !== 6}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
               >
                 {verificando ? (
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
