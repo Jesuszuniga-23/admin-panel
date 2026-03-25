@@ -26,16 +26,18 @@ class AuthService {
 
   // ✅ CORRECTO - NO recibe pendingToken
   async verificar2FA(codigo) {
-    try {
-      const response = await axiosInstance.post(ENDPOINTS.AUTH.VERIFY_2FA, {
-        codigo
-      });
-      return response.data;
-    } catch (error) {
-      console.error("Error verificando 2FA:", error);
-      throw error.response?.data || { error: 'Error al verificar código' };
-    }
+  try {
+    const response = await axiosInstance.post(ENDPOINTS.AUTH.VERIFY_2FA, {
+      codigo
+    });
+    console.log('🔐 Respuesta de verificar2FA:', response.data);
+    return response.data;  // Debe tener { success: true, usuario: {...} }
+  } catch (error) {
+    console.error("Error verificando 2FA:", error);
+    throw error.response?.data || { error: 'Error al verificar código' };
   }
+}
+
 
   // ✅ CORRECTO - NO recibe pendingToken
   async reenviarCodigo2FA() {

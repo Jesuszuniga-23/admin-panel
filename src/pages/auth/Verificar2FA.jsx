@@ -4,10 +4,12 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Shield, ArrowLeft, Mail, Loader, CheckCircle, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import authService from '../../services/auth.service';
+import useAuthStore from '../../store/authStore';
 
 const Verificar2FA = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { setUser } = useAuthStore();
   const [codigo, setCodigo] = useState('');
   const [loading, setLoading] = useState(false);
   const [reenviando, setReenviando] = useState(false);
@@ -48,13 +50,25 @@ const Verificar2FA = () => {
       console.log('🔐 Verificando código 2FA...');
       const response = await authService.verificar2FA(codigo);
       
+      console.log('📦 Respuesta del backend:', response);
+      
       if (response.success) {
         toast.success('Verificación exitosa');
         
+        // ✅ GUARDAR EL USUARIO EN EL STORE
+        if (response.usuario) {
+          console.log('✅ Guardando usuario en store:', response.usuario);
+          setUser(response.usuario);
+        } else {
+          console.error('❌ No hay usuario en la respuesta');
+        }
+        
         const rolesAdmin = ['superadmin', 'admin', 'operador_tecnico', 'operador_policial', 'operador_medico', 'operador_general'];
         if (rolesAdmin.includes(response.usuario?.rol)) {
+          console.log('✅ Redirigiendo a /admin/dashboard');
           window.location.href = '/admin/dashboard';
         } else {
+          console.log('✅ Redirigiendo a /mobile');
           window.location.href = '/mobile';
         }
       } else {
