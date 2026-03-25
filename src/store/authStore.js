@@ -10,38 +10,40 @@ const useAuthStore = create(
       isLoading: true,
       
       setUser: (userData) => {
-        console.log("Store actualizado:", userData?.email);
+        console.log("📝 Store actualizado con usuario:", userData?.email);
+        console.log("📝 Rol del usuario:", userData?.rol);
         set({ user: userData, isLoading: false });
         
-        // 🔥 GUARDAR TODOS LOS ROLES WEB (admin, superadmin, operadores)
         const rolesWeb = ['admin', 'superadmin', 'operador_tecnico', 'operador_policial', 'operador_medico', 'operador_general'];
         
         if (userData && rolesWeb.includes(userData.rol)) {
           localStorage.setItem('user', JSON.stringify(userData));
+          console.log('✅ Usuario guardado en localStorage');
         } else {
           localStorage.removeItem('user');
+          console.log('⚠️ Usuario no guardado (rol no web o sin datos)');
         }
       },
       
       setLoading: (isLoading) => set({ isLoading }),
       
       logout: () => {
-        console.log("Logout desde store");
+        console.log("🔴 Logout desde store");
         authService.logout();
         set({ user: null, isLoading: false });
         localStorage.removeItem('user');
         localStorage.removeItem('auth-storage');
-        
-        // Forzar redirección en TODAS las pestañas
         window.location.href = '/login';
       },
       
       initFromService: async () => {
-        console.log("Inicializando store desde servicio...");
+        console.log("🔄 Inicializando store desde servicio...");
         const user = authService.getCurrentUser();
         if (user) {
+          console.log("✅ Usuario encontrado:", user.email);
           set({ user, isLoading: false });
         } else {
+          console.log("⚠️ No hay usuario en localStorage");
           set({ isLoading: false });
         }
       }
@@ -53,11 +55,10 @@ const useAuthStore = create(
   )
 );
 
-// Escuchar cambios en localStorage para sincronizar logout
 if (typeof window !== 'undefined') {
   window.addEventListener('storage', (e) => {
     if (e.key === 'user' && !e.newValue) {
-      console.log(" Logout detectado en otra pestaña");
+      console.log("🔴 Logout detectado en otra pestaña");
       window.location.href = '/login';
     }
   });

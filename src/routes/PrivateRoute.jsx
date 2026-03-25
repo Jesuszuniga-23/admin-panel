@@ -8,9 +8,14 @@ const PrivateRoute = ({ children, allowedRoles = ['admin', 'superadmin'] }) => {
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsReady(true), 50);
+    console.log('🔒 PrivateRoute - isLoading:', isLoading);
+    console.log('🔒 PrivateRoute - user:', user?.email);
+    console.log('🔒 PrivateRoute - user rol:', user?.rol);
+    console.log('🔒 PrivateRoute - allowedRoles:', allowedRoles);
+    
+    const timer = setTimeout(() => setIsReady(true), 100);
     return () => clearTimeout(timer);
-  }, []);
+  }, [isLoading, user]);
 
   if (isLoading || !isReady) {
     return (
@@ -21,16 +26,16 @@ const PrivateRoute = ({ children, allowedRoles = ['admin', 'superadmin'] }) => {
   }
 
   if (!user) {
-    console.log("No hay usuario, redirigiendo...");
+    console.log("❌ No hay usuario, redirigiendo a login");
     return <Navigate to="/login" replace />;
   }
 
   if (!allowedRoles.includes(user.rol)) {
-    console.log("Rol no autorizado:", user.rol);
+    console.log("❌ Rol no autorizado:", user.rol);
     return <Navigate to="/login" replace />;
   }
 
-  console.log("Acceso permitido para:", user.rol);
+  console.log("✅ Acceso permitido para:", user.rol);
   return children;
 };
 
