@@ -191,6 +191,31 @@ const Dashboard = () => {
 
   const COLORS = ['#3b82f6', '#ef4444', '#f59e0b', '#10b981', '#8b5cf6'];
 
+  // ✅ Función para determinar qué datos mostrar en la gráfica según el rol
+  const getPersonalDistributionData = () => {
+    // Si es operador policial, solo mostrar Policía
+    if (rolPersonalPermitido === 'policia') {
+      return [
+        { name: 'Policía', value: stats?.personal?.porRol?.policia || 0 }
+      ];
+    }
+    
+    // Si es operador médico, solo mostrar Ambulancia
+    if (rolPersonalPermitido === 'ambulancia') {
+      return [
+        { name: 'Ambulancia', value: stats?.personal?.porRol?.ambulancia || 0 }
+      ];
+    }
+    
+    // Para admin, superadmin y técnico, mostrar todos
+    return [
+      { name: 'Policía', value: stats?.personal?.porRol?.policia || 0 },
+      { name: 'Ambulancia', value: stats?.personal?.porRol?.ambulancia || 0 },
+      { name: 'Admin', value: stats?.personal?.porRol?.admin || 0 },
+      { name: 'Super Admin', value: stats?.personal?.porRol?.superadmin || 0 }
+    ];
+  };
+
   if (error) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
@@ -223,6 +248,7 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <main className="p-4 sm:p-6 md:p-8">
+        {/* KPIs */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
           {stats?.kpis && Object.entries(stats.kpis).map(([key, data]) => (
             <div key={key} className="bg-white rounded-xl md:rounded-2xl shadow-lg shadow-slate-200/50 p-4 md:p-6 hover:shadow-xl transition-all">
@@ -249,7 +275,9 @@ const Dashboard = () => {
           ))}
         </div>
 
+        {/* Gráficas */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
+          {/* Alertas por hora */}
           <div className="lg:col-span-2 bg-white rounded-xl md:rounded-2xl shadow-lg shadow-slate-200/50 p-4 md:p-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 md:mb-6">
               <div>
@@ -300,6 +328,7 @@ const Dashboard = () => {
             )}
           </div>
 
+          {/* Distribución de Personal - CORREGIDA */}
           <div className="bg-white rounded-xl md:rounded-2xl shadow-lg shadow-slate-200/50 p-4 md:p-6">
             <h2 className="text-base md:text-lg font-semibold text-slate-800 mb-4 md:mb-6">
               Distribución de Personal
@@ -309,12 +338,7 @@ const Dashboard = () => {
               <ResponsiveContainer width="100%" height="100%">
                 <RePieChart>
                   <Pie
-                    data={[
-                      { name: 'Policía', value: stats?.personal?.porRol?.policia || 0 },
-                      { name: 'Ambulancia', value: stats?.personal?.porRol?.ambulancia || 0 },
-                      { name: 'Admin', value: stats?.personal?.porRol?.admin || 0 },
-                      { name: 'Super Admin', value: stats?.personal?.porRol?.superadmin || 0 }
-                    ]}
+                    data={getPersonalDistributionData()}
                     cx="50%"
                     cy="50%"
                     innerRadius={30}
@@ -322,35 +346,26 @@ const Dashboard = () => {
                     paddingAngle={2}
                     dataKey="value"
                   >
-                    {COLORS.map((color, index) => (
-                      <Cell key={`cell-${index}`} fill={color} stroke="white" strokeWidth={2} />
+                    {getPersonalDistributionData().map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="white" strokeWidth={2} />
                     ))}
                   </Pie>
                   <Tooltip />
                 </RePieChart>
               </ResponsiveContainer>
             </div>
-            <div className="grid grid-cols-2 gap-2 mt-3 md:mt-4">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 md:w-3 md:h-3 bg-blue-500 rounded-full"></div>
-                <span className="text-xs text-slate-500">Policía: {stats?.personal?.porRol?.policia || 0}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 md:w-3 md:h-3 bg-red-500 rounded-full"></div>
-                <span className="text-xs text-slate-500">Ambulancia: {stats?.personal?.porRol?.ambulancia || 0}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 md:w-3 md:h-3 bg-amber-500 rounded-full"></div>
-                <span className="text-xs text-slate-500">Admin: {stats?.personal?.porRol?.admin || 0}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 md:w-3 md:h-3 bg-purple-500 rounded-full"></div>
-                <span className="text-xs text-slate-500">Super: {stats?.personal?.porRol?.superadmin || 0}</span>
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3 md:mt-4">
+              {getPersonalDistributionData().map((item, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <div className={`w-2 h-2 md:w-3 md:h-3 rounded-full`} style={{ backgroundColor: COLORS[idx % COLORS.length] }}></div>
+                  <span className="text-xs text-slate-500">{item.name}: {item.value}</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
 
+        {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8">
           <StatCard
             icon={<IconoEntidad entidad="POLICIA" size={20} />}
@@ -413,6 +428,7 @@ const Dashboard = () => {
           />
         </div>
 
+        {/* Actividad Reciente */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
           <div className="bg-white rounded-xl md:rounded-2xl shadow-lg shadow-slate-200/50 p-4 md:p-6">
             <h2 className="text-base md:text-lg font-semibold text-slate-800 mb-3 md:mb-4">

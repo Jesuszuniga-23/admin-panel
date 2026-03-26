@@ -17,9 +17,13 @@ class DashboardService {
       const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
       const rolPersonalPermitido = authService.getRolPersonalPermitido();
       
+      // ✅ NUEVO: Para unidades, usar el mismo filtro que personal
+      const tipoUnidadPermitido = rolPersonalPermitido; // 'policia' o 'ambulancia'
+      
       // Preparar parámetros para cada llamada
       const personalParams = rolPersonalPermitido ? { rol: rolPersonalPermitido } : {};
       const alertasParams = tipoAlertaPermitido ? { tipo: tipoAlertaPermitido } : {};
+      const unidadParams = tipoUnidadPermitido ? { tipo: tipoUnidadPermitido } : {};
       
       // Obtener datos en paralelo
       const [
@@ -32,7 +36,7 @@ class DashboardService {
         alertasCerradasRes
       ] = await Promise.allSettled([
         personalService.listarPersonal({ limite: 1000, ...personalParams }),
-        unidadService.listarUnidades({ limite: 1000 }),
+        unidadService.listarUnidades({ limite: 1000, ...unidadParams }), // ✅ AHORA CON FILTRO
         alertasService.obtenerExpiradas({ limite: 1000, ...alertasParams }),
         alertasService.obtenerCerradasManual({ limite: 1000, ...alertasParams }),
         alertasPanelService.obtenerActivas({ limite: 1000, ...alertasParams }),
@@ -72,7 +76,11 @@ class DashboardService {
           policia: personalData.filter(p => p.rol === 'policia').length,
           ambulancia: personalData.filter(p => p.rol === 'ambulancia').length,
           admin: personalData.filter(p => p.rol === 'admin').length,
-          superadmin: personalData.filter(p => p.rol === 'superadmin').length
+          superadmin: personalData.filter(p => p.rol === 'superadmin').length,
+          operador_tecnico: personalData.filter(p => p.rol === 'operador_tecnico').length,
+          operador_policial: personalData.filter(p => p.rol === 'operador_policial').length,
+          operador_medico: personalData.filter(p => p.rol === 'operador_medico').length,
+          operador_general: personalData.filter(p => p.rol === 'operador_general').length
         }
       };
 
@@ -222,12 +230,16 @@ class DashboardService {
       const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
       const rolPersonalPermitido = authService.getRolPersonalPermitido();
       
+      // ✅ NUEVO: Para unidades, usar el mismo filtro que personal
+      const tipoUnidadPermitido = rolPersonalPermitido;
+      
       const personalParams = rolPersonalPermitido ? { rol: rolPersonalPermitido } : {};
       const alertasParams = tipoAlertaPermitido ? { tipo: tipoAlertaPermitido } : {};
+      const unidadParams = tipoUnidadPermitido ? { tipo: tipoUnidadPermitido } : {};
       
       const [personalRes, unidadesRes, alertasActivasRes, alertasProcesoRes] = await Promise.allSettled([
         personalService.listarPersonal({ limite: 5, orden: 'DESC', ordenarPor: 'creado_en', ...personalParams }),
-        unidadService.listarUnidades({ limite: 5, orden: 'DESC', ordenarPor: 'creado_en' }),
+        unidadService.listarUnidades({ limite: 5, orden: 'DESC', ordenarPor: 'creado_en', ...unidadParams }),
         alertasPanelService.obtenerActivas({ limite: 3, ...alertasParams }),
         alertasPanelService.obtenerEnProceso({ limite: 3, ...alertasParams })
       ]);
