@@ -136,10 +136,22 @@ const UnidadesList = () => {
   const [loading, setLoading] = useState(true);
   const [exportando, setExportando] = useState(false);
   
-  // Obtener tipo de unidad permitido según rol (operadores solo ven su tipo)
-  const tipoUnidadPermitido = authService.getRolPersonalPermitido(); // 'policia' o 'ambulancia'
-  const puedeGestionar = tipoUnidadPermitido ? 
-    (tipoUnidadPermitido === 'policia' || tipoUnidadPermitido === 'ambulancia') : true;
+  const tipoUnidadPermitido = authService.getRolPersonalPermitido();
+  
+  // Funciones de permisos para unidades
+  const puedeCrearUnidades = () => {
+    const puedeCrearPolicia = authService.puedeCrearUnidad('policia');
+    const puedeCrearAmbulancia = authService.puedeCrearUnidad('ambulancia');
+    return puedeCrearPolicia || puedeCrearAmbulancia;
+  };
+  
+  const puedeGestionarUnidad = (unidad) => {
+    return authService.puedeEditarUnidad(unidad.tipo);
+  };
+  
+  const puedeEliminarUnidad = (unidad) => {
+    return authService.puedeEliminarUnidad(unidad.tipo);
+  };
   
   const [modalInfo, setModalInfo] = useState({ show: false, mensaje: '' });
   const [modalConfirmacion, setModalConfirmacion] = useState({
@@ -250,10 +262,10 @@ const UnidadesList = () => {
   };
 
   const handleToggleActivo = async (id, codigo, unidad) => {
-    if (!puedeGestionar) {
+    if (!puedeGestionarUnidad(unidad)) {
       setModalInfo({
         show: true,
-        mensaje: `No tienes permisos para modificar unidades.`
+        mensaje: `No tienes permisos para modificar esta unidad.`
       });
       return;
     }
@@ -323,10 +335,10 @@ const UnidadesList = () => {
   };
 
   const handleEliminar = async (id, codigo, unidad) => {
-    if (!puedeGestionar) {
+    if (!puedeEliminarUnidad(unidad)) {
       setModalInfo({
         show: true,
-        mensaje: `No tienes permisos para eliminar unidades.`
+        mensaje: `No tienes permisos para eliminar esta unidad.`
       });
       return;
     }
@@ -370,10 +382,10 @@ const UnidadesList = () => {
   };
 
   const handleEditar = (id, unidad) => {
-    if (!puedeGestionar) {
+    if (!puedeGestionarUnidad(unidad)) {
       setModalInfo({
         show: true,
-        mensaje: `No tienes permisos para editar unidades.`
+        mensaje: `No tienes permisos para editar esta unidad.`
       });
       return;
     }
@@ -397,6 +409,9 @@ const UnidadesList = () => {
       limite: 10
     });
   };
+
+  const inicio = paginacion.total > 0 ? ((paginacion.pagina - 1) * paginacion.limite) + 1 : 0;
+  const fin = Math.min(paginacion.pagina * paginacion.limite, paginacion.total);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-3 sm:p-4 md:p-6 lg:p-8">
@@ -461,7 +476,7 @@ const UnidadesList = () => {
             <span className="sm:hidden">PDF</span>
             <span className="hidden sm:inline">PDF</span>
           </button>
-          {puedeGestionar && (
+          {puedeCrearUnidades() && (
             <button
               onClick={() => navigate('/admin/unidades/crear')}
               className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-blue-600 text-white px-3 sm:px-4 py-2 text-sm sm:text-base rounded-lg hover:bg-blue-700 transition-colors"
@@ -557,7 +572,7 @@ const UnidadesList = () => {
                 ? `No hay unidades de tipo ${tipoUnidadPermitido === 'policia' ? 'Policía' : 'Ambulancia'} registradas`
                 : 'Comienza creando una nueva unidad'}
             </p>
-            {puedeGestionar && !tipoUnidadPermitido && (
+            {puedeCrearUnidades() && !tipoUnidadPermitido && (
               <button
                 onClick={() => navigate('/admin/unidades/crear')}
                 className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-600 text-white text-xs sm:text-sm rounded-lg hover:bg-blue-700"
@@ -578,7 +593,7 @@ const UnidadesList = () => {
                     <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
                     <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase">Personal</th>
                     <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
-                   </tr>
+                  </tr>
                 </thead>
                 <tbody className="divide-y">
                   {unidades.map((unidad) => (
@@ -620,7 +635,7 @@ const UnidadesList = () => {
                       </td>
                       <td className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 lg:py-4 text-right">
                         <div className="flex items-center justify-end gap-1 sm:gap-1.5 lg:gap-2">
-                          {puedeGestionar && (
+                          {puedeGestionarUnidad(unidad) && (
                             <button
                               onClick={() => handleToggleActivo(unidad.id, unidad.codigo, unidad)}
                               className={`p-1 rounded-lg transition-colors ${
@@ -638,7 +653,7 @@ const UnidadesList = () => {
                           >
                             <Eye size={14} className="text-gray-500" />
                           </button>
-                          {puedeGestionar && (
+                          {puedeGestionarUnidad(unidad) && (
                             <button
                               onClick={() => handleEditar(unidad.id, unidad)}
                               className="p-1 hover:bg-gray-100 rounded-lg"
@@ -647,7 +662,7 @@ const UnidadesList = () => {
                               <Edit size={14} className="text-gray-500" />
                             </button>
                           )}
-                          {puedeGestionar && (
+                          {puedeEliminarUnidad(unidad) && (
                             <button
                               onClick={() => handleEliminar(unidad.id, unidad.codigo, unidad)}
                               className="p-1 hover:bg-red-50 rounded-lg"

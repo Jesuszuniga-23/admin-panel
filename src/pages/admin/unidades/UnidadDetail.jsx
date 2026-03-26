@@ -182,9 +182,10 @@ const UnidadDetail = () => {
   const [personalSeleccionado, setPersonalSeleccionado] = useState('');
   const [cargandoPersonal, setCargandoPersonal] = useState(false);
   
-  // Obtener permisos según rol
-  const puedeGestionar = authService.getRolPersonalPermitido() ? 
-    (authService.getRolPersonalPermitido() === unidad?.tipo) : true;
+  // ✅ CORRECTO: Usar los nuevos métodos de permisos
+  const puedeEditarUnidad = authService.puedeEditarUnidad(unidad?.tipo);
+  const puedeEliminarUnidad = authService.puedeEliminarUnidad(unidad?.tipo);
+  const puedeGestionar = puedeEditarUnidad || puedeEliminarUnidad;
   
   const [modalInfo, setModalInfo] = useState({ show: false, mensaje: '' });
   const [modalConfirmacion, setModalConfirmacion] = useState({
@@ -239,7 +240,7 @@ const UnidadDetail = () => {
   };
 
   const cargarPersonalDisponible = async () => {
-    if (!puedeGestionar) {
+    if (!puedeEditarUnidad) {
       toast.error('No tienes permisos para asignar personal a esta unidad');
       return;
     }
@@ -296,7 +297,7 @@ const UnidadDetail = () => {
   };
 
   const handleRemover = async (personalId, nombre) => {
-    if (!puedeGestionar) {
+    if (!puedeEditarUnidad) {
       toast.error('No tienes permisos para remover personal de esta unidad');
       return;
     }
@@ -339,7 +340,7 @@ const UnidadDetail = () => {
   };
 
   const handleToggleActiva = async () => {
-    if (!puedeGestionar) {
+    if (!puedeEditarUnidad) {
       toast.error('No tienes permisos para modificar esta unidad');
       return;
     }
@@ -390,7 +391,7 @@ const UnidadDetail = () => {
   };
 
   const handleEliminar = async () => {
-    if (!puedeGestionar) {
+    if (!puedeEliminarUnidad) {
       toast.error('No tienes permisos para eliminar esta unidad');
       return;
     }
@@ -431,7 +432,7 @@ const UnidadDetail = () => {
   };
 
   const handleEditar = () => {
-    if (!puedeGestionar) {
+    if (!puedeEditarUnidad) {
       toast.error('No tienes permisos para editar esta unidad');
       return;
     }
@@ -604,7 +605,7 @@ const UnidadDetail = () => {
                 <Users size={20} />
                 Personal asignado ({unidad.personal_asignado?.length || 0})
               </h3>
-              {puedeGestionar && (
+              {puedeEditarUnidad && (
                 <button
                   onClick={cargarPersonalDisponible}
                   className="flex items-center gap-2 px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
@@ -678,7 +679,7 @@ const UnidadDetail = () => {
                         </p>
                       </div>
                     </div>
-                    {puedeGestionar && (
+                    {puedeEditarUnidad && (
                       <button
                         onClick={() => handleRemover(persona.id, persona.nombre)}
                         className="p-1 hover:bg-red-100 rounded-lg transition-colors"
@@ -723,9 +724,9 @@ const UnidadDetail = () => {
           </div>
         </div>
 
-        {/* Botones de acción */}
+        {/* Botones de acción - CORREGIDOS */}
         <div className="border-t px-6 py-4 bg-gray-50 flex justify-end gap-3">
-          {puedeGestionar && (
+          {puedeEditarUnidad && (
             <>
               <button
                 onClick={handleToggleActiva}
@@ -746,18 +747,20 @@ const UnidadDetail = () => {
                 <Edit size={18} />
                 Editar
               </button>
-
-              <button
-                onClick={handleEliminar}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"
-              >
-                <Trash2 size={18} />
-                Eliminar
-              </button>
             </>
           )}
           
-          {!puedeGestionar && (
+          {puedeEliminarUnidad && (
+            <button
+              onClick={handleEliminar}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"
+            >
+              <Trash2 size={18} />
+              Eliminar
+            </button>
+          )}
+          
+          {!puedeEditarUnidad && !puedeEliminarUnidad && (
             <div className="flex items-center gap-2 text-gray-400 text-sm">
               <Lock size={14} />
               No tienes permisos para modificar esta unidad

@@ -24,22 +24,19 @@ class AuthService {
     }
   }
 
-  // ✅ CORRECTO - NO recibe pendingToken
   async verificar2FA(codigo) {
-  try {
-    const response = await axiosInstance.post(ENDPOINTS.AUTH.VERIFY_2FA, {
-      codigo
-    });
-    console.log('🔐 Respuesta de verificar2FA:', response.data);
-    return response.data;  // Debe tener { success: true, usuario: {...} }
-  } catch (error) {
-    console.error("Error verificando 2FA:", error);
-    throw error.response?.data || { error: 'Error al verificar código' };
+    try {
+      const response = await axiosInstance.post(ENDPOINTS.AUTH.VERIFY_2FA, {
+        codigo
+      });
+      console.log('🔐 Respuesta de verificar2FA:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error("Error verificando 2FA:", error);
+      throw error.response?.data || { error: 'Error al verificar código' };
+    }
   }
-}
 
-
-  // ✅ CORRECTO - NO recibe pendingToken
   async reenviarCodigo2FA() {
     try {
       const response = await axiosInstance.post(ENDPOINTS.AUTH.RESEND_2FA, {});
@@ -174,13 +171,83 @@ class AuthService {
     return null;
   }
 
-  puedeModificarPersonal(rolPersonal) {
+  // =====================================================
+  // PERMISOS PARA CREAR PERSONAL Y UNIDADES
+  // =====================================================
+  
+  puedeCrearPersonal(rolACrear) {
     const user = this.getCurrentUser();
-    if (user?.rol === 'admin' || user?.rol === 'superadmin') return true;
-    if (user?.rol === 'operador_tecnico') return false;
-    if (user?.rol === 'operador_policial') return rolPersonal === 'policia';
-    if (user?.rol === 'operador_medico') return rolPersonal === 'ambulancia';
+    const rolUsuario = user?.rol;
+    
+    const permisos = {
+      superadmin: true,
+      admin: ['admin', 'operador_tecnico', 'operador_general'],
+      operador_policial: ['policia'],
+      operador_medico: ['ambulancia'],
+      operador_tecnico: [],
+      operador_general: []
+    };
+    
+    if (rolUsuario === 'superadmin') return true;
+    return permisos[rolUsuario]?.includes(rolACrear) || false;
+  }
+  
+  puedeCrearUnidad(tipoUnidad) {
+    const user = this.getCurrentUser();
+    const rolUsuario = user?.rol;
+    
+    const permisos = {
+      superadmin: true,
+      admin: false,
+      operador_policial: tipoUnidad === 'policia',
+      operador_medico: tipoUnidad === 'ambulancia',
+      operador_tecnico: true,
+      operador_general: false
+    };
+    
+    if (rolUsuario === 'superadmin') return true;
+    if (rolUsuario === 'admin') return false;
+    return permisos[rolUsuario] || false;
+  }
+  
+  puedeEditarPersonal(rolPersonal) {
+    const user = this.getCurrentUser();
+    const rolUsuario = user?.rol;
+    
+    if (rolUsuario === 'superadmin') return true;
+    if (rolUsuario === 'admin') {
+      return rolPersonal !== 'superadmin' && rolPersonal !== 'policia' && rolPersonal !== 'ambulancia';
+    }
+    if (rolUsuario === 'operador_policial') return rolPersonal === 'policia';
+    if (rolUsuario === 'operador_medico') return rolPersonal === 'ambulancia';
+    if (rolUsuario === 'operador_tecnico') return false;
+    if (rolUsuario === 'operador_general') return false;
     return false;
+  }
+  
+  puedeEliminarPersonal(rolPersonal) {
+    return this.puedeEditarPersonal(rolPersonal);
+  }
+  
+  puedeEditarUnidad(tipoUnidad) {
+    const user = this.getCurrentUser();
+    const rolUsuario = user?.rol;
+    
+    if (rolUsuario === 'superadmin') return true;
+    if (rolUsuario === 'admin') return false;
+    if (rolUsuario === 'operador_policial') return tipoUnidad === 'policia';
+    if (rolUsuario === 'operador_medico') return tipoUnidad === 'ambulancia';
+    if (rolUsuario === 'operador_tecnico') return true;
+    return false;
+  }
+  
+  puedeEliminarUnidad(tipoUnidad) {
+    return this.puedeEditarUnidad(tipoUnidad);
+  }
+  
+  // Métodos existentes
+  puedeModificarPersonal(rolPersonal) {
+    return this.puedeEditarPersonal(rolPersonal);
   }
 
   puedeGestionarAlerta(tipoAlerta) {

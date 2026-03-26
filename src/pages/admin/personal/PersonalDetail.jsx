@@ -50,11 +50,11 @@ const PersonalDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Obtener permisos según rol del usuario actual
+  // ✅ CORRECTO: Usar los nuevos métodos de permisos
   const rolPersonal = personal?.rol;
-  const puedeEditar = authService.puedeModificarPersonal(rolPersonal);
-  const puedeEliminar = authService.puedeModificarPersonal(rolPersonal);
-  const puedeCambiarEstado = authService.puedeModificarPersonal(rolPersonal);
+  const puedeEditar = authService.puedeEditarPersonal(rolPersonal);
+  const puedeEliminar = authService.puedeEliminarPersonal(rolPersonal);
+  const puedeCambiarEstado = authService.puedeEditarPersonal(rolPersonal);
   
   // Verificar si es el propio usuario (no puede eliminarse a sí mismo)
   const esPropioUsuario = currentUser?.id === parseInt(id);

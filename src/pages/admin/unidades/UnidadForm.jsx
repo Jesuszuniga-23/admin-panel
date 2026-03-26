@@ -53,9 +53,7 @@ const UnidadForm = () => {
   const isEditing = !!id;
   const storageKey = isEditing ? `unidad_form_edit_${id}` : 'unidad_form_new';
 
-  // Obtener permisos según rol
-  const puedeGestionar = authService.getRolPersonalPermitido() ? 
-    (authService.getRolPersonalPermitido() === 'policia' || authService.getRolPersonalPermitido() === 'ambulancia') : true;
+  // ✅ Obtener permisos según rol
   const tipoUnidadPermitido = authService.getRolPersonalPermitido(); // 'policia' o 'ambulancia'
 
   const [loading, setLoading] = useState(false);
@@ -87,6 +85,11 @@ const UnidadForm = () => {
       activa: true
     };
   });
+
+  // ✅ Verificar permisos para crear/editar unidades
+  const puedeCrearUnidad = authService.puedeCrearUnidad(formData.tipo);
+  const puedeEditarUnidad = authService.puedeEditarUnidad(formData.tipo);
+  const puedeGestionar = puedeCrearUnidad || puedeEditarUnidad;
 
   const codigoRef = useRef();
   const tipoRef = useRef();
@@ -373,8 +376,15 @@ const UnidadForm = () => {
     e.preventDefault();
     setLoading(true);
     
-    if (!puedeGestionar) {
-      toast.error('No tienes permisos para crear/modificar unidades');
+    // ✅ Verificar permisos según el tipo de unidad
+    if (!isEditing && !authService.puedeCrearUnidad(formData.tipo)) {
+      toast.error(`No tienes permisos para crear unidades de tipo ${formData.tipo === 'policia' ? 'Policía' : 'Ambulancia'}`);
+      setLoading(false);
+      return;
+    }
+    
+    if (isEditing && !authService.puedeEditarUnidad(formData.tipo)) {
+      toast.error(`No tienes permisos para editar esta unidad`);
       setLoading(false);
       return;
     }

@@ -78,9 +78,18 @@ const PersonalList = () => {
   
   // Obtener permisos según rol
   const rolPersonalPermitido = authService.getRolPersonalPermitido();
-  const puedeCrear = authService.puedeModificarPersonal(rolPersonalPermitido || '');
-  const puedeEditar = authService.puedeModificarPersonal(rolPersonalPermitido || '');
-  const puedeEliminar = authService.puedeModificarPersonal(rolPersonalPermitido || '');
+  const puedeEditar = authService.puedeEditarPersonal;
+  const puedeEliminar = authService.puedeEliminarPersonal;
+  
+  // ✅ NUEVO: Verificar si puede crear personal
+  const puedeCrearPersonal = () => {
+    const currentUserRol = authService.getCurrentUser()?.rol;
+    if (currentUserRol === 'superadmin') return true;
+    if (currentUserRol === 'admin') return true;
+    if (currentUserRol === 'operador_policial') return true;
+    if (currentUserRol === 'operador_medico') return true;
+    return false;
+  };
   
   const [filtros, setFiltros] = useState({
     rol: rolPersonalPermitido || '',
@@ -133,7 +142,6 @@ const PersonalList = () => {
   const cargarPersonal = async () => {
     setLoading(true);
     try {
-      // Enviar filtro de rol al backend si es necesario
       const params = {};
       if (rolPersonalPermitido) {
         params.rol = rolPersonalPermitido;
@@ -218,9 +226,9 @@ const PersonalList = () => {
     }
   }, [filtros.rol, filtros.activo, filtros.disponible, filtros.search, filtros.pagina, personalOriginal]);
 
-  const handleEliminar = async (id, nombreCompleto, disponible) => {
-    if (!puedeEliminar) {
-      toast.error('No tienes permisos para eliminar personal');
+  const handleEliminar = async (id, nombreCompleto, disponible, rolPersonal) => {
+    if (!authService.puedeEliminarPersonal(rolPersonal)) {
+      toast.error('No tienes permisos para eliminar este personal');
       return;
     }
     
@@ -257,9 +265,9 @@ const PersonalList = () => {
     });
   };
 
-  const handleToggleActivo = async (id, nombreCompleto, estadoActual, disponible) => {
-    if (!puedeEditar) {
-      toast.error('No tienes permisos para modificar personal');
+  const handleToggleActivo = async (id, nombreCompleto, estadoActual, disponible, rolPersonal) => {
+    if (!authService.puedeEditarPersonal(rolPersonal)) {
+      toast.error('No tienes permisos para modificar este personal');
       return;
     }
     
@@ -324,7 +332,8 @@ const PersonalList = () => {
               </p>
             </div>
           </div>
-          {puedeCrear && (
+          {/* ✅ Botón Nuevo Personal corregido */}
+          {puedeCrearPersonal() && (
             <button
               onClick={() => navigate('/admin/personal/crear')}
               className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap"
@@ -503,9 +512,9 @@ const PersonalList = () => {
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-2">
-                            {puedeEditar && (
+                            {authService.puedeEditarPersonal(persona.rol) && (
                               <button
-                                onClick={() => handleToggleActivo(persona.id, persona.nombreCompleto, persona.activo, persona.disponible)}
+                                onClick={() => handleToggleActivo(persona.id, persona.nombreCompleto, persona.activo, persona.disponible, persona.rol)}
                                 className={`p-1.5 rounded-lg transition-colors ${
                                   persona.activo ? 'hover:bg-yellow-50 text-yellow-600' : 'hover:bg-green-50 text-green-600'
                                 }`}
@@ -521,7 +530,7 @@ const PersonalList = () => {
                             >
                               <Eye size={16} className="text-gray-500" />
                             </button>
-                            {puedeEditar && (
+                            {authService.puedeEditarPersonal(persona.rol) && (
                               <button
                                 onClick={() => navigate(`/admin/personal/editar/${persona.id}`)}
                                 className="p-1.5 hover:bg-gray-100 rounded-lg"
@@ -530,9 +539,9 @@ const PersonalList = () => {
                                 <Edit size={16} className="text-gray-500" />
                               </button>
                             )}
-                            {puedeEliminar && (
+                            {authService.puedeEliminarPersonal(persona.rol) && (
                               <button
-                                onClick={() => handleEliminar(persona.id, persona.nombreCompleto, persona.disponible)}
+                                onClick={() => handleEliminar(persona.id, persona.nombreCompleto, persona.disponible, persona.rol)}
                                 className="p-1.5 hover:bg-red-50 rounded-lg"
                                 title="Eliminar"
                               >

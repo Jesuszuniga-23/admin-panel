@@ -37,14 +37,14 @@ const rolTexto = {
   operador_general: 'Operador General'
 };
 
-// Roles disponibles para crear según el rol del usuario actual
+// ✅ CORREGIDO: Roles disponibles según el rol del usuario
 const rolesDisponiblesPorUsuario = {
-  admin: ['policia', 'ambulancia', 'admin'],
+  admin: ['admin', 'operador_tecnico', 'operador_general'], // Admin NO crea policía/ambulancia
   superadmin: ['policia', 'ambulancia', 'admin', 'superadmin', 'operador_tecnico', 'operador_policial', 'operador_medico', 'operador_general'],
   operador_policial: ['policia'],
   operador_medico: ['ambulancia'],
-  operador_tecnico: [], // No puede crear personal
-  operador_general: []  // No puede crear personal
+  operador_tecnico: [],
+  operador_general: []
 };
 
 // Función para corregir caracteres mal codificados
@@ -102,9 +102,7 @@ const PersonalForm = () => {
   const [loading, setLoading] = useState(false);
   const [cargandoDatos, setCargandoDatos] = useState(isEditing);
   
-  // Obtener permisos según rol del usuario actual
-  const puedeCrear = authService.puedeModificarPersonal(null);
-  const puedeEditar = authService.puedeModificarPersonal(null);
+  // ✅ Obtener permisos según rol del usuario actual
   const rolesPermitidos = rolesDisponiblesPorUsuario[currentUser?.rol] || [];
   
   const [formData, setFormData] = useState(() => {
@@ -534,13 +532,14 @@ const PersonalForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!puedeCrear && !isEditing) {
-      toast.error('No tienes permisos para crear personal');
+    // ✅ Verificar permisos según el rol que se intenta crear
+    if (!isEditing && !authService.puedeCrearPersonal(formData.rol)) {
+      toast.error(`No tienes permisos para crear personal con rol: ${rolTexto[formData.rol] || formData.rol}`);
       return;
     }
     
-    if (!puedeEditar && isEditing) {
-      toast.error('No tienes permisos para editar personal');
+    if (isEditing && !authService.puedeEditarPersonal(formData.rol)) {
+      toast.error(`No tienes permisos para editar este personal`);
       return;
     }
     
