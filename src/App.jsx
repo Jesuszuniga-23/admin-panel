@@ -4,7 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import AppRouter from './routes/AppRouter';
 import useAuthStore from './store/authStore';
-import SecurityGuard from './components/common/SecurityGuard'; // ✅ CORREGIDO: exportación por defecto
+//import SecurityGuard from './components/common/SecurityGuard'; // ✅ CORREGIDO: exportación por defecto
 
 // ✅ Timeout para loading infinito (10 segundos)
 const LOADING_TIMEOUT = 10000;
@@ -115,8 +115,8 @@ function App() {
 
   return (
     <BrowserRouter>
-      <SecurityGuard />
-      <AppRouter />
+ {/* <SecurityGuard /> */}  {/* ← COMENTADO */}
+       <AppRouter />
       <Toaster 
         position="top-right"
         toastOptions={{
