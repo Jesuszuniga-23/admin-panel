@@ -1,5 +1,5 @@
 // src/pages/admin/analisis/AnalisisGeografico.jsx
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Globe, MapPin, BarChart3, PieChart, TrendingUp,
@@ -23,6 +23,7 @@ import useAuthStore from '../../../store/authStore';
 import toast from 'react-hot-toast';
 import IconoEntidad, { BadgeTipoAlerta } from '../../../components/ui/IconoEntidad';
 import authService from '../../../services/auth.service';
+import { useDebounce } from '../../../hooks/useDebounce';
 
 // Colores consistentes para gráficas
 const COLORS = {
@@ -53,7 +54,7 @@ const AnalisisGeografico = () => {
   const graficaEstadosRef = useRef(null);
   const mapaRef = useRef(null);
   
-  // ✅ REF para AbortController
+  // REF para AbortController
   const abortControllerRef = useRef(null);
   
   const [cargando, setCargando] = useState(true);
@@ -83,6 +84,9 @@ const AnalisisGeografico = () => {
     zona: 'todas'
   });
 
+  // ✅ DEBOUNCE para filtros (evita parpadeo)
+  const debouncedFiltros = useDebounce(filtros, 500);
+
   const calcularZona = useCallback((lat, lng) => {
     if (!lat || !lng || isNaN(lat) || isNaN(lng)) return 'Sin ubicación';
     if (lat > 19.6) return 'Zona Norte';
@@ -95,7 +99,7 @@ const AnalisisGeografico = () => {
     return 'Otra zona';
   }, []);
 
-  // ✅ Procesar datos por zona con useCallback
+  // Procesar datos por zona con useCallback
   const procesarDatosPorZona = useCallback((alertas) => {
     const zonas = {};
 
@@ -144,7 +148,7 @@ const AnalisisGeografico = () => {
     setDatosPorZona(zonasArray.sort((a, b) => b.total - a.total));
   }, [calcularZona]);
 
-  // ✅ Procesar tendencias con useCallback
+  // Procesar tendencias con useCallback
   const procesarTendencias = useCallback((alertas) => {
     const meses = {};
 
@@ -177,7 +181,7 @@ const AnalisisGeografico = () => {
     setTendencias(tendenciasArray);
   }, []);
 
-  // ✅ Función para aplicar filtros con useCallback
+  // Función para aplicar filtros con useCallback
   const aplicarFiltros = useCallback((datos = datosOriginales) => {
     let filtrados = [...datos];
 
@@ -219,15 +223,13 @@ const AnalisisGeografico = () => {
     procesarTendencias(filtrados);
   }, [filtros, datosOriginales, calcularZona, procesarDatosPorZona, procesarTendencias]);
 
-  // ✅ Cargar datos con AbortController
+  // Cargar datos con AbortController
   const cargarDatosAnalisis = useCallback(async () => {
-    // Cancelar petición anterior si existe
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       console.log('🛑 Petición anterior cancelada en AnalisisGeografico');
     }
     
-    // Crear nuevo AbortController
     abortControllerRef.current = new AbortController();
     
     setCargando(true);
@@ -257,7 +259,6 @@ const AnalisisGeografico = () => {
 
       aplicarFiltros(alertas);
     } catch (error) {
-      // ✅ Ignorar errores de cancelación
       if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
         console.error('Error cargando datos:', error);
         toast.error('Error al cargar datos');
@@ -267,7 +268,7 @@ const AnalisisGeografico = () => {
     }
   }, [tipoAlertaPermitido, aplicarFiltros]);
 
-  // ✅ Efecto con limpieza
+  // Efecto con limpieza
   useEffect(() => {
     cargarDatosAnalisis();
     
@@ -279,12 +280,17 @@ const AnalisisGeografico = () => {
     };
   }, [cargarDatosAnalisis]);
 
-  // ✅ Efecto para aplicar filtros cuando cambian
+  // ✅ Efecto para aplicar filtros cuando cambian (con debounce)
   useEffect(() => {
     if (datosOriginales.length > 0) {
       aplicarFiltros();
     }
-  }, [filtros, aplicarFiltros, datosOriginales]);
+  }, [debouncedFiltros, datosOriginales, aplicarFiltros]);
+
+  // ✅ Memoizar alertas para el mapa (evita recrear array)
+  const alertasParaMapa = useMemo(() => {
+    return datosFiltrados.filter(a => a.lat && a.lng);
+  }, [datosFiltrados]);
 
   const limpiarFiltros = () => {
     setFiltros({
@@ -575,14 +581,14 @@ const AnalisisGeografico = () => {
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full">
-                {datosFiltrados.filter(a => a.lat && a.lng).length} puntos visibles
+                {alertasParaMapa.length} puntos visibles
               </span>
             </div>
           </div>
 
           <div ref={mapaRef} className="h-[500px] w-full rounded-xl overflow-hidden border border-gray-200 shadow-inner">
             <MapaMultiAlertas 
-              alertas={datosFiltrados.filter(a => a.lat && a.lng)}
+              alertas={alertasParaMapa}
               onSeleccionarAlerta={setAlertaSeleccionada}
             />
           </div>
@@ -807,7 +813,7 @@ const AnalisisGeografico = () => {
   );
 };
 
-// Componente de tarjeta de resumen avanzada (sin cambios)
+// Componente de tarjeta de resumen avanzada
 const ResumenCardAvanzado = ({ label, value, icon: Icon, color, subValue }) => {
   const colors = {
     indigo: 'from-indigo-50 to-indigo-100 border-indigo-200 text-indigo-600',

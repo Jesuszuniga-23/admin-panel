@@ -21,7 +21,6 @@ class AlertasService {
       const response = await axiosInstance.get(url, config);
       return response.data;
     } catch (error) {
-      // ✅ Propagar error de cancelación (tanto AbortError como ERR_CANCELED)
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
@@ -49,7 +48,6 @@ class AlertasService {
       const response = await axiosInstance.get(url, config);
       return response.data;
     } catch (error) {
-      // ✅ Propagar error de cancelación
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
@@ -75,7 +73,6 @@ class AlertasService {
       const response = await axiosInstance.get(url, config);
       return response.data;
     } catch (error) {
-      // ✅ Propagar error de cancelación
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
@@ -99,7 +96,6 @@ class AlertasService {
       );
       return response.data;
     } catch (error) {
-      // ✅ Propagar error de cancelación
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
@@ -127,7 +123,6 @@ class AlertasService {
       const response = await axiosInstance.get(url, config);
       return response.data;
     } catch (error) {
-      // ✅ Propagar error de cancelación
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
@@ -136,7 +131,7 @@ class AlertasService {
     }
   }
   
-  // OBTENER TODAS LAS ALERTAS PARA ANÁLISIS GEOGRÁFICO
+  // OBTENER TODAS LAS ALERTAS PARA ANÁLISIS GEOGRÁFICO (CORREGIDO)
   async obtenerAlertasGeograficas(filtros = {}) {
     try {
       const params = new URLSearchParams();
@@ -150,33 +145,29 @@ class AlertasService {
         config.signal = filtros.signal;
       }
       
-      // ✅ Manejo correcto de cancelación en cada petición individual
+      const queryString = params.toString();
+      
+      // ✅ AGREGAR DELAY ENTRE PETICIONES para evitar rate limit
+      const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+      
+      // ✅ Ejecutar peticiones con delay
       const [activas, proceso, cerradas, expiradas] = await Promise.all([
-        axiosInstance.get(`${ENDPOINTS.ALERTAS_PANEL.ACTIVAS}?${params.toString()}`, config).catch(err => {
-          // Si es error de cancelación, propagarlo
-          if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') {
-            throw err;
-          }
+        delay(0).then(() => axiosInstance.get(`${ENDPOINTS.ALERTAS_PANEL.ACTIVAS}?${queryString}`, config).catch(err => {
+          if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') throw err;
           return { data: { data: [] } };
-        }),
-        axiosInstance.get(`${ENDPOINTS.ALERTAS_PANEL.EN_PROCESO}?${params.toString()}`, config).catch(err => {
-          if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') {
-            throw err;
-          }
+        })),
+        delay(300).then(() => axiosInstance.get(`${ENDPOINTS.ALERTAS_PANEL.EN_PROCESO}?${queryString}`, config).catch(err => {
+          if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') throw err;
           return { data: { data: [] } };
-        }),
-        axiosInstance.get(`${ENDPOINTS.ALERTAS_PANEL.CERRADAS}?${params.toString()}`, config).catch(err => {
-          if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') {
-            throw err;
-          }
+        })),
+        delay(600).then(() => axiosInstance.get(`${ENDPOINTS.ALERTAS_PANEL.CERRADAS}?${queryString}`, config).catch(err => {
+          if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') throw err;
           return { data: { data: [] } };
-        }),
-        axiosInstance.get(`${ENDPOINTS.ALERTAS.EXPIRADAS}?${params.toString()}`, config).catch(err => {
-          if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') {
-            throw err;
-          }
+        })),
+        delay(900).then(() => axiosInstance.get(`${ENDPOINTS.ALERTAS.EXPIRADAS}?${queryString}`, config).catch(err => {
+          if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') throw err;
           return { data: { data: [] } };
-        })
+        }))
       ]);
 
       const todasAlertas = [
@@ -189,7 +180,6 @@ class AlertasService {
       console.log(`📍 ${todasAlertas.length} alertas cargadas para análisis geográfico`);
       return { data: todasAlertas, total: todasAlertas.length };
     } catch (error) {
-      // ✅ Propagar error de cancelación
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
