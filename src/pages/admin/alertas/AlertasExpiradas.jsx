@@ -47,25 +47,21 @@ const formatearNombre = (nombre) => {
 const AlertasExpiradas = () => {
   const navigate = useNavigate();
   
-  // Obtener tipo de alerta permitido según rol
   const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
   
   const [alertas, setAlertas] = useState([]);
   const [alertasOriginal, setAlertasOriginal] = useState([]);
   const [cargando, setCargando] = useState(true);
-  const [detalleLoading, setDetalleLoading] = useState(false); // ✅ Estado separado
+  const [detalleLoading, setDetalleLoading] = useState(false);
   
-  // ✅ REF para AbortControllers
   const abortControllerRef = useRef(null);
   const detalleAbortControllerRef = useRef(null);
   
-  // Estados para el modal OTP
   const [alertaSeleccionada, setAlertaSeleccionada] = useState(null);
   const [mostrarModalOtp, setMostrarModalOtp] = useState(false);
   const [datosCompletosAlerta, setDatosCompletosAlerta] = useState(null);
   const [codigoOtp, setCodigoOtp] = useState('');
   
-  // Hook OTP
   const {
     solicitando,
     verificando,
@@ -102,15 +98,12 @@ const AlertasExpiradas = () => {
     total_paginas: 0
   });
 
-  // ✅ Función para cargar alertas con AbortController
   const cargarAlertas = useCallback(async () => {
-    // Cancelar petición anterior si existe
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       console.log('🛑 Petición anterior cancelada en AlertasExpiradas');
     }
     
-    // Crear nuevo AbortController
     abortControllerRef.current = new AbortController();
     
     setCargando(true);
@@ -126,75 +119,96 @@ const AlertasExpiradas = () => {
         signal: abortControllerRef.current.signal 
       });
       
-      const alertasFormateadas = (resultado.data || []).map(alerta => ({
+      console.log('📊 [DEBUG] resultado completo:', resultado);
+      console.log('📊 [DEBUG] resultado.data length:', resultado.data?.length);
+      
+      const datosAlerta = resultado.data || [];
+      
+      const alertasFormateadas = datosAlerta.map(alerta => ({
         ...alerta,
         ciudadano: alerta.ciudadano ? {
           ...alerta.ciudadano,
           nombre: formatearNombre(alerta.ciudadano.nombre)
         } : null
       }));
+      
+      console.log('📊 [DEBUG] alertasFormateadas length:', alertasFormateadas.length);
+      
       setAlertasOriginal(alertasFormateadas);
-      aplicarFiltrosLocal(alertasFormateadas);
+      
+      const datosFiltrados = aplicarFiltrosLocalDirecto(alertasFormateadas);
+      console.log('📊 [DEBUG] datosFiltrados length:', datosFiltrados.length);
+      
+      setAlertas(datosFiltrados);
+      setPaginacion({
+        total: datosFiltrados.length,
+        pagina: filtros.pagina,
+        limite: filtros.limite,
+        total_paginas: Math.ceil(datosFiltrados.length / filtros.limite)
+      });
+      
     } catch (error) {
-      // ✅ Ignorar errores de cancelación
       if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
         console.error("Error:", error);
+        toast.error('Error al cargar alertas expiradas');
       }
     } finally {
       setCargando(false);
     }
   }, [tipoAlertaPermitido]);
 
-  // ✅ Función de filtrado simplificada
-  const filtrarDatos = useCallback((datos) => {
-    return datos.filter(item => {
-      // Filtro por búsqueda
-      if (filtros.search) {
-        const termino = filtros.search.toLowerCase().trim();
+  const aplicarFiltrosLocalDirecto = useCallback((datos) => {
+    if (!datos || datos.length === 0) return [];
+    
+    let datosFiltrados = [...datos];
+    
+    if (filtros.search && filtros.search.trim() !== '') {
+      const termino = filtros.search.toLowerCase().trim();
+      datosFiltrados = datosFiltrados.filter(item => {
         const idMatch = item.id?.toString().includes(termino);
-        const tipoMatch = item.tipo?.toLowerCase().includes(termino) ||
-                         (termino === 'panico' && item.tipo === 'panico') ||
-                         (termino === 'pánico' && item.tipo === 'panico') ||
-                         (termino === 'medica' && item.tipo === 'medica') ||
-                         (termino === 'médica' && item.tipo === 'medica');
+        const tipoMatch = item.tipo?.toLowerCase().includes(termino);
         const ciudadanoMatch = item.ciudadano?.nombre?.toLowerCase().includes(termino);
-        if (!idMatch && !tipoMatch && !ciudadanoMatch) return false;
-      }
-      
-      // Filtro por fechas
-      if (filtros.desde) {
-        const desdeParts = filtros.desde.split('-');
-        const desde = new Date(parseInt(desdeParts[0]), parseInt(desdeParts[1]) - 1, parseInt(desdeParts[2]), 0, 0, 0, 0);
+        return idMatch || tipoMatch || ciudadanoMatch;
+      });
+    }
+    
+    if (filtros.desde) {
+      const desdeParts = filtros.desde.split('-');
+      const desde = new Date(parseInt(desdeParts[0]), parseInt(desdeParts[1]) - 1, parseInt(desdeParts[2]), 0, 0, 0, 0);
+      datosFiltrados = datosFiltrados.filter(item => {
         const fechaCreacion = new Date(item.fecha_creacion);
-        if (fechaCreacion < desde) return false;
-      }
-      
-      if (filtros.hasta) {
-        const hastaParts = filtros.hasta.split('-');
-        const hasta = new Date(parseInt(hastaParts[0]), parseInt(hastaParts[1]) - 1, parseInt(hastaParts[2]), 23, 59, 59, 999);
+        return fechaCreacion >= desde;
+      });
+    }
+    
+    if (filtros.hasta) {
+      const hastaParts = filtros.hasta.split('-');
+      const hasta = new Date(parseInt(hastaParts[0]), parseInt(hastaParts[1]) - 1, parseInt(hastaParts[2]), 23, 59, 59, 999);
+      datosFiltrados = datosFiltrados.filter(item => {
         const fechaCreacion = new Date(item.fecha_creacion);
-        if (fechaCreacion > hasta) return false;
-      }
-      
-      return true;
-    });
-  }, [filtros.search, filtros.desde, filtros.hasta]);
-
-  const aplicarFiltrosLocal = useCallback((datos = alertasOriginal) => {
-    const datosFiltrados = filtrarDatos(datos);
-    const total = datosFiltrados.length;
-    const totalPaginas = Math.ceil(total / filtros.limite);
+        return fechaCreacion <= hasta;
+      });
+    }
+    
     const inicio = (filtros.pagina - 1) * filtros.limite;
     const fin = inicio + filtros.limite;
     const datosPaginados = datosFiltrados.slice(inicio, fin);
-    setAlertas(datosPaginados);
-    setPaginacion({
-      total,
-      pagina: filtros.pagina,
-      limite: filtros.limite,
-      total_paginas: totalPaginas
-    });
-  }, [filtrarDatos, filtros.limite, filtros.pagina]);
+    
+    return datosPaginados;
+  }, [filtros.search, filtros.desde, filtros.hasta, filtros.pagina, filtros.limite]);
+
+  useEffect(() => {
+    if (alertasOriginal.length > 0) {
+      const datosFiltrados = aplicarFiltrosLocalDirecto(alertasOriginal);
+      setAlertas(datosFiltrados);
+      setPaginacion({
+        total: datosFiltrados.length,
+        pagina: filtros.pagina,
+        limite: filtros.limite,
+        total_paginas: Math.ceil(datosFiltrados.length / filtros.limite)
+      });
+    }
+  }, [filtros.search, filtros.desde, filtros.hasta, filtros.pagina, alertasOriginal, aplicarFiltrosLocalDirecto]);
 
   const handleSearchChange = (e) => {
     const value = e.target.value;
@@ -209,9 +223,6 @@ const AlertasExpiradas = () => {
 
   const aplicarFiltros = () => {
     setFiltros(prev => ({ ...prev, pagina: 1 }));
-    if (alertasOriginal.length) {
-      aplicarFiltrosLocal();
-    }
   };
 
   const limpiarFiltros = () => {
@@ -225,15 +236,12 @@ const AlertasExpiradas = () => {
     });
   };
 
-  // ✅ Manejar clic en alerta con AbortController
   const handleRowClick = useCallback(async (alerta) => {
-    // Cancelar petición de detalle anterior si existe
     if (detalleAbortControllerRef.current) {
       detalleAbortControllerRef.current.abort();
       console.log('🛑 Petición de detalle anterior cancelada');
     }
     
-    // Crear nuevo AbortController para detalle
     detalleAbortControllerRef.current = new AbortController();
     
     setDetalleLoading(true);
@@ -255,7 +263,6 @@ const AlertasExpiradas = () => {
         toast.error('Error al cargar la alerta');
       }
     } catch (error) {
-      // ✅ Ignorar errores de cancelación
       if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
         console.error('Error al cargar detalle:', error);
         toast.error('Error al cargar la alerta');
@@ -306,7 +313,6 @@ const AlertasExpiradas = () => {
     });
   };
 
-  // ✅ Efecto con limpieza
   useEffect(() => {
     cargarAlertas();
     
@@ -322,13 +328,8 @@ const AlertasExpiradas = () => {
     };
   }, [cargarAlertas]);
 
-  useEffect(() => {
-    if (alertasOriginal.length) {
-      aplicarFiltrosLocal();
-    }
-  }, [filtros.search, filtros.desde, filtros.hasta, filtros.pagina, alertasOriginal, aplicarFiltrosLocal]);
-
   const formatearFecha = (fecha) => {
+    if (!fecha) return '—';
     return new Date(fecha).toLocaleString('es-MX', {
       day: '2-digit',
       month: '2-digit',
@@ -459,7 +460,7 @@ const AlertasExpiradas = () => {
           {(filtros.desde || filtros.hasta || filtros.search) && (
             <div className="mt-3 flex items-center gap-2 text-xs">
               <span className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-pulse"></span>
-              <span className="text-gray-600">Filtros aplicados - {paginacion.total} resultados</span>
+              <span className="text-gray-600">Filtros activos - {paginacion.total} resultados</span>
             </div>
           )}
         </div>
@@ -478,9 +479,19 @@ const AlertasExpiradas = () => {
               </div>
               <h3 className="text-sm md:text-base font-medium text-slate-700 mb-1">No hay alertas expiradas</h3>
               <p className="text-xs text-slate-400">
-                Todas las alertas han sido atendidas a tiempo
+                {filtros.search || filtros.desde || filtros.hasta
+                  ? 'No se encontraron resultados con los filtros aplicados'
+                  : 'Todas las alertas han sido atendidas a tiempo'}
                 {tipoAlertaPermitido && ` (Filtro: ${tipoAlertaPermitido === 'panico' ? 'Solo Pánico' : 'Solo Médicas'})`}
               </p>
+              {(filtros.search || filtros.desde || filtros.hasta) && (
+                <button
+                  onClick={limpiarFiltros}
+                  className="mt-4 text-sm text-blue-600 hover:text-blue-800"
+                >
+                  Limpiar filtros
+                </button>
+              )}
             </div>
           ) : (
             <>
@@ -493,7 +504,7 @@ const AlertasExpiradas = () => {
                       <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-slate-500 uppercase">UBICACIÓN</th>
                       <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-slate-500 uppercase">FECHA</th>
                       <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-slate-500 uppercase">ESTADO</th>
-                      </tr>
+                    </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {alertas.map((alerta) => (
@@ -545,32 +556,35 @@ const AlertasExpiradas = () => {
               </div>
 
               {/* Paginación */}
-              <div className="px-4 md:px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-3">
-                <p className="text-xs sm:text-sm text-slate-600">
-                  Mostrando <span className="font-medium">{inicio}</span> a <span className="font-medium">{fin}</span> de{' '}
-                  <span className="font-medium">{paginacion.total}</span> registros
-                </p>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setFiltros(prev => ({ ...prev, pagina: prev.pagina - 1 }))}
-                    disabled={paginacion.pagina === 1}
-                    className="px-3 py-1.5 text-xs sm:text-sm border border-slate-200 bg-white rounded-lg hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 transition-colors"
-                  >
-                    Anterior
-                  </button>
-                  <span className="px-3 py-1.5 text-xs sm:text-sm text-slate-600">
-                    Página <span className="font-medium">{paginacion.pagina}</span> de{' '}
-                    <span className="font-medium">{paginacion.total_paginas}</span>
-                  </span>
-                  <button
-                    onClick={() => setFiltros(prev => ({ ...prev, pagina: prev.pagina + 1 }))}
-                    disabled={paginacion.pagina === paginacion.total_paginas}
-                    className="px-3 py-1.5 text-xs sm:text-sm border border-slate-200 bg-white rounded-lg hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 transition-colors"
-                  >
-                    Siguiente
-                  </button>
+              {paginacion.total_paginas > 1 && (
+                <div className="px-4 md:px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <p className="text-xs sm:text-sm text-slate-600">
+                    Mostrando <span className="font-medium">{inicio}</span> a{' '}
+                    <span className="font-medium">{fin}</span> de{' '}
+                    <span className="font-medium">{paginacion.total}</span> registros
+                  </p>
+                  
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setFiltros(prev => ({ ...prev, pagina: prev.pagina - 1 }))}
+                      disabled={paginacion.pagina === 1}
+                      className="px-3 py-1.5 text-xs sm:text-sm border border-slate-200 bg-white rounded-lg hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 transition-colors"
+                    >
+                      Anterior
+                    </button>
+                    <span className="px-3 py-1.5 text-xs sm:text-sm text-slate-600">
+                      Página {paginacion.pagina} de {paginacion.total_paginas}
+                    </span>
+                    <button
+                      onClick={() => setFiltros(prev => ({ ...prev, pagina: prev.pagina + 1 }))}
+                      disabled={paginacion.pagina === paginacion.total_paginas}
+                      className="px-3 py-1.5 text-xs sm:text-sm border border-slate-200 bg-white rounded-lg hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 transition-colors"
+                    >
+                      Siguiente
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
             </>
           )}
         </div>
