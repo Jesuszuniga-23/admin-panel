@@ -1,5 +1,5 @@
 // src/components/common/SessionMonitor.jsx
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Clock, AlertCircle, LogOut } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -12,13 +12,37 @@ const SessionMonitor = () => {
   const [showWarning, setShowWarning] = useState(false);
   const [countdown, setCountdown] = useState(60);
   const [sessionActive, setSessionActive] = useState(true);
+  const sessionActiveRef = useRef(sessionActive);
+
+  // Mantener la referencia actualizada
+  useEffect(() => {
+    sessionActiveRef.current = sessionActive;
+  }, [sessionActive]);
+
+  // ✅ TEMPORAL: Simular sesión expirada después de 10 segundos (para pruebas)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      console.log('🔴 SIMULACIÓN: Sesión expirada por inactividad (prueba)');
+      if (sessionActiveRef.current) {
+        setSessionActive(false);
+        setShowWarning(true);
+        setCountdown(30);
+        toast.error('Sesión expirada por inactividad (SIMULACIÓN)', {
+          duration: 5000
+        });
+      }
+    }, 10000); // 10 segundos para prueba rápida
+    
+    return () => clearTimeout(timer);
+  }, []);
 
   const verificarSesion = useCallback(async () => {
     try {
       const estado = await authService.obtenerEstadoSesion();
       
       if (!estado.activa) {
-        if (sessionActive) {
+        // ✅ Usar la referencia, no el estado directo
+        if (sessionActiveRef.current) {
           setSessionActive(false);
           setShowWarning(true);
           setCountdown(estado.minutos_restantes * 60 || 30);
@@ -34,7 +58,7 @@ const SessionMonitor = () => {
     } catch (error) {
       console.error('Error verificando sesión:', error);
     }
-  }, [sessionActive]);
+  }, []); // ✅ Dependencias vacías - no depende de sessionActive
 
   const registrarActividad = useCallback(async () => {
     try {
@@ -44,16 +68,19 @@ const SessionMonitor = () => {
     }
   }, []);
 
+  // Intervalo para verificar sesión
   useEffect(() => {
     const interval = setInterval(verificarSesion, 30000);
     return () => clearInterval(interval);
   }, [verificarSesion]);
 
+  // Eventos de actividad del usuario
   useEffect(() => {
     const eventos = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
     
     const handleActivity = () => {
-      if (sessionActive) {
+      // ✅ Usar la referencia
+      if (sessionActiveRef.current) {
         registrarActividad();
       }
     };
@@ -67,8 +94,9 @@ const SessionMonitor = () => {
         window.removeEventListener(evento, handleActivity);
       });
     };
-  }, [registrarActividad, sessionActive]);
+  }, [registrarActividad]); // ✅ Solo depende de registrarActividad
 
+  // Cuenta regresiva del warning
   useEffect(() => {
     let timer;
     if (showWarning && countdown > 0) {

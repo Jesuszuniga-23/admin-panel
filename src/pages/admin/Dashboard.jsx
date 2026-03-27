@@ -2,19 +2,17 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard, UserCog, Bell, Users, BarChart3, FileText,
-  AlertTriangle, Activity, Flame, Clock, User, MapPin, Phone,
-  Truck, Ambulance, ChevronRight, AlertCircle, CheckCircle, XCircle,
-  LogOut, Menu, MoreVertical, Download, Filter, Search,
-  Shield, Calendar, Clock3, Map, Home, Settings, HelpCircle,
-  Mail, UserCircle, LogIn, TrendingUp, TrendingDown, Minus,
-  PieChart, GitPullRequest, Star, Zap, Target, Award
+  LayoutDashboard, Bell, Users, Truck,
+  AlertTriangle, Activity, Clock, User, Phone,
+  ChevronRight, AlertCircle, CheckCircle, XCircle,
+  TrendingUp, TrendingDown, Minus,
+  PieChart
 } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
-import dashboardService from '../../services/admin/dashboard.service';
-import { LineChart, Line, AreaChart, Area, PieChart as RePieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, PieChart as RePieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import IconoEntidad, { BadgeIcono } from '../../components/ui/IconoEntidad';
 import authService from '../../services/auth.service';
+import { useDashboardCache } from '../../hooks/useDashboardCache';
 
 // Mapeo de roles a entidades para badges
 const rolToEntidad = {
@@ -52,16 +50,13 @@ const formatearNombre = (nombre) => {
     .join(' ');
 };
 
-// Valores por defecto para cuando no hay datos
-const defaultStats = {
+// Valores por defecto
+const defaultData = {
   personal: { total: 0, activos: 0, inactivos: 0, disponibles: 0, noDisponibles: 0, porRol: { policia: 0, ambulancia: 0, admin: 0, superadmin: 0 } },
   unidades: { total: 0, activas: 0, inactivas: 0, disponibles: 0, ocupadas: 0, porTipo: { policia: 0, ambulancia: 0 } },
   alertas: { expiradas: 0, cerradasManual: 0, totalAlertas: 0, activas: 0, enProceso: 0, cerradasTotales: 0 },
-  kpis: {
-    personal: { total: 0, variacion: '0%', tendencia: 'stable' },
-    unidades: { total: 0, variacion: '0%', tendencia: 'stable' },
-    alertas: { total: 0, variacion: '0%', tendencia: 'stable' }
-  }
+  actividadReciente: { personal: [], unidades: [], alertas: [] },
+  alertasPorHora: []
 };
 
 const StatCard = ({ icon, title, value, subtitle, color }) => {
@@ -94,9 +89,8 @@ const StatCard = ({ icon, title, value, subtitle, color }) => {
 
 const Dashboard = () => {
   const { user, isLoading: authLoading } = useAuthStore();
-  const [cargando, setCargando] = useState(true);
-  const [error, setError] = useState(null);
-  const [stats, setStats] = useState(defaultStats);
+  const { data, loading, error, cached, recargar } = useDashboardCache();
+  const [stats, setStats] = useState(defaultData);
   const [alertasPorHora, setAlertasPorHora] = useState([]);
   const [actividadReciente, setActividadReciente] = useState({ personal: [], unidades: [], alertas: [] });
   const navigate = useNavigate();
@@ -104,74 +98,30 @@ const Dashboard = () => {
   const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
   const rolPersonalPermitido = authService.getRolPersonalPermitido();
 
+  // Actualizar estado cuando llegan los datos
+  useEffect(() => {
+    if (data) {
+      setStats({
+        personal: data.personal || defaultData.personal,
+        unidades: data.unidades || defaultData.unidades,
+        alertas: data.alertas || defaultData.alertas,
+        kpis: {
+          personal: { total: data.personal?.total || 0, variacion: '0%', tendencia: 'stable' },
+          unidades: { total: data.unidades?.total || 0, variacion: '0%', tendencia: 'stable' },
+          alertas: { total: data.alertas?.totalAlertas || 0, variacion: '0%', tendencia: 'stable' }
+        }
+      });
+      setAlertasPorHora(data.alertasPorHora || []);
+      setActividadReciente(data.actividadReciente || { personal: [], unidades: [], alertas: [] });
+    }
+  }, [data]);
+
+  // Redirigir si no hay usuario
   useEffect(() => {
     if (!authLoading && !user) {
-      console.log('❌ No hay usuario autenticado, redirigiendo a login');
       navigate('/login');
-      return;
     }
-    
-    if (user) {
-      console.log('✅ Usuario autenticado:', user.email, 'Rol:', user.rol);
-      cargarDatosDashboard();
-    }
-  }, [user, authLoading]);
-
-  const cargarDatosDashboard = async () => {
-    setCargando(true);
-    setError(null);
-    
-    const timeoutId = setTimeout(() => {
-      if (cargando) {
-        setError('El dashboard está tardando en cargar. Verifica tu conexión o recarga la página.');
-        setCargando(false);
-      }
-    }, 20000);
-    
-    try {
-      console.log('📊 Cargando datos del dashboard...');
-      
-      const params = {};
-      if (tipoAlertaPermitido) params.tipo = tipoAlertaPermitido;
-      if (rolPersonalPermitido) params.rol = rolPersonalPermitido;
-      
-      let estadisticas = defaultStats;
-      let horas = [];
-      let actividad = { personal: [], unidades: [], alertas: [] };
-      
-      try {
-        const result = await dashboardService.obtenerEstadisticas(params);
-        estadisticas = result?.success ? result : defaultStats;
-      } catch (err) {
-        console.error('❌ Error en estadísticas:', err);
-      }
-      
-      try {
-        horas = await dashboardService.obtenerAlertasPorHora(params);
-      } catch (err) {
-        console.error('❌ Error en alertas por hora:', err);
-        horas = [];
-      }
-      
-      try {
-        actividad = await dashboardService.obtenerActividadReciente(params);
-      } catch (err) {
-        console.error('❌ Error en actividad reciente:', err);
-        actividad = { personal: [], unidades: [], alertas: [] };
-      }
-      
-      setStats(estadisticas);
-      setAlertasPorHora(Array.isArray(horas) ? horas : []);
-      setActividadReciente(actividad || { personal: [], unidades: [], alertas: [] });
-      
-    } catch (error) {
-      console.error("❌ Error cargando dashboard:", error);
-      setError(error.message || 'Error al cargar el dashboard');
-    } finally {
-      clearTimeout(timeoutId);
-      setCargando(false);
-    }
-  };
+  }, [user, authLoading, navigate]);
 
   const getVariacionColor = (tendencia) => {
     switch (tendencia) {
@@ -191,23 +141,13 @@ const Dashboard = () => {
 
   const COLORS = ['#3b82f6', '#ef4444', '#f59e0b', '#10b981', '#8b5cf6'];
 
-  // ✅ Función para determinar qué datos mostrar en la gráfica según el rol
   const getPersonalDistributionData = () => {
-    // Si es operador policial, solo mostrar Policía
     if (rolPersonalPermitido === 'policia') {
-      return [
-        { name: 'Policía', value: stats?.personal?.porRol?.policia || 0 }
-      ];
+      return [{ name: 'Policía', value: stats?.personal?.porRol?.policia || 0 }];
     }
-    
-    // Si es operador médico, solo mostrar Ambulancia
     if (rolPersonalPermitido === 'ambulancia') {
-      return [
-        { name: 'Ambulancia', value: stats?.personal?.porRol?.ambulancia || 0 }
-      ];
+      return [{ name: 'Ambulancia', value: stats?.personal?.porRol?.ambulancia || 0 }];
     }
-    
-    // Para admin, superadmin y técnico, mostrar todos
     return [
       { name: 'Policía', value: stats?.personal?.porRol?.policia || 0 },
       { name: 'Ambulancia', value: stats?.personal?.porRol?.ambulancia || 0 },
@@ -224,7 +164,7 @@ const Dashboard = () => {
           <h2 className="text-lg font-semibold text-red-800 mb-2">Error al cargar el dashboard</h2>
           <p className="text-red-600 mb-4">{error}</p>
           <button
-            onClick={() => window.location.reload()}
+            onClick={() => recargar()}
             className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
           >
             Reintentar
@@ -234,12 +174,17 @@ const Dashboard = () => {
     );
   }
 
-  if (cargando) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
         <div className="relative text-center">
           <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto"></div>
-          <p className="mt-4 text-slate-600 font-medium">Cargando dashboard...</p>
+          <p className="mt-4 text-slate-600 font-medium">
+            {cached ? 'Cargando datos actualizados...' : 'Cargando dashboard...'}
+          </p>
+          {cached && (
+            <p className="text-xs text-slate-400 mt-1">Mostrando datos en caché</p>
+          )}
         </div>
       </div>
     );
@@ -328,7 +273,7 @@ const Dashboard = () => {
             )}
           </div>
 
-          {/* Distribución de Personal - CORREGIDA */}
+          {/* Distribución de Personal */}
           <div className="bg-white rounded-xl md:rounded-2xl shadow-lg shadow-slate-200/50 p-4 md:p-6">
             <h2 className="text-base md:text-lg font-semibold text-slate-800 mb-4 md:mb-6">
               Distribución de Personal
@@ -499,22 +444,6 @@ const Dashboard = () => {
           </div>
         </div>
       </main>
-
-      <style>{`
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(-10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        .animate-fadeIn {
-          animation: fadeIn 0.2s ease-out;
-        }
-      `}</style>
     </div>
   );
 };

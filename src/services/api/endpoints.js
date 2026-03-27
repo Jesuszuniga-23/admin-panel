@@ -72,5 +72,8 @@ export const ENDPOINTS = {
   SECURITY: {
     REPORT_VIOLATION: `${BASE_URL}/security/report-violation`,
     SCRIPT: `${BASE_URL}/security/script.js`
-  }
+  },
+  DASHBOARD: {
+  COMPLETO: `${BASE_URL}/admin/dashboard/completo`
+}
 };

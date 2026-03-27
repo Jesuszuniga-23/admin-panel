@@ -8,24 +8,39 @@ import authService from '../../services/auth.service';
 
 class DashboardService {
   
-  // OBTENER TODAS LAS ESTADÍSTICAS DEL DASHBOARD
+  // ✅ NUEVO: Obtener dashboard completo en UNA sola petición
+  async obtenerDashboardCompleto(options = {}) {
+    try {
+      const response = await axiosInstance.get('/admin/dashboard/completo', {
+        signal: options.signal  // Para AbortController
+      });
+      return response.data;
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        console.log('📡 Petición cancelada');
+        return { success: false, aborted: true };
+      }
+      console.error('Error obteniendo dashboard completo:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // =====================================================
+  // MÉTODOS EXISTENTES (se mantienen para compatibilidad)
+  // =====================================================
+  
   async obtenerEstadisticas(filtros = {}) {
     try {
       console.log("Cargando estadísticas del dashboard...");
       
-      // Obtener filtros según rol
       const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
       const rolPersonalPermitido = authService.getRolPersonalPermitido();
+      const tipoUnidadPermitido = rolPersonalPermitido;
       
-      // ✅ NUEVO: Para unidades, usar el mismo filtro que personal
-      const tipoUnidadPermitido = rolPersonalPermitido; // 'policia' o 'ambulancia'
-      
-      // Preparar parámetros para cada llamada
       const personalParams = rolPersonalPermitido ? { rol: rolPersonalPermitido } : {};
       const alertasParams = tipoAlertaPermitido ? { tipo: tipoAlertaPermitido } : {};
       const unidadParams = tipoUnidadPermitido ? { tipo: tipoUnidadPermitido } : {};
       
-      // Obtener datos en paralelo
       const [
         personalRes,
         unidadesRes,
@@ -36,7 +51,7 @@ class DashboardService {
         alertasCerradasRes
       ] = await Promise.allSettled([
         personalService.listarPersonal({ limite: 1000, ...personalParams }),
-        unidadService.listarUnidades({ limite: 1000, ...unidadParams }), // ✅ AHORA CON FILTRO
+        unidadService.listarUnidades({ limite: 1000, ...unidadParams }),
         alertasService.obtenerExpiradas({ limite: 1000, ...alertasParams }),
         alertasService.obtenerCerradasManual({ limite: 1000, ...alertasParams }),
         alertasPanelService.obtenerActivas({ limite: 1000, ...alertasParams }),
@@ -44,28 +59,14 @@ class DashboardService {
         alertasPanelService.obtenerCerradas({ limite: 1000, ...alertasParams })
       ]);
 
-      // Procesar personal
       const personalData = personalRes.status === 'fulfilled' ? personalRes.value.data || [] : [];
-      
-      // Procesar unidades
       const unidadesData = unidadesRes.status === 'fulfilled' ? unidadesRes.value.data || [] : [];
-      
-      // Procesar alertas expiradas
       const alertasExpiradas = alertasExpiradasRes.status === 'fulfilled' ? alertasExpiradasRes.value.data || [] : [];
-      
-      // Procesar alertas cerradas manualmente
       const alertasCerradasManual = alertasCerradasManualRes.status === 'fulfilled' ? alertasCerradasManualRes.value.data || [] : [];
-
-      // Procesar alertas activas
       const alertasActivas = alertasActivasRes.status === 'fulfilled' ? alertasActivasRes.value.data || [] : [];
-      
-      // Procesar alertas en proceso
       const alertasEnProceso = alertasEnProcesoRes.status === 'fulfilled' ? alertasEnProcesoRes.value.data || [] : [];
-      
-      // Procesar alertas cerradas (totales)
       const alertasCerradas = alertasCerradasRes.status === 'fulfilled' ? alertasCerradasRes.value.data || [] : [];
 
-      // Calcular estadísticas de personal
       const personalStats = {
         total: personalData.length,
         activos: personalData.filter(p => p.activo).length,
@@ -76,15 +77,10 @@ class DashboardService {
           policia: personalData.filter(p => p.rol === 'policia').length,
           ambulancia: personalData.filter(p => p.rol === 'ambulancia').length,
           admin: personalData.filter(p => p.rol === 'admin').length,
-          superadmin: personalData.filter(p => p.rol === 'superadmin').length,
-          operador_tecnico: personalData.filter(p => p.rol === 'operador_tecnico').length,
-          operador_policial: personalData.filter(p => p.rol === 'operador_policial').length,
-          operador_medico: personalData.filter(p => p.rol === 'operador_medico').length,
-          operador_general: personalData.filter(p => p.rol === 'operador_general').length
+          superadmin: personalData.filter(p => p.rol === 'superadmin').length
         }
       };
 
-      // Calcular estadísticas de unidades
       const unidadesStats = {
         total: unidadesData.length,
         activas: unidadesData.filter(u => u.activa).length,
@@ -97,7 +93,6 @@ class DashboardService {
         }
       };
 
-      // Calcular estadísticas de alertas
       const alertasStats = {
         expiradas: alertasExpiradas.length,
         cerradasManual: alertasCerradasManual.length,
@@ -107,7 +102,6 @@ class DashboardService {
         cerradasTotales: alertasCerradas.length
       };
 
-      // Calcular KPIs
       const mesActual = new Date().getMonth();
       const mesAnterior = mesActual === 0 ? 11 : mesActual - 1;
       
@@ -181,7 +175,6 @@ class DashboardService {
     }
   }
 
-  // Obtener alertas por hora
   async obtenerAlertasPorHora(filtros = {}) {
     try {
       const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
@@ -224,13 +217,10 @@ class DashboardService {
     }
   }
 
-  // Obtener actividad reciente
   async obtenerActividadReciente(filtros = {}) {
     try {
       const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
       const rolPersonalPermitido = authService.getRolPersonalPermitido();
-      
-      // ✅ NUEVO: Para unidades, usar el mismo filtro que personal
       const tipoUnidadPermitido = rolPersonalPermitido;
       
       const personalParams = rolPersonalPermitido ? { rol: rolPersonalPermitido } : {};
