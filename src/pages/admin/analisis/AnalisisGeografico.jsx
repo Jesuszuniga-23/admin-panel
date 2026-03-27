@@ -84,7 +84,7 @@ const AnalisisGeografico = () => {
     zona: 'todas'
   });
 
-  // ✅ DEBOUNCE para filtros (evita parpadeo)
+  // DEBOUNCE para filtros (evita parpadeo)
   const debouncedFiltros = useDebounce(filtros, 500);
 
   const calcularZona = useCallback((lat, lng) => {
@@ -280,17 +280,29 @@ const AnalisisGeografico = () => {
     };
   }, [cargarDatosAnalisis]);
 
-  // ✅ Efecto para aplicar filtros cuando cambian (con debounce)
+  // Efecto para aplicar filtros cuando cambian (con debounce)
   useEffect(() => {
     if (datosOriginales.length > 0) {
       aplicarFiltros();
     }
   }, [debouncedFiltros, datosOriginales, aplicarFiltros]);
 
-  // ✅ Memoizar alertas para el mapa (evita recrear array)
+  // Memoizar alertas para el mapa (evita recrear array)
   const alertasParaMapa = useMemo(() => {
     return datosFiltrados.filter(a => a.lat && a.lng);
   }, [datosFiltrados]);
+
+  // ✅ Manejar resize de gráficas
+  useEffect(() => {
+    const handleResize = () => {
+      setTimeout(() => {
+        window.dispatchEvent(new Event('resize'));
+      }, 100);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const limpiarFiltros = () => {
     setFiltros({
@@ -586,11 +598,26 @@ const AnalisisGeografico = () => {
             </div>
           </div>
 
-          <div ref={mapaRef} className="h-[500px] w-full rounded-xl overflow-hidden border border-gray-200 shadow-inner">
-            <MapaMultiAlertas 
-              alertas={alertasParaMapa}
-              onSeleccionarAlerta={setAlertaSeleccionada}
-            />
+          {/* ✅ Contenedor del mapa con key para evitar re-montaje innecesario */}
+          <div 
+            ref={mapaRef} 
+            className="h-[500px] w-full rounded-xl overflow-hidden border border-gray-200 shadow-inner"
+            key={`mapa-container-${alertasParaMapa.length}`}
+          >
+            {alertasParaMapa.length > 0 ? (
+              <MapaMultiAlertas 
+                alertas={alertasParaMapa}
+                onSeleccionarAlerta={setAlertaSeleccionada}
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                <div className="text-center text-gray-400">
+                  <MapPin size={32} className="mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No hay ubicaciones para mostrar</p>
+                  <p className="text-xs mt-1">Total alertas: {datosFiltrados.length}</p>
+                </div>
+              </div>
+            )}
           </div>
 
           {alertaSeleccionada && (
@@ -716,7 +743,7 @@ const AnalisisGeografico = () => {
               </div>
             </div>
             {datosPorZona.length > 0 ? (
-              <div className="h-80">
+              <div className="h-80 w-full" style={{ minHeight: '320px' }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={datosPorZona}
@@ -754,7 +781,7 @@ const AnalisisGeografico = () => {
               </div>
               <h2 className="text-lg font-semibold text-gray-800">Distribución por Tipo</h2>
             </div>
-            <div className="h-64 flex items-center justify-center">
+            <div className="h-64 w-full" style={{ minHeight: '260px' }}>
               <ResponsiveContainer width="100%" height="100%">
                 <RePieChart>
                   <Pie
