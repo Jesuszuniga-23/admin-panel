@@ -44,17 +44,29 @@ const GeneradorReporte = () => {
   const [datos, setDatos] = useState([]);
   const [datosFiltrados, setDatosFiltrados] = useState([]);
   const [estadisticas, setEstadisticas] = useState(null);
+  
+  // ✅ CORRECCIÓN: Inicializar filtros correctamente según el tipo de reporte
+  const getInitialTipo = () => {
+    if (tipo === 'personal' && rolPersonalPermitido) {
+      return rolPersonalPermitido; // 'policia' o 'ambulancia'
+    }
+    if (tipo === 'alertas' && tipoAlertaPermitido) {
+      return tipoAlertaPermitido; // 'panico' o 'medica'
+    }
+    return 'todos';
+  };
+  
   const [filtros, setFiltros] = useState({
     fechaInicio: '',
     fechaFin: '',
-    tipo: tipoAlertaPermitido || 'todos',
+    tipo: getInitialTipo(),
     estado: 'todos',
     zona: 'todas',
     busqueda: ''
   });
   const [vistaPrevia, setVistaPrevia] = useState(true);
 
-  // ✅ REF para AbortController
+  // REF para AbortController
   const abortControllerRef = useRef(null);
 
   // Configuración según el tipo de reporte
@@ -127,7 +139,7 @@ const GeneradorReporte = () => {
 
   const info = config[tipo] || config.personal;
 
-  // ✅ Función para cargar datos con AbortController
+  // Función para cargar datos con AbortController
   const cargarDatos = useCallback(async () => {
     // Cancelar petición anterior si existe
     if (abortControllerRef.current) {
@@ -157,31 +169,19 @@ const GeneradorReporte = () => {
       
       if (tipo === 'personal') {
         const res = await personalService.listarPersonal({ limite: 1000, ...params });
+        console.log('🔍 [PERSONAL] Respuesta:', res);
+        console.log('🔍 [PERSONAL] Datos cargados:', res.data?.length);
         data = res.data || [];
       } else if (tipo === 'unidades') {
         const res = await unidadService.listarUnidades({ limite: 1000, ...params });
+        console.log('🔍 [UNIDADES] Datos cargados:', res.data?.length);
         data = res.data || [];
       } else if (tipo === 'alertas') {
-        // ✅ Manejo individual de cancelación para cada petición
-        const configWithSignal = { signal };
-        
         const [exp, cer, act, proc] = await Promise.all([
-          alertasService.obtenerExpiradas({ limite: 500, ...params }).catch(err => {
-            if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') throw err;
-            return { data: [] };
-          }),
-          alertasService.obtenerCerradasManual({ limite: 500, ...params }).catch(err => {
-            if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') throw err;
-            return { data: [] };
-          }),
-          alertasService.obtenerActivas?.({ limite: 500, ...params }).catch(err => {
-            if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') throw err;
-            return { data: [] };
-          }) || Promise.resolve({ data: [] }),
-          alertasService.obtenerEnProceso?.({ limite: 500, ...params }).catch(err => {
-            if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') throw err;
-            return { data: [] };
-          }) || Promise.resolve({ data: [] })
+          alertasService.obtenerExpiradas({ limite: 500, ...params }).catch(() => ({ data: [] })),
+          alertasService.obtenerCerradasManual({ limite: 500, ...params }).catch(() => ({ data: [] })),
+          alertasService.obtenerActivas?.({ limite: 500, ...params }).catch(() => ({ data: [] })) || Promise.resolve({ data: [] }),
+          alertasService.obtenerEnProceso?.({ limite: 500, ...params }).catch(() => ({ data: [] })) || Promise.resolve({ data: [] })
         ]);
         
         data = [
@@ -190,12 +190,12 @@ const GeneradorReporte = () => {
           ...(act.data || []),
           ...(proc.data || [])
         ];
+        console.log('🔍 [ALERTAS] Datos cargados:', data.length);
       }
 
       setDatos(data);
       toast.success(`${data.length} registros cargados`);
     } catch (error) {
-      // ✅ Ignorar errores de cancelación
       if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
         console.error('Error cargando datos:', error);
         toast.error('Error al cargar datos');
@@ -205,7 +205,7 @@ const GeneradorReporte = () => {
     }
   }, [tipo, filtros.fechaInicio, filtros.fechaFin, rolPersonalPermitido, tipoAlertaPermitido]);
 
-  // ✅ Efecto con limpieza
+  // Efecto con limpieza
   useEffect(() => {
     cargarDatos();
     
@@ -238,8 +238,12 @@ const GeneradorReporte = () => {
   };
 
   const aplicarFiltrosYEstadisticas = () => {
+    console.log('🔍 [FILTROS] Datos originales length:', datos.length);
+    console.log('🔍 [FILTROS] Filtros aplicados:', filtros);
+    
     let filtrados = [...datos];
 
+    // Filtro por fechas
     if (filtros.fechaInicio && filtros.fechaFin) {
       const inicio = new Date(filtros.fechaInicio);
       inicio.setHours(0, 0, 0, 0);
@@ -266,12 +270,21 @@ const GeneradorReporte = () => {
       });
     }
 
+    // ✅ CORRECCIÓN: Filtro por tipo - aplicar solo si tiene sentido
     if (filtros.tipo !== 'todos') {
-      filtrados = filtrados.filter(item => 
-        item.tipo === filtros.tipo || item.rol === filtros.tipo
-      );
+      if (tipo === 'personal') {
+        // Para personal, filtrar por rol
+        filtrados = filtrados.filter(item => item.rol === filtros.tipo);
+      } else if (tipo === 'alertas') {
+        // Para alertas, filtrar por tipo
+        filtrados = filtrados.filter(item => item.tipo === filtros.tipo);
+      } else if (tipo === 'unidades') {
+        // Para unidades, filtrar por tipo
+        filtrados = filtrados.filter(item => item.tipo === filtros.tipo);
+      }
     }
 
+    // Filtro por estado
     if (filtros.estado !== 'todos') {
       filtrados = filtrados.filter(item => {
         if (tipo === 'personal') return item.activo === (filtros.estado === 'activo');
@@ -281,6 +294,7 @@ const GeneradorReporte = () => {
       });
     }
 
+    // Filtro por zona (solo alertas)
     if (tipo === 'alertas' && filtros.zona !== 'todas') {
       filtrados = filtrados.filter(item => {
         const zona = calcularZona(item.lat, item.lng);
@@ -288,6 +302,7 @@ const GeneradorReporte = () => {
       });
     }
 
+    // Filtro por búsqueda
     if (filtros.busqueda) {
       const busqueda = filtros.busqueda.toLowerCase();
       filtrados = filtrados.filter(item => {
@@ -307,6 +322,7 @@ const GeneradorReporte = () => {
       });
     }
 
+    console.log('🔍 [FILTROS] Datos filtrados length:', filtrados.length);
     setDatosFiltrados(filtrados);
     calcularEstadisticas(filtrados);
   };
@@ -512,7 +528,7 @@ const GeneradorReporte = () => {
         </div>
       </div>
 
-      {/* Panel de filtros - sin cambios estructurales */}
+      {/* Panel de filtros */}
       <div className="bg-white rounded-xl shadow-lg p-5 mb-6 border border-gray-100">
         <div className="flex items-center gap-2 mb-4">
           <Filter size={16} className="text-blue-600" />
@@ -643,7 +659,7 @@ const GeneradorReporte = () => {
         </div>
       )}
 
-      {/* Vista previa de datos - sin cambios estructurales */}
+      {/* Vista previa de datos */}
       {vistaPrevia && datosFiltrados.length > 0 && (
         <div className="bg-white rounded-xl shadow-lg overflow-hidden mb-6">
           <div className="px-6 py-4 border-b bg-gray-50 flex items-center justify-between">
@@ -683,14 +699,14 @@ const GeneradorReporte = () => {
                         return (
                           <td key={campo.key} className="px-4 py-3">
                             {renderBadgeTipoUnidad(item.tipo)}
-                           </td>
+                            </td>
                         );
                       }
                       if (campo.key === 'tipo' && tipo === 'alertas') {
                         return (
                           <td key={campo.key} className="px-4 py-3">
                             {renderBadgeAlerta(item.tipo)}
-                           </td>
+                            </td>
                         );
                       }
                       
@@ -700,7 +716,7 @@ const GeneradorReporte = () => {
                         </td>
                       );
                     })}
-                   </tr>
+                  </tr>
                 ))}
               </tbody>
             </table>
@@ -746,7 +762,7 @@ const GeneradorReporte = () => {
   );
 };
 
-// Componente de tarjeta de estadísticas (sin cambios)
+// Componente de tarjeta de estadísticas
 const StatCard = ({ label, value, icon: Icon, color }) => {
   const colors = {
     blue: 'bg-blue-50 text-blue-600 border-blue-100',
