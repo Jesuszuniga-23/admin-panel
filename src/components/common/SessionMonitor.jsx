@@ -13,40 +13,26 @@ const SessionMonitor = () => {
   const [countdown, setCountdown] = useState(60);
   const [sessionActive, setSessionActive] = useState(true);
   const sessionActiveRef = useRef(sessionActive);
+  
+  // ✅ Ref para debounce de actividad
+  const actividadTimeoutRef = useRef(null);
+  const ultimaActividadRef = useRef(Date.now());
 
   // Mantener la referencia actualizada
   useEffect(() => {
     sessionActiveRef.current = sessionActive;
   }, [sessionActive]);
 
-  // ✅ TEMPORAL: Simular sesión expirada después de 10 segundos (para pruebas)
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      console.log('🔴 SIMULACIÓN: Sesión expirada por inactividad (prueba)');
-      if (sessionActiveRef.current) {
-        setSessionActive(false);
-        setShowWarning(true);
-        setCountdown(30);
-        toast.error('Sesión expirada por inactividad (SIMULACIÓN)', {
-          duration: 5000
-        });
-      }
-    }, 10000); // 10 segundos para prueba rápida
-
-    return () => clearTimeout(timer);
-  }, []);
-
   const verificarSesion = useCallback(async () => {
     try {
       const estado = await authService.obtenerEstadoSesion();
-
+      
       if (!estado.activa) {
-        // ✅ Usar la referencia, no el estado directo
         if (sessionActiveRef.current) {
           setSessionActive(false);
           setShowWarning(true);
           setCountdown(estado.minutos_restantes * 60 || 30);
-
+          
           toast.error(estado.motivo || 'Sesión expirada por inactividad', {
             duration: 5000
           });
@@ -58,14 +44,35 @@ const SessionMonitor = () => {
     } catch (error) {
       console.error('Error verificando sesión:', error);
     }
-  }, []); // ✅ Dependencias vacías - no depende de sessionActive
+  }, []);
 
+  // ✅ FUNCIÓN CON DEBOUNCE - Solo registra actividad cada 30 segundos
   const registrarActividad = useCallback(async () => {
-    try {
-      await authService.registrarActividad();
-    } catch (error) {
-      // Silencioso
+    // Limpiar timeout anterior
+    if (actividadTimeoutRef.current) {
+      clearTimeout(actividadTimeoutRef.current);
     }
+    
+    // ✅ Debounce: esperar 2 segundos después del último evento
+    actividadTimeoutRef.current = setTimeout(async () => {
+      // Verificar si pasó suficiente tiempo desde la última actividad registrada
+      const ahora = Date.now();
+      const tiempoDesdeUltima = ahora - ultimaActividadRef.current;
+      
+      // ✅ Solo registrar si pasaron al menos 30 segundos desde la última vez
+      if (tiempoDesdeUltima >= 30000) {
+        ultimaActividadRef.current = ahora;
+        try {
+          await authService.registrarActividad();
+          console.log('🔄 Actividad registrada');
+        } catch (error) {
+          // Ignorar errores de rate limit
+          if (error.response?.status !== 429) {
+            console.error('Error registrando actividad:', error);
+          }
+        }
+      }
+    }, 2000); // Esperar 2 segundos de inactividad
   }, []);
 
   // Intervalo para verificar sesión
@@ -74,27 +81,46 @@ const SessionMonitor = () => {
     return () => clearInterval(interval);
   }, [verificarSesion]);
 
-  // Eventos de actividad del usuario
+  // ✅ Eventos de actividad del usuario con debounce
   useEffect(() => {
     const eventos = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
-
+    
     const handleActivity = () => {
-      // ✅ Usar la referencia
       if (sessionActiveRef.current) {
         registrarActividad();
       }
     };
-
+    
     eventos.forEach(evento => {
       window.addEventListener(evento, handleActivity);
     });
-
+    
     return () => {
       eventos.forEach(evento => {
         window.removeEventListener(evento, handleActivity);
       });
+      if (actividadTimeoutRef.current) {
+        clearTimeout(actividadTimeoutRef.current);
+      }
     };
-  }, [registrarActividad]); // ✅ Solo depende de registrarActividad
+  }, [registrarActividad]);
+
+  // ✅ SIMULACIÓN: Sesión expirada después de 10 segundos (para pruebas)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      console.log('🔴 SIMULACIÓN: Sesión expirada por inactividad (prueba)');
+      if (sessionActiveRef.current) {
+        setSessionActive(false);
+        setShowWarning(true);
+        setCountdown(30);
+        toast.error('Sesión expirada por inactividad (SIMULACIÓN)', {
+          duration: 5000
+        });
+      }
+    }, 10000);
+    
+    return () => clearTimeout(timer);
+  }, []);
 
   // Cuenta regresiva del warning
   useEffect(() => {
@@ -105,11 +131,9 @@ const SessionMonitor = () => {
       }, 1000);
     } else if (showWarning && countdown === 0) {
       logout();
-      setTimeout(() => {
-        window.location.href = '/login';
-      }, 100);
+      navigate('/login');
     }
-
+    
     return () => clearTimeout(timer);
   }, [showWarning, countdown, logout, navigate]);
 
@@ -122,63 +146,64 @@ const SessionMonitor = () => {
   if (!showWarning) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/70 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm animate-fadeIn">      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
-      <div className="bg-gradient-to-r from-amber-500 to-amber-600 px-6 py-4">
-        <div className="flex items-center gap-3">
-          <div className="bg-white/20 p-2 rounded-full">
-            <Clock className="text-white" size={24} />
+    <div className="fixed inset-0 bg-black/70 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm animate-fadeIn">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+        <div className="bg-gradient-to-r from-amber-500 to-amber-600 px-6 py-4">
+          <div className="flex items-center gap-3">
+            <div className="bg-white/20 p-2 rounded-full">
+              <Clock className="text-white" size={24} />
+            </div>
+            <h2 className="text-xl font-bold text-white">Sesión expirada</h2>
           </div>
-          <h2 className="text-xl font-bold text-white">Sesión expirada</h2>
         </div>
-      </div>
-
-      <div className="p-6">
-        <div className="text-center mb-6">
-          <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <AlertCircle className="w-8 h-8 text-amber-600" />
+        
+        <div className="p-6">
+          <div className="text-center mb-6">
+            <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <AlertCircle className="w-8 h-8 text-amber-600" />
+            </div>
+            <p className="text-gray-700 mb-2">
+              Tu sesión ha expirado por inactividad.
+            </p>
+            <p className="text-sm text-gray-500">
+              Serás redirigido automáticamente al inicio de sesión.
+            </p>
           </div>
-          <p className="text-gray-700 mb-2">
-            Tu sesión ha expirado por inactividad.
-          </p>
-          <p className="text-sm text-gray-500">
-            Serás redirigido automáticamente al inicio de sesión.
-          </p>
-        </div>
-
-        <div className="flex justify-center mb-6">
-          <div className="relative w-24 h-24">
-            <svg className="w-24 h-24 transform -rotate-90">
-              <circle cx="48" cy="48" r="44" stroke="#E5E7EB" strokeWidth="4" fill="none" />
-              <circle
-                cx="48"
-                cy="48"
-                r="44"
-                stroke="#F59E0B"
-                strokeWidth="4"
-                fill="none"
-                strokeDasharray={`${(countdown / 60) * 276} 276`}
-                strokeLinecap="round"
-                className="transition-all duration-1000"
-              />
-            </svg>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-2xl font-bold text-amber-600">{formatTime(countdown)}</span>
+          
+          <div className="flex justify-center mb-6">
+            <div className="relative w-24 h-24">
+              <svg className="w-24 h-24 transform -rotate-90">
+                <circle cx="48" cy="48" r="44" stroke="#E5E7EB" strokeWidth="4" fill="none" />
+                <circle
+                  cx="48"
+                  cy="48"
+                  r="44"
+                  stroke="#F59E0B"
+                  strokeWidth="4"
+                  fill="none"
+                  strokeDasharray={`${(countdown / 60) * 276} 276`}
+                  strokeLinecap="round"
+                  className="transition-all duration-1000"
+                />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-2xl font-bold text-amber-600">{formatTime(countdown)}</span>
+              </div>
             </div>
           </div>
+          
+          <button
+            onClick={() => {
+              logout();
+              navigate('/login');
+            }}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <LogOut size={18} />
+            Iniciar sesión nuevamente
+          </button>
         </div>
-
-        <button
-          onClick={() => {
-            logout();
-            navigate('/login');
-          }}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <LogOut size={18} />
-          Iniciar sesión nuevamente
-        </button>
       </div>
-    </div>
     </div>
   );
 };
