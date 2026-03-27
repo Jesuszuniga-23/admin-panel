@@ -1,5 +1,5 @@
 // src/pages/admin/analisis/AnalisisGeografico.jsx
-// Versión CORREGIDA con isMountedRef
+// VERSIÓN CORREGIDA - UNA SOLA PETICIÓN
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -16,7 +16,7 @@ import {
   Pie, Cell
 } from 'recharts';
 import html2canvas from 'html2canvas';
-import alertasService from '../../../services/admin/alertas.service';
+import analisisGeograficoService from '../../../services/admin/analisisGeografico.service';
 import reportesService from '../../../services/admin/reportes.service';
 import reportesGraficasService from '../../../services/admin/reportesGraficas.service';
 import Loader from '../../../components/common/Loader';
@@ -29,11 +29,7 @@ import { useDebounce } from '../../../hooks/useDebounce';
 
 const COLORS = {
   panico: '#EF4444',
-  medica: '#10B981',
-  activa: '#3B82F6',
-  proceso: '#F59E0B',
-  cerrada: '#8B5CF6',
-  expirada: '#6B7280'
+  medica: '#10B981'
 };
 
 const AnalisisGeografico = () => {
@@ -49,8 +45,8 @@ const AnalisisGeografico = () => {
   
   const [cargando, setCargando] = useState(true);
   const [exportando, setExportando] = useState(false);
-  const [datosOriginales, setDatosOriginales] = useState([]);
-  const [datosFiltrados, setDatosFiltrados] = useState([]);
+  const [alertas, setAlertas] = useState([]);
+  const [alertasFiltradas, setAlertasFiltradas] = useState([]);
   const [datosPorZona, setDatosPorZona] = useState([]);
   const [tendencias, setTendencias] = useState([]);
   const [alertaSeleccionada, setAlertaSeleccionada] = useState(null);
@@ -76,71 +72,10 @@ const AnalisisGeografico = () => {
 
   const debouncedFiltros = useDebounce(filtros, 500);
 
-  // ✅ FUNCIONES PURAS (sin cambios)
-  const calcularZona = useCallback((lat, lng) => {
-    if (!lat || !lng || isNaN(lat) || isNaN(lng)) return 'Sin ubicación';
-    if (lat > 19.6) return 'Zona Norte';
-    if (lat > 19.4 && lat <= 19.6) {
-      if (lng < -99.2) return 'Zona Poniente';
-      if (lng > -99.0) return 'Zona Oriente';
-      return 'Zona Centro';
-    }
-    if (lat <= 19.4) return 'Zona Sur';
-    return 'Otra zona';
-  }, []);
-
-  const procesarDatosPorZona = useCallback((alertas) => {
-    const zonas = {};
-    alertas.forEach(alerta => {
-      const zona = calcularZona(alerta.lat, alerta.lng);
-      if (!zonas[zona]) {
-        zonas[zona] = { zona, total: 0, panico: 0, medica: 0, activas: 0, enProceso: 0, cerradas: 0, expiradas: 0 };
-      }
-      zonas[zona].total++;
-      if (alerta.tipo === 'panico') zonas[zona].panico++;
-      else zonas[zona].medica++;
-      if (alerta.estado === 'activa') zonas[zona].activas++;
-      else if (['asignada', 'atendiendo'].includes(alerta.estado)) zonas[zona].enProceso++;
-      else if (alerta.estado === 'cerrada') zonas[zona].cerradas++;
-      else if (alerta.estado === 'expirada') zonas[zona].expiradas++;
-    });
-    return Object.values(zonas).sort((a, b) => b.total - a.total);
-  }, [calcularZona]);
-
-  const procesarTendencias = useCallback((alertas) => {
-    const meses = {};
-    alertas.forEach(alerta => {
-      if (!alerta.fecha_creacion) return;
-      const fecha = new Date(alerta.fecha_creacion);
-      const mesKey = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
-      const mesNombre = fecha.toLocaleString('es-MX', { month: 'short', year: 'numeric' });
-      if (!meses[mesKey]) {
-        meses[mesKey] = { mes: mesNombre, mesKey, total: 0, panico: 0, medica: 0 };
-      }
-      meses[mesKey].total++;
-      if (alerta.tipo === 'panico') meses[mesKey].panico++;
-      else meses[mesKey].medica++;
-    });
-    return Object.values(meses).sort((a, b) => a.mesKey.localeCompare(b.mesKey)).slice(-12);
-  }, []);
-
-  const calcularEstadisticas = useCallback((alertas) => {
-    const conUbicacion = alertas.filter(a => a.lat && a.lng).length;
-    return {
-      total: alertas.length,
-      conUbicacion,
-      sinUbicacion: alertas.length - conUbicacion,
-      panico: alertas.filter(a => a.tipo === 'panico').length,
-      medica: alertas.filter(a => a.tipo === 'medica').length,
-      activas: alertas.filter(a => a.estado === 'activa').length,
-      proceso: alertas.filter(a => ['asignada', 'atendiendo'].includes(a.estado)).length,
-      cerradas: alertas.filter(a => a.estado === 'cerrada').length,
-      expiradas: alertas.filter(a => a.estado === 'expirada').length
-    };
-  }, []);
-
-  const aplicarFiltros = useCallback((datos, filtrosActuales) => {
+  // ✅ FUNCIÓN PARA APLICAR FILTROS LOCALMENTE
+  const aplicarFiltrosLocales = useCallback((datos, filtrosActuales) => {
     let filtrados = [...datos];
+    
     if (filtrosActuales.fechaInicio && filtrosActuales.fechaFin) {
       const inicio = new Date(filtrosActuales.fechaInicio);
       inicio.setHours(0, 0, 0, 0);
@@ -151,9 +86,11 @@ const AnalisisGeografico = () => {
         return fecha >= inicio && fecha <= fin;
       });
     }
+    
     if (filtrosActuales.tipo !== 'todos') {
       filtrados = filtrados.filter(item => item.tipo === filtrosActuales.tipo);
     }
+    
     if (filtrosActuales.estado !== 'todos') {
       filtrados = filtrados.filter(item => {
         if (filtrosActuales.estado === 'activa') return item.estado === 'activa';
@@ -163,17 +100,31 @@ const AnalisisGeografico = () => {
         return true;
       });
     }
+    
     if (filtrosActuales.zona !== 'todas') {
       filtrados = filtrados.filter(item => {
-        const zona = calcularZona(item.lat, item.lng);
+        const zona = calcularZonaLocal(item.lat, item.lng);
         return zona === filtrosActuales.zona;
       });
     }
+    
     return filtrados;
-  }, [calcularZona]);
+  }, []);
 
-  // ✅ CARGAR DATOS CON isMountedRef
-  const cargarDatosAnalisis = useCallback(async () => {
+  const calcularZonaLocal = (lat, lng) => {
+    if (!lat || !lng || isNaN(lat) || isNaN(lng)) return 'Sin ubicación';
+    if (lat > 19.6) return 'Zona Norte';
+    if (lat > 19.4 && lat <= 19.6) {
+      if (lng < -99.2) return 'Zona Poniente';
+      if (lng > -99.0) return 'Zona Oriente';
+      return 'Zona Centro';
+    }
+    if (lat <= 19.4) return 'Zona Sur';
+    return 'Otra zona';
+  };
+
+  // ✅ UNA SOLA PETICIÓN - COMO EL DASHBOARD
+  const cargarDatos = useCallback(async () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
@@ -183,13 +134,24 @@ const AnalisisGeografico = () => {
     setCargando(true);
     
     try {
-      const params = { limite: 5000, signal: abortControllerRef.current.signal };
+      const params = {
+        signal: abortControllerRef.current.signal,
+        limite: 5000
+      };
       if (tipoAlertaPermitido) params.tipo = tipoAlertaPermitido;
-      const respuesta = await alertasService.obtenerAlertasGeograficas(params);
+      
+      const response = await analisisGeograficoService.obtenerDatosCompletos(params);
       
       if (!isMountedRef.current) return;
-      const alertas = respuesta.data || [];
-      setDatosOriginales(alertas);
+      
+      if (response.success) {
+        setAlertas(response.alertas || []);
+        setEstadisticas(response.estadisticas || {});
+        setDatosPorZona(response.datosPorZona || []);
+        setTendencias(response.tendencias || []);
+      } else {
+        toast.error(response.error || 'Error al cargar datos');
+      }
     } catch (error) {
       if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED' && isMountedRef.current) {
         console.error('Error cargando datos:', error);
@@ -200,10 +162,19 @@ const AnalisisGeografico = () => {
     }
   }, [tipoAlertaPermitido]);
 
+  // ✅ APLICAR FILTROS LOCALMENTE
+  useEffect(() => {
+    if (alertas.length === 0) return;
+    const filtrados = aplicarFiltrosLocales(alertas, debouncedFiltros);
+    if (isMountedRef.current) {
+      setAlertasFiltradas(filtrados);
+    }
+  }, [alertas, debouncedFiltros, aplicarFiltrosLocales]);
+
   // ✅ EFECTO PRINCIPAL
   useEffect(() => {
     isMountedRef.current = true;
-    cargarDatosAnalisis();
+    cargarDatos();
     
     return () => {
       isMountedRef.current = false;
@@ -211,30 +182,12 @@ const AnalisisGeografico = () => {
         abortControllerRef.current.abort();
       }
     };
-  }, [cargarDatosAnalisis]);
-
-  // ✅ EFECTO PARA PROCESAR DATOS - CON VERIFICACIÓN DE MONTADO
-  useEffect(() => {
-    if (datosOriginales.length === 0) return;
-    
-    const filtrados = aplicarFiltros(datosOriginales, debouncedFiltros);
-    const stats = calcularEstadisticas(filtrados);
-    const zonas = procesarDatosPorZona(filtrados);
-    const tendenciasArray = procesarTendencias(filtrados);
-    
-    // ✅ Solo actualizar si el componente sigue montado
-    if (isMountedRef.current) {
-      setDatosFiltrados(filtrados);
-      setEstadisticas(stats);
-      setDatosPorZona(zonas);
-      setTendencias(tendenciasArray);
-    }
-  }, [datosOriginales, debouncedFiltros, aplicarFiltros, calcularEstadisticas, procesarDatosPorZona, procesarTendencias]);
+  }, [cargarDatos]);
 
   // ✅ Memoizar alertas para el mapa
   const alertasParaMapa = useMemo(() => {
-    return datosFiltrados.filter(a => a.lat && a.lng);
-  }, [datosFiltrados]);
+    return alertasFiltradas.filter(a => a.lat && a.lng);
+  }, [alertasFiltradas]);
 
   const limpiarFiltros = () => {
     if (!isMountedRef.current) return;
@@ -252,7 +205,7 @@ const AnalisisGeografico = () => {
     try {
       const graficas = {};
       if (mapaRef.current) {
-        const canvas = await html2canvas(mapaRef.current, { scale: 1.5, backgroundColor: '#ffffff', logging: false, allowTaint: false, useCORS: true });
+        const canvas = await html2canvas(mapaRef.current, { scale: 1.5, backgroundColor: '#ffffff', logging: false });
         graficas.mapa = canvas.toDataURL('image/png');
       }
       if (graficaBarrasRef.current) {
@@ -275,7 +228,7 @@ const AnalisisGeografico = () => {
     setExportando(true);
     try {
       toast.loading('Generando reporte de Excel...', { id: 'export' });
-      await reportesService.generarExcelPersonalizado(datosFiltrados, 'alertas', filtros, user);
+      await reportesService.generarExcelPersonalizado(alertasFiltradas, 'alertas', filtros, user);
       toast.success('Reporte de Excel generado correctamente', { id: 'export' });
     } catch (error) {
       console.error('Error exportando Excel:', error);
@@ -291,7 +244,7 @@ const AnalisisGeografico = () => {
     try {
       toast.loading('Generando PDF con gráficas...', { id: 'export' });
       const graficas = await capturarGraficas();
-      await reportesGraficasService.generarPDFConGraficas(datosFiltrados, 'alertas', filtros, user, {
+      await reportesGraficasService.generarPDFConGraficas(alertasFiltradas, 'alertas', filtros, user, {
         ...graficas,
         estadisticas,
         datosPorZona,
@@ -343,16 +296,13 @@ const AnalisisGeografico = () => {
             </div>
             <div className="flex gap-2">
               <button onClick={exportarExcel} disabled={exportando} className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all text-sm shadow-md disabled:opacity-50">
-                <FileSpreadsheet size={16} />
-                <span className="hidden sm:inline">Excel</span>
+                <FileSpreadsheet size={16} /><span className="hidden sm:inline">Excel</span>
               </button>
               <button onClick={exportarPDF} disabled={exportando} className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl hover:from-red-700 hover:to-red-800 transition-all text-sm shadow-md disabled:opacity-50">
-                <FilePieChart size={16} />
-                <span className="hidden sm:inline">PDF Gráficas</span>
+                <FilePieChart size={16} /><span className="hidden sm:inline">PDF Gráficas</span>
               </button>
               <button onClick={() => navigate('/admin/dashboard')} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all text-sm shadow-sm">
-                <ChevronLeft size={16} />
-                <span className="hidden sm:inline">Dashboard</span>
+                <ChevronLeft size={16} /><span className="hidden sm:inline">Dashboard</span>
               </button>
             </div>
           </div>
@@ -422,7 +372,7 @@ const AnalisisGeografico = () => {
               <MapaMultiAlertas alertas={alertasParaMapa} onSeleccionarAlerta={setAlertaSeleccionada} />
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                <div className="text-center text-gray-400"><MapPin size={32} className="mx-auto mb-2 opacity-50" /><p className="text-sm">No hay ubicaciones para mostrar</p><p className="text-xs mt-1">Total alertas: {datosFiltrados.length}</p></div>
+                <div className="text-center text-gray-400"><MapPin size={32} className="mx-auto mb-2 opacity-50" /><p className="text-sm">No hay ubicaciones para mostrar</p><p className="text-xs mt-1">Total alertas: {alertasFiltradas.length}</p></div>
               </div>
             )}
           </div>

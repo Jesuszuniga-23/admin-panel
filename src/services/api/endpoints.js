@@ -80,7 +80,10 @@ export const ENDPOINTS = {
     // Puedes agregar más endpoints de dashboard aquí si es necesario
     // ESTADISTICAS: `${BASE_URL}/admin/dashboard/estadisticas`,
     // ACTIVIDAD_RECIENTE: `${BASE_URL}/admin/dashboard/actividad-reciente`,
-  }
+  },
+  ANALISIS_GEOGRAFICO: {
+    COMPLETO: `${BASE_URL}/admin/analisis-geografico/completo`
+}
 };
 
 // ✅ Función de utilidad para verificar endpoints
