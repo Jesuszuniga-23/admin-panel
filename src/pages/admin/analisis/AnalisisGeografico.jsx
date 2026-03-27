@@ -1,5 +1,5 @@
 // src/pages/admin/analisis/AnalisisGeografico.jsx
-// VERSIÓN CORREGIDA - UNA SOLA PETICIÓN
+// VERSIÓN CORREGIDA CON MAPA BAJO DEMANDA
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -50,6 +50,7 @@ const AnalisisGeografico = () => {
   const [datosPorZona, setDatosPorZona] = useState([]);
   const [tendencias, setTendencias] = useState([]);
   const [alertaSeleccionada, setAlertaSeleccionada] = useState(null);
+  const [mostrarMapa, setMostrarMapa] = useState(false); // ✅ NUEVO: controla si el mapa está montado
   const [estadisticas, setEstadisticas] = useState({
     total: 0,
     conUbicacion: 0,
@@ -71,6 +72,73 @@ const AnalisisGeografico = () => {
   });
 
   const debouncedFiltros = useDebounce(filtros, 500);
+
+  // ✅ FUNCIÓN PARA CALCULAR ZONA LOCALMENTE
+  const calcularZonaLocal = useCallback((lat, lng) => {
+    if (!lat || !lng || isNaN(lat) || isNaN(lng)) return 'Sin ubicación';
+    if (lat > 19.6) return 'Zona Norte';
+    if (lat > 19.4 && lat <= 19.6) {
+      if (lng < -99.2) return 'Zona Poniente';
+      if (lng > -99.0) return 'Zona Oriente';
+      return 'Zona Centro';
+    }
+    if (lat <= 19.4) return 'Zona Sur';
+    return 'Otra zona';
+  }, []);
+
+  // ✅ FUNCIÓN PARA CALCULAR ESTADÍSTICAS LOCALMENTE
+  const calcularEstadisticasLocal = useCallback((alertasData) => {
+    const conUbicacion = alertasData.filter(a => a.lat && a.lng).length;
+    return {
+      total: alertasData.length,
+      conUbicacion,
+      sinUbicacion: alertasData.length - conUbicacion,
+      panico: alertasData.filter(a => a.tipo === 'panico').length,
+      medica: alertasData.filter(a => a.tipo === 'medica').length,
+      activas: alertasData.filter(a => a.estado === 'activa').length,
+      proceso: alertasData.filter(a => ['asignada', 'atendiendo'].includes(a.estado)).length,
+      cerradas: alertasData.filter(a => a.estado === 'cerrada').length,
+      expiradas: alertasData.filter(a => a.estado === 'expirada').length
+    };
+  }, []);
+
+  // ✅ FUNCIÓN PARA PROCESAR ZONAS LOCALMENTE
+  const procesarZonasLocal = useCallback((alertasData) => {
+    const zonas = {};
+    alertasData.forEach(alerta => {
+      if (!alerta.lat || !alerta.lng) return;
+      const zona = calcularZonaLocal(alerta.lat, alerta.lng);
+      if (!zonas[zona]) {
+        zonas[zona] = { zona, total: 0, panico: 0, medica: 0, activas: 0, enProceso: 0, cerradas: 0, expiradas: 0 };
+      }
+      zonas[zona].total++;
+      if (alerta.tipo === 'panico') zonas[zona].panico++;
+      else zonas[zona].medica++;
+      if (alerta.estado === 'activa') zonas[zona].activas++;
+      else if (['asignada', 'atendiendo'].includes(alerta.estado)) zonas[zona].enProceso++;
+      else if (alerta.estado === 'cerrada') zonas[zona].cerradas++;
+      else if (alerta.estado === 'expirada') zonas[zona].expiradas++;
+    });
+    return Object.values(zonas).sort((a, b) => b.total - a.total);
+  }, [calcularZonaLocal]);
+
+  // ✅ FUNCIÓN PARA PROCESAR TENDENCIAS LOCALMENTE
+  const procesarTendenciasLocal = useCallback((alertasData) => {
+    const meses = {};
+    alertasData.forEach(alerta => {
+      if (!alerta.fecha_creacion) return;
+      const fecha = new Date(alerta.fecha_creacion);
+      const mesKey = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
+      const mesNombre = fecha.toLocaleString('es-MX', { month: 'short', year: 'numeric' });
+      if (!meses[mesKey]) {
+        meses[mesKey] = { mes: mesNombre, mesKey, total: 0, panico: 0, medica: 0 };
+      }
+      meses[mesKey].total++;
+      if (alerta.tipo === 'panico') meses[mesKey].panico++;
+      else meses[mesKey].medica++;
+    });
+    return Object.values(meses).sort((a, b) => a.mesKey.localeCompare(b.mesKey)).slice(-12);
+  }, []);
 
   // ✅ FUNCIÓN PARA APLICAR FILTROS LOCALMENTE
   const aplicarFiltrosLocales = useCallback((datos, filtrosActuales) => {
@@ -109,19 +177,7 @@ const AnalisisGeografico = () => {
     }
     
     return filtrados;
-  }, []);
-
-  const calcularZonaLocal = (lat, lng) => {
-    if (!lat || !lng || isNaN(lat) || isNaN(lng)) return 'Sin ubicación';
-    if (lat > 19.6) return 'Zona Norte';
-    if (lat > 19.4 && lat <= 19.6) {
-      if (lng < -99.2) return 'Zona Poniente';
-      if (lng > -99.0) return 'Zona Oriente';
-      return 'Zona Centro';
-    }
-    if (lat <= 19.4) return 'Zona Sur';
-    return 'Otra zona';
-  };
+  }, [calcularZonaLocal]);
 
   // ✅ UNA SOLA PETICIÓN - COMO EL DASHBOARD
   const cargarDatos = useCallback(async () => {
@@ -162,14 +218,21 @@ const AnalisisGeografico = () => {
     }
   }, [tipoAlertaPermitido]);
 
-  // ✅ APLICAR FILTROS LOCALMENTE
+  // ✅ APLICAR FILTROS LOCALMENTE Y ACTUALIZAR ESTADÍSTICAS
   useEffect(() => {
     if (alertas.length === 0) return;
     const filtrados = aplicarFiltrosLocales(alertas, debouncedFiltros);
+    const stats = calcularEstadisticasLocal(filtrados);
+    const zonas = procesarZonasLocal(filtrados);
+    const tendenciasArray = procesarTendenciasLocal(filtrados);
+    
     if (isMountedRef.current) {
       setAlertasFiltradas(filtrados);
+      setEstadisticas(stats);
+      setDatosPorZona(zonas);
+      setTendencias(tendenciasArray);
     }
-  }, [alertas, debouncedFiltros, aplicarFiltrosLocales]);
+  }, [alertas, debouncedFiltros, aplicarFiltrosLocales, calcularEstadisticasLocal, procesarZonasLocal, procesarTendenciasLocal]);
 
   // ✅ EFECTO PRINCIPAL
   useEffect(() => {
@@ -199,6 +262,7 @@ const AnalisisGeografico = () => {
       zona: 'todas'
     });
     setAlertaSeleccionada(null);
+    setMostrarMapa(false); // ✅ Al limpiar filtros, ocultar el mapa
   };
 
   const capturarGraficas = async () => {
@@ -354,43 +418,114 @@ const AnalisisGeografico = () => {
           </div>
         </div>
 
-        {/* MAPA PRINCIPAL */}
+        {/* ✅ MAPA PRINCIPAL CON CARGA BAJO DEMANDA */}
         <div className="bg-white rounded-2xl shadow-xl p-6 mb-8 border border-gray-100 overflow-hidden">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl shadow-md"><Map size={20} className="text-white" /></div>
+              <div className="p-2 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl shadow-md">
+                <Map size={20} className="text-white" />
+              </div>
               <h2 className="text-lg font-semibold text-gray-800">Mapa de Incidentes</h2>
               <div className="flex items-center gap-2 ml-4">
-                <div className="flex items-center gap-1"><div className="w-3 h-3 bg-red-500 rounded-full"></div><span className="text-xs text-gray-500">Pánico</span></div>
-                <div className="flex items-center gap-1"><div className="w-3 h-3 bg-green-500 rounded-full"></div><span className="text-xs text-gray-500">Médica</span></div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                  <span className="text-xs text-gray-500">Pánico</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                  <span className="text-xs text-gray-500">Médica</span>
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-2"><span className="text-xs bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full">{alertasParaMapa.length} puntos visibles</span></div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full">
+                {alertasParaMapa.length} puntos disponibles
+              </span>
+            </div>
           </div>
-          <div ref={mapaRef} className="h-[500px] w-full rounded-xl overflow-hidden border border-gray-200 shadow-inner">
-            {alertasParaMapa.length > 0 ? (
-              <MapaMultiAlertas alertas={alertasParaMapa} onSeleccionarAlerta={setAlertaSeleccionada} />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                <div className="text-center text-gray-400"><MapPin size={32} className="mx-auto mb-2 opacity-50" /><p className="text-sm">No hay ubicaciones para mostrar</p><p className="text-xs mt-1">Total alertas: {alertasFiltradas.length}</p></div>
-              </div>
-            )}
-          </div>
+
+          {/* ✅ LÓGICA DE CARGA BAJO DEMANDA */}
+          {!mostrarMapa ? (
+            <div className="h-[500px] w-full rounded-xl overflow-hidden border border-gray-200 shadow-inner bg-gray-50 flex flex-col items-center justify-center">
+              <MapPin size={48} className="text-gray-400 mb-4" />
+              <p className="text-gray-500 text-sm mb-2">
+                {alertasParaMapa.length === 0 
+                  ? 'No hay ubicaciones disponibles en el mapa' 
+                  : `Hay ${alertasParaMapa.length} ubicación${alertasParaMapa.length !== 1 ? 'es' : ''} para mostrar`}
+              </p>
+              {alertasParaMapa.length > 0 && (
+                <button
+                  onClick={() => setMostrarMapa(true)}
+                  className="mt-2 px-6 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-colors flex items-center gap-2 shadow-md"
+                >
+                  <Map size={16} />
+                  Ver mapa completo
+                </button>
+              )}
+            </div>
+          ) : (
+            <div 
+              ref={mapaRef} 
+              className="h-[500px] w-full rounded-xl overflow-hidden border border-gray-200 shadow-inner"
+            >
+              {alertasParaMapa.length > 0 ? (
+                <MapaMultiAlertas 
+                  alertas={alertasParaMapa}
+                  onSeleccionarAlerta={setAlertaSeleccionada}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                  <div className="text-center text-gray-400">
+                    <MapPin size={32} className="mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">No hay ubicaciones para mostrar</p>
+                    <button
+                      onClick={() => setMostrarMapa(false)}
+                      className="mt-4 text-sm text-indigo-600 hover:text-indigo-800"
+                    >
+                      Ocultar mapa
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {alertaSeleccionada && (
             <div className="mt-4 p-4 bg-indigo-50 rounded-xl border border-indigo-200 animate-fadeIn">
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-3">
-                  <div className={`p-2 rounded-lg ${alertaSeleccionada.tipo === 'panico' ? 'bg-red-100' : 'bg-green-100'}`}><IconoEntidad entidad={alertaSeleccionada.tipo === 'panico' ? 'ALERTA_PANICO' : 'ALERTA_MEDICA'} size={16} /></div>
+                  <div className={`p-2 rounded-lg ${alertaSeleccionada.tipo === 'panico' ? 'bg-red-100' : 'bg-green-100'}`}>
+                    <IconoEntidad 
+                      entidad={alertaSeleccionada.tipo === 'panico' ? 'ALERTA_PANICO' : 'ALERTA_MEDICA'} 
+                      size={16}
+                    />
+                  </div>
                   <div>
-                    <div className="flex items-center gap-2 mb-1"><h3 className="font-semibold text-gray-800">Alerta #{alertaSeleccionada.id}</h3><BadgeTipoAlerta tipo={alertaSeleccionada.tipo} size={12} /></div>
-                    <p className="text-sm text-gray-600 mb-2">{alertaSeleccionada.ciudadano?.nombre || 'Ciudadano desconocido'}</p>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-semibold text-gray-800">Alerta #{alertaSeleccionada.id}</h3>
+                      <BadgeTipoAlerta tipo={alertaSeleccionada.tipo} size={12} />
+                    </div>
+                    <p className="text-sm text-gray-600 mb-2">
+                      {alertaSeleccionada.ciudadano?.nombre || 'Ciudadano desconocido'}
+                    </p>
                     <div className="flex items-center gap-4 text-xs text-gray-500">
-                      <span className="flex items-center gap-1"><IconoEntidad entidad="UBICACION" size={12} />{alertaSeleccionada.lat?.toFixed(4)}, {alertaSeleccionada.lng?.toFixed(4)}</span>
-                      <span className="flex items-center gap-1"><Clock size={12} />{new Date(alertaSeleccionada.fecha_creacion).toLocaleString()}</span>
+                      <span className="flex items-center gap-1">
+                        <IconoEntidad entidad="UBICACION" size={12} />
+                        {alertaSeleccionada.lat?.toFixed(4)}, {alertaSeleccionada.lng?.toFixed(4)}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Clock size={12} />
+                        {new Date(alertaSeleccionada.fecha_creacion).toLocaleString()}
+                      </span>
                     </div>
                   </div>
                 </div>
-                <button onClick={() => setAlertaSeleccionada(null)} className="p-1 hover:bg-white rounded-lg transition-colors"><XCircle size={18} className="text-gray-400" /></button>
+                <button
+                  onClick={() => setAlertaSeleccionada(null)}
+                  className="p-1 hover:bg-white rounded-lg transition-colors"
+                >
+                  <XCircle size={18} className="text-gray-400" />
+                </button>
               </div>
             </div>
           )}
@@ -410,10 +545,25 @@ const AnalisisGeografico = () => {
 
         {/* Gráficas */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          {/* Gráfica de barras */}
           <div ref={graficaBarrasRef} className="lg:col-span-2 bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
             <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3"><div className="p-2 bg-indigo-100 rounded-xl"><BarChart3 size={20} className="text-indigo-600" /></div><h2 className="text-lg font-semibold text-gray-800">Incidentes por Zona</h2></div>
-              <div className="flex items-center gap-3"><div className="flex items-center gap-2"><div className="w-3 h-3 bg-red-500 rounded-full"></div><span className="text-xs text-gray-500">Pánico</span></div><div className="flex items-center gap-2"><div className="w-3 h-3 bg-green-500 rounded-full"></div><span className="text-xs text-gray-500">Médica</span></div></div>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-indigo-100 rounded-xl">
+                  <BarChart3 size={20} className="text-indigo-600" />
+                </div>
+                <h2 className="text-lg font-semibold text-gray-800">Incidentes por Zona</h2>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                  <span className="text-xs text-gray-500">Pánico</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                  <span className="text-xs text-gray-500">Médica</span>
+                </div>
+              </div>
             </div>
             {datosPorZona.length > 0 ? (
               <div className="h-80 w-full" style={{ minHeight: '320px' }}>
@@ -422,31 +572,67 @@ const AnalisisGeografico = () => {
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0" />
                     <XAxis type="number" tick={{ fontSize: 11 }} />
                     <YAxis type="category" dataKey="zona" width={100} tick={{ fontSize: 11 }} />
-                    <Tooltip formatter={(value, name) => { const nombres = { panico: 'Pánico', medica: 'Médica' }; return [value, nombres[name] || name]; }} contentStyle={{ fontSize: '11px' }} />
+                    <Tooltip 
+                      formatter={(value, name) => { 
+                        const nombres = { panico: 'Pánico', medica: 'Médica' }; 
+                        return [value, nombres[name] || name]; 
+                      }} 
+                      contentStyle={{ fontSize: '11px' }} 
+                    />
                     <Legend wrapperStyle={{ fontSize: '11px' }} />
                     <Bar dataKey="panico" name="Pánico" fill={COLORS.panico} stackId="a" radius={[0, 4, 4, 0]} />
                     <Bar dataKey="medica" name="Médica" fill={COLORS.medica} stackId="a" radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-            ) : <div className="h-80 flex items-center justify-center text-gray-400">No hay datos disponibles</div>}
+            ) : (
+              <div className="h-80 flex items-center justify-center text-gray-400">
+                No hay datos disponibles
+              </div>
+            )}
           </div>
 
+          {/* Gráfica de pastel */}
           <div ref={graficaPastelRef} className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
-            <div className="flex items-center gap-3 mb-6"><div className="p-2 bg-purple-100 rounded-xl"><PieChart size={20} className="text-purple-600" /></div><h2 className="text-lg font-semibold text-gray-800">Distribución por Tipo</h2></div>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 bg-purple-100 rounded-xl">
+                <PieChart size={20} className="text-purple-600" />
+              </div>
+              <h2 className="text-lg font-semibold text-gray-800">Distribución por Tipo</h2>
+            </div>
             <div className="h-64 w-full" style={{ minHeight: '260px' }}>
               <ResponsiveContainer width="100%" height="100%">
                 <RePieChart>
-                  <Pie data={[{ name: 'Pánico', value: estadisticas.panico }, { name: 'Médica', value: estadisticas.medica }]} cx="50%" cy="50%" innerRadius={50} outerRadius={70} paddingAngle={5} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false}>
-                    <Cell fill={COLORS.panico} /><Cell fill={COLORS.medica} />
+                  <Pie 
+                    data={[
+                      { name: 'Pánico', value: estadisticas.panico }, 
+                      { name: 'Médica', value: estadisticas.medica }
+                    ]} 
+                    cx="50%" 
+                    cy="50%" 
+                    innerRadius={50} 
+                    outerRadius={70} 
+                    paddingAngle={5} 
+                    dataKey="value" 
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} 
+                    labelLine={false}
+                  >
+                    <Cell fill={COLORS.panico} />
+                    <Cell fill={COLORS.medica} />
                   </Pie>
                   <Tooltip contentStyle={{ fontSize: '11px' }} />
                 </RePieChart>
               </ResponsiveContainer>
             </div>
             <div className="mt-4 grid grid-cols-2 gap-2">
-              <div className="bg-red-50 rounded-lg p-2 text-center"><p className="text-xs text-gray-500">Pánico</p><p className="text-lg font-bold text-red-600">{estadisticas.panico}</p></div>
-              <div className="bg-green-50 rounded-lg p-2 text-center"><p className="text-xs text-gray-500">Médica</p><p className="text-lg font-bold text-green-600">{estadisticas.medica}</p></div>
+              <div className="bg-red-50 rounded-lg p-2 text-center">
+                <p className="text-xs text-gray-500">Pánico</p>
+                <p className="text-lg font-bold text-red-600">{estadisticas.panico}</p>
+              </div>
+              <div className="bg-green-50 rounded-lg p-2 text-center">
+                <p className="text-xs text-gray-500">Médica</p>
+                <p className="text-lg font-bold text-green-600">{estadisticas.medica}</p>
+              </div>
             </div>
           </div>
         </div>
@@ -454,8 +640,19 @@ const AnalisisGeografico = () => {
         {/* Nota informativa */}
         <div className="mt-8 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl p-6 border border-indigo-200">
           <div className="flex items-start gap-4">
-            <div className="p-2 bg-white rounded-xl shadow-sm"><Info size={20} className="text-indigo-600" /></div>
-            <div className="flex-1"><h3 className="text-sm font-semibold text-indigo-900 mb-1">Análisis basado en datos reales</h3><p className="text-sm text-indigo-700">Este análisis utiliza las coordenadas reales de {estadisticas.conUbicacion} alertas con ubicación geográfica válida. {estadisticas.sinUbicacion} alertas no tienen coordenadas y no se incluyen en el análisis por zona.{tipoAlertaPermitido && ` Actualmente filtrado para mostrar solo alertas de tipo ${tipoAlertaPermitido === 'panico' ? 'Pánico' : 'Médicas'}.`}</p></div>
+            <div className="p-2 bg-white rounded-xl shadow-sm">
+              <Info size={20} className="text-indigo-600" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-indigo-900 mb-1">
+                Análisis basado en datos reales
+              </h3>
+              <p className="text-sm text-indigo-700">
+                Este análisis utiliza las coordenadas reales de {estadisticas.conUbicacion} alertas con ubicación geográfica válida. 
+                {estadisticas.sinUbicacion} alertas no tienen coordenadas y no se incluyen en el análisis por zona.
+                {tipoAlertaPermitido && ` Actualmente filtrado para mostrar solo alertas de tipo ${tipoAlertaPermitido === 'panico' ? 'Pánico' : 'Médicas'}.`}
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -463,6 +660,7 @@ const AnalisisGeografico = () => {
   );
 };
 
+// Componente de tarjeta de resumen
 const ResumenCardAvanzado = ({ label, value, icon: Icon, color, subValue }) => {
   const colors = {
     indigo: 'from-indigo-50 to-indigo-100 border-indigo-200 text-indigo-600',
@@ -476,7 +674,10 @@ const ResumenCardAvanzado = ({ label, value, icon: Icon, color, subValue }) => {
 
   return (
     <div className={`bg-gradient-to-br ${colors[color]} rounded-xl p-4 border shadow-sm hover:shadow-md transition-all`}>
-      <div className="flex items-center justify-between mb-2"><Icon size={18} className={colors[color].split(' ')[2]} />{subValue && <span className="text-xs font-medium bg-white/50 px-2 py-1 rounded-full">{subValue}</span>}</div>
+      <div className="flex items-center justify-between mb-2">
+        <Icon size={18} className={colors[color].split(' ')[2]} />
+        {subValue && <span className="text-xs font-medium bg-white/50 px-2 py-1 rounded-full">{subValue}</span>}
+      </div>
       <p className="text-2xl font-bold text-gray-800">{value}</p>
       <p className="text-xs text-gray-500 mt-1">{label}</p>
     </div>
