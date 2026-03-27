@@ -1,5 +1,5 @@
 // src/pages/admin/personal/PersonalForm.jsx
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
   User, Mail, Phone, Shield, Hash, Save, X,
@@ -37,9 +37,9 @@ const rolTexto = {
   operador_general: 'Operador General'
 };
 
-// ✅ CORREGIDO: Roles disponibles según el rol del usuario
+// Roles disponibles según el rol del usuario
 const rolesDisponiblesPorUsuario = {
-  admin: ['admin', 'operador_tecnico', 'operador_general'], // Admin NO crea policía/ambulancia
+  admin: ['admin', 'operador_tecnico', 'operador_general'],
   superadmin: ['policia', 'ambulancia', 'admin', 'superadmin', 'operador_tecnico', 'operador_policial', 'operador_medico', 'operador_general'],
   operador_policial: ['policia'],
   operador_medico: ['ambulancia'],
@@ -66,7 +66,7 @@ const corregirTexto = (texto) => {
   return textoCorregido;
 };
 
-// Componente de barra de progreso
+// Componente de barra de progreso (sin cambios)
 const ProgressBar = ({ completed, total }) => {
   const percentage = Math.min(100, Math.round((completed / total) * 100));
   
@@ -102,7 +102,11 @@ const PersonalForm = () => {
   const [loading, setLoading] = useState(false);
   const [cargandoDatos, setCargandoDatos] = useState(isEditing);
   
-  // ✅ Obtener permisos según rol del usuario actual
+  // ✅ REF para AbortControllers
+  const abortControllerRef = useRef(null);
+  const abortControllerListaRef = useRef(null);
+  
+  // Obtener permisos según rol del usuario actual
   const rolesPermitidos = rolesDisponiblesPorUsuario[currentUser?.rol] || [];
   
   const [formData, setFormData] = useState(() => {
@@ -182,7 +186,7 @@ const PersonalForm = () => {
     return false;
   };
 
-  // Emitir evento de cambios sin guardar
+  // Emitir evento de cambios sin guardar (sin cambios)
   useEffect(() => {
     const emitUnsavedStatus = () => {
       const hasChanges = hasUnsavedChanges() && !isEditing;
@@ -214,7 +218,7 @@ const PersonalForm = () => {
     };
   }, []);
 
-  // Escuchar eventos del sidebar
+  // Escuchar eventos del sidebar (sin cambios)
   useEffect(() => {
     const handleSaveProgress = () => {
       if (!isEditing) {
@@ -245,7 +249,7 @@ const PersonalForm = () => {
     };
   }, [formData, isEditing, storageKey]);
 
-  // Interceptar navegación con beforeunload para recargar página
+  // Interceptar navegación con beforeunload (sin cambios)
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (hasUnsavedChanges() && !isEditing) {
@@ -264,35 +268,21 @@ const PersonalForm = () => {
     sessionStorage.removeItem(storageKey);
   };
 
-  useEffect(() => {
-    cargarTodosPersonales();
-  }, []);
-
-  useEffect(() => {
-    if (isEditing) {
-      cargarPersonal();
+  // ✅ Función para cargar todos los personales con AbortController
+  const cargarTodosPersonales = useCallback(async () => {
+    // Cancelar petición anterior si existe
+    if (abortControllerListaRef.current) {
+      abortControllerListaRef.current.abort();
+      console.log('🛑 Petición anterior cancelada en cargarTodosPersonales');
     }
-  }, [id]);
-
-  useEffect(() => {
-    setTelefonoBloqueado(isEditing);
-    setTelefonoClicks(0);
-  }, [isEditing]);
-
-  useEffect(() => {
-    const autoSaveInterval = setInterval(() => {
-      if (hasUnsavedChanges() && !isEditing) {
-        sessionStorage.setItem(storageKey, JSON.stringify(formData));
-        console.log('Auto-guardado realizado');
-      }
-    }, 30000);
-
-    return () => clearInterval(autoSaveInterval);
-  }, [formData, isEditing, storageKey]);
-
-  const cargarTodosPersonales = async () => {
+    
+    abortControllerListaRef.current = new AbortController();
+    
     try {
-      const response = await personalService.listarPersonal({ limite: 1000 });
+      const response = await personalService.listarPersonal({ 
+        limite: 1000,
+        signal: abortControllerListaRef.current.signal 
+      });
       const personalesCorregidos = (response.data || []).map(p => ({
         ...p,
         nombre: corregirTexto(p.nombre),
@@ -301,14 +291,30 @@ const PersonalForm = () => {
       }));
       setTodosPersonales(personalesCorregidos);
     } catch (error) {
-      console.error('Error cargando personales:', error);
+      // ✅ Ignorar errores de cancelación
+      if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
+        console.error('Error cargando personales:', error);
+      }
     }
-  };
+  }, []);
 
-  const cargarPersonal = async () => {
+  // ✅ Función para cargar personal individual con AbortController
+  const cargarPersonal = useCallback(async () => {
+    if (!id) return;
+    
+    // Cancelar petición anterior si existe
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      console.log('🛑 Petición anterior cancelada en cargarPersonal');
+    }
+    
+    abortControllerRef.current = new AbortController();
+    
+    setCargandoDatos(true);
     try {
-      setCargandoDatos(true);
-      const response = await personalService.obtenerPersonal(id);
+      const response = await personalService.obtenerPersonal(id, {
+        signal: abortControllerRef.current.signal
+      });
       
       const loadedData = {
         nombre: corregirTexto(response.data.nombre || ''),
@@ -325,13 +331,57 @@ const PersonalForm = () => {
       setFormData(loadedData);
       setOriginalFormData(JSON.parse(JSON.stringify(loadedData)));
     } catch (error) {
-      console.error('Error cargando personal:', error);
-      toast.error('Error al cargar los datos');
-      navigate('/admin/personal');
+      // ✅ Ignorar errores de cancelación
+      if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
+        console.error('Error cargando personal:', error);
+        toast.error('Error al cargar los datos');
+        navigate('/admin/personal');
+      }
     } finally {
       setCargandoDatos(false);
     }
-  };
+  }, [id, navigate]);
+
+  // ✅ Efectos con limpieza
+  useEffect(() => {
+    cargarTodosPersonales();
+    
+    return () => {
+      if (abortControllerListaRef.current) {
+        abortControllerListaRef.current.abort();
+        console.log('🛑 Petición de lista cancelada al desmontar');
+      }
+    };
+  }, [cargarTodosPersonales]);
+
+  useEffect(() => {
+    if (isEditing) {
+      cargarPersonal();
+    }
+    
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        console.log('🛑 Petición de personal cancelada al desmontar');
+      }
+    };
+  }, [isEditing, cargarPersonal]);
+
+  useEffect(() => {
+    setTelefonoBloqueado(isEditing);
+    setTelefonoClicks(0);
+  }, [isEditing]);
+
+  useEffect(() => {
+    const autoSaveInterval = setInterval(() => {
+      if (hasUnsavedChanges() && !isEditing) {
+        sessionStorage.setItem(storageKey, JSON.stringify(formData));
+        console.log('Auto-guardado realizado');
+      }
+    }, 30000);
+
+    return () => clearInterval(autoSaveInterval);
+  }, [formData, isEditing, storageKey]);
 
   const handleTelefonoClick = (e) => {
     if (!isEditing) return;
@@ -532,7 +582,7 @@ const PersonalForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // ✅ Verificar permisos según el rol que se intenta crear
+    // Verificar permisos según el rol que se intenta crear
     if (!isEditing && !authService.puedeCrearPersonal(formData.rol)) {
       toast.error(`No tienes permisos para crear personal con rol: ${rolTexto[formData.rol] || formData.rol}`);
       return;
@@ -693,7 +743,7 @@ const PersonalForm = () => {
 
         {!isEditing && <ProgressBar completed={calcularProgreso()} total={4} />}
 
-        {/* Formulario */}
+        {/* Formulario - el resto del JSX se mantiene igual */}
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-200">
           <div className="h-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-600"></div>
           

@@ -1,5 +1,5 @@
 // src/pages/admin/Perfil.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   User, Mail, Shield, Hash, Phone,
@@ -8,7 +8,8 @@ import {
 } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
 import toast from 'react-hot-toast';
-import AlertasService from '../../services/admin/alertas.service';
+// ✅ CORREGIDO: Importar con nombre correcto (lowercase)
+import alertasService from '../../services/admin/alertas.service';
 import authService from '../../services/auth.service';
 
 // Función para formatear nombres
@@ -74,51 +75,74 @@ const Perfil = () => {
   const [loading, setLoading] = useState(false);
   const [totalCerradasManual, setTotalCerradasManual] = useState(0);
   const [cargandoEstadisticas, setCargandoEstadisticas] = useState(true);
+  
+  // ✅ REF para AbortController
+  const abortControllerRef = useRef(null);
 
   const nombreFormateado = user?.nombre ? formatearNombre(user.nombre) : '';
   
   // Obtener tipo de alerta permitido según rol
   const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
 
-  // Cargar total de alertas cerradas manualmente por este usuario
-  useEffect(() => {
-    const cargarTotalCerradasManual = async () => {
-      try {
-        setCargandoEstadisticas(true);
-        
-        console.log('Cargando total de alertas cerradas por usuario:', user.id);
-        
-        const params = {};
-        if (tipoAlertaPermitido) {
-          params.tipo = tipoAlertaPermitido;
-        }
-        
-        const response = await AlertasService.obtenerCerradasManual({ 
-          admin_id: user.id,
-          limite: 1000,
-          ...params
-        });
-        
-        console.log('Respuesta:', response);
-        
-        if (response && response.data) {
-          const total = response.data.length;
-          setTotalCerradasManual(total);
-        } else {
-          setTotalCerradasManual(0);
-        }
-      } catch (error) {
+  // ✅ Función para cargar total de alertas cerradas con AbortController
+  const cargarTotalCerradasManual = useCallback(async () => {
+    if (!user?.id) return;
+    
+    // Cancelar petición anterior si existe
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      console.log('🛑 Petición anterior cancelada en Perfil');
+    }
+    
+    // Crear nuevo AbortController
+    abortControllerRef.current = new AbortController();
+    
+    try {
+      setCargandoEstadisticas(true);
+      
+      console.log('Cargando total de alertas cerradas por usuario:', user.id);
+      
+      const params = { signal: abortControllerRef.current.signal };
+      if (tipoAlertaPermitido) {
+        params.tipo = tipoAlertaPermitido;
+      }
+      
+      const response = await alertasService.obtenerCerradasManual({ 
+        admin_id: user.id,
+        limite: 1000,
+        ...params
+      });
+      
+      console.log('Respuesta:', response);
+      
+      if (response && response.data) {
+        const total = response.data.length;
+        setTotalCerradasManual(total);
+      } else {
+        setTotalCerradasManual(0);
+      }
+    } catch (error) {
+      // ✅ Ignorar errores de cancelación
+      if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
         console.error('Error cargando estadísticas:', error);
         setTotalCerradasManual(0);
-      } finally {
-        setCargandoEstadisticas(false);
+      }
+    } finally {
+      setCargandoEstadisticas(false);
+    }
+  }, [user?.id, tipoAlertaPermitido]);
+
+  // ✅ Efecto con limpieza
+  useEffect(() => {
+    cargarTotalCerradasManual();
+    
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        console.log('🛑 Componente Perfil desmontado - peticiones canceladas');
       }
     };
-    
-    if (user?.id) {
-      cargarTotalCerradasManual();
-    }
-  }, [user, tipoAlertaPermitido]);
+  }, [cargarTotalCerradasManual]);
 
   const handleLogout = async () => {
     setLoading(true);

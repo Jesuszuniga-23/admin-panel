@@ -13,7 +13,6 @@ class AlertasService {
       
       const url = `${ENDPOINTS.ALERTAS.EXPIRADAS}?${params.toString()}`;
       
-      // ✅ Configurar la petición con signal si existe
       const config = {};
       if (filtros.signal) {
         config.signal = filtros.signal;
@@ -22,8 +21,8 @@ class AlertasService {
       const response = await axiosInstance.get(url, config);
       return response.data;
     } catch (error) {
-      // ✅ Propagar error de cancelación para que el componente lo maneje
-      if (error.name === 'AbortError') {
+      // ✅ Propagar error de cancelación (tanto AbortError como ERR_CANCELED)
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
       console.error("Error cargando alertas expiradas:", error);
@@ -42,7 +41,6 @@ class AlertasService {
       
       const url = `${ENDPOINTS.ALERTAS.CERRADAS_MANUAL}?${params.toString()}`;
       
-      // ✅ Configurar la petición con signal si existe
       const config = {};
       if (filtros.signal) {
         config.signal = filtros.signal;
@@ -51,7 +49,8 @@ class AlertasService {
       const response = await axiosInstance.get(url, config);
       return response.data;
     } catch (error) {
-      if (error.name === 'AbortError') {
+      // ✅ Propagar error de cancelación
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
       console.error("Error cargando alertas cerradas manual:", error);
@@ -76,7 +75,8 @@ class AlertasService {
       const response = await axiosInstance.get(url, config);
       return response.data;
     } catch (error) {
-      if (error.name === 'AbortError') {
+      // ✅ Propagar error de cancelación
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
       console.error("Error cargando estadísticas:", error);
@@ -99,7 +99,8 @@ class AlertasService {
       );
       return response.data;
     } catch (error) {
-      if (error.name === 'AbortError') {
+      // ✅ Propagar error de cancelación
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
       console.error('Error cerrando alerta manual:', error);
@@ -126,7 +127,8 @@ class AlertasService {
       const response = await axiosInstance.get(url, config);
       return response.data;
     } catch (error) {
-      if (error.name === 'AbortError') {
+      // ✅ Propagar error de cancelación
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
       console.error('Error obteniendo alertas para reportes:', error);
@@ -148,12 +150,33 @@ class AlertasService {
         config.signal = filtros.signal;
       }
       
-      // Obtener alertas de todas las fuentes
+      // ✅ Manejo correcto de cancelación en cada petición individual
       const [activas, proceso, cerradas, expiradas] = await Promise.all([
-        axiosInstance.get(`${ENDPOINTS.ALERTAS_PANEL.ACTIVAS}?${params.toString()}`, config).catch(() => ({ data: { data: [] } })),
-        axiosInstance.get(`${ENDPOINTS.ALERTAS_PANEL.EN_PROCESO}?${params.toString()}`, config).catch(() => ({ data: { data: [] } })),
-        axiosInstance.get(`${ENDPOINTS.ALERTAS_PANEL.CERRADAS}?${params.toString()}`, config).catch(() => ({ data: { data: [] } })),
-        axiosInstance.get(`${ENDPOINTS.ALERTAS.EXPIRADAS}?${params.toString()}`, config).catch(() => ({ data: { data: [] } }))
+        axiosInstance.get(`${ENDPOINTS.ALERTAS_PANEL.ACTIVAS}?${params.toString()}`, config).catch(err => {
+          // Si es error de cancelación, propagarlo
+          if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') {
+            throw err;
+          }
+          return { data: { data: [] } };
+        }),
+        axiosInstance.get(`${ENDPOINTS.ALERTAS_PANEL.EN_PROCESO}?${params.toString()}`, config).catch(err => {
+          if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') {
+            throw err;
+          }
+          return { data: { data: [] } };
+        }),
+        axiosInstance.get(`${ENDPOINTS.ALERTAS_PANEL.CERRADAS}?${params.toString()}`, config).catch(err => {
+          if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') {
+            throw err;
+          }
+          return { data: { data: [] } };
+        }),
+        axiosInstance.get(`${ENDPOINTS.ALERTAS.EXPIRADAS}?${params.toString()}`, config).catch(err => {
+          if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') {
+            throw err;
+          }
+          return { data: { data: [] } };
+        })
       ]);
 
       const todasAlertas = [
@@ -166,7 +189,8 @@ class AlertasService {
       console.log(`📍 ${todasAlertas.length} alertas cargadas para análisis geográfico`);
       return { data: todasAlertas, total: todasAlertas.length };
     } catch (error) {
-      if (error.name === 'AbortError') {
+      // ✅ Propagar error de cancelación
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
       console.error('Error obteniendo alertas geográficas:', error);

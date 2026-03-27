@@ -1,5 +1,5 @@
 // src/pages/admin/unidades/UnidadDetail.jsx
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Truck, MapPin, Hash, Edit, Trash2, Power,
@@ -46,6 +46,7 @@ const corregirTexto = (texto) => {
   return textoCorregido;
 };
 
+// Componentes modales (sin cambios estructurales, pero se mantienen)
 const ModalAccionNoPermitida = ({ isOpen, onClose, mensaje }) => {
   if (!isOpen) return null;
 
@@ -181,6 +182,11 @@ const UnidadDetail = () => {
   const [mostrarAsignacion, setMostrarAsignacion] = useState(false);
   const [personalSeleccionado, setPersonalSeleccionado] = useState('');
   const [cargandoPersonal, setCargandoPersonal] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false); // ✅ Estado para acciones
+  
+  // ✅ REF para AbortControllers
+  const abortControllerRef = useRef(null);
+  const personalAbortControllerRef = useRef(null);
   
   // ✅ CORRECTO: Usar los nuevos métodos de permisos
   const puedeEditarUnidad = authService.puedeEditarUnidad(unidad?.tipo);
@@ -197,14 +203,24 @@ const UnidadDetail = () => {
     onConfirm: null
   });
 
-  useEffect(() => {
-    cargarUnidad();
-  }, [id]);
-
-  const cargarUnidad = async () => {
+  // ✅ Función para cargar unidad con AbortController
+  const cargarUnidad = useCallback(async () => {
+    if (!id) return;
+    
+    // Cancelar petición anterior si existe
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      console.log('🛑 Petición anterior cancelada en UnidadDetail');
+    }
+    
+    // Crear nuevo AbortController
+    abortControllerRef.current = new AbortController();
+    
     try {
       setLoading(true);
-      const response = await unidadService.obtenerUnidad(id);
+      const response = await unidadService.obtenerUnidad(id, {
+        signal: abortControllerRef.current.signal
+      });
 
       const dataCorregida = {
         ...response.data,
@@ -223,31 +239,45 @@ const UnidadDetail = () => {
       };
 
       setUnidad(dataCorregida);
+      setError(null);
     } catch (error) {
-      console.error("Error cargando unidad:", error);
-      if (error.response?.status === 429) {
-        toast.error('Demasiadas peticiones. Espera unos segundos...', {
-          icon: <Clock size={18} className="text-yellow-500" />
-        });
-        setTimeout(() => cargarUnidad(), 5000);
-      } else {
-        setError(error.error || 'Error al cargar los datos');
-        toast.error('No se pudo cargar la información');
+      // ✅ Ignorar errores de cancelación
+      if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
+        console.error("Error cargando unidad:", error);
+        if (error.response?.status === 429) {
+          toast.error('Demasiadas peticiones. Espera unos segundos...', {
+            icon: <Clock size={18} className="text-yellow-500" />
+          });
+        } else {
+          setError(error.error || 'Error al cargar los datos');
+          toast.error('No se pudo cargar la información');
+        }
       }
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
-  const cargarPersonalDisponible = async () => {
+  // ✅ Función para cargar personal disponible con AbortController
+  const cargarPersonalDisponible = useCallback(async () => {
     if (!puedeEditarUnidad) {
       toast.error('No tienes permisos para asignar personal a esta unidad');
       return;
     }
     
+    // Cancelar petición anterior si existe
+    if (personalAbortControllerRef.current) {
+      personalAbortControllerRef.current.abort();
+      console.log('🛑 Petición de personal anterior cancelada');
+    }
+    
+    personalAbortControllerRef.current = new AbortController();
+    
     try {
       setCargandoPersonal(true);
-      const response = await unidadService.personalDisponible(id, unidad?.tipo);
+      const response = await unidadService.personalDisponible(id, unidad?.tipo, {
+        signal: personalAbortControllerRef.current.signal
+      });
 
       const personalCorregido = (response.data || []).map(p => ({
         ...p,
@@ -257,25 +287,46 @@ const UnidadDetail = () => {
       setPersonalDisponible(personalCorregido);
       setMostrarAsignacion(true);
     } catch (error) {
-      console.error("Error cargando personal disponible:", error);
-      if (error.response?.status === 429) {
-        toast.error('Demasiadas peticiones. Espera unos segundos...', {
-          icon: <Clock size={18} className="text-yellow-500" />
-        });
-      } else {
-        toast.error('Error al cargar personal disponible');
+      // ✅ Ignorar errores de cancelación
+      if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
+        console.error("Error cargando personal disponible:", error);
+        if (error.response?.status === 429) {
+          toast.error('Demasiadas peticiones. Espera unos segundos...', {
+            icon: <Clock size={18} className="text-yellow-500" />
+          });
+        } else {
+          toast.error('Error al cargar personal disponible');
+        }
       }
     } finally {
       setCargandoPersonal(false);
     }
-  };
+  }, [id, unidad?.tipo, puedeEditarUnidad]);
 
+  // ✅ Efecto con limpieza
+  useEffect(() => {
+    cargarUnidad();
+    
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        console.log('🛑 Componente UnidadDetail desmontado - peticiones canceladas');
+      }
+      if (personalAbortControllerRef.current) {
+        personalAbortControllerRef.current.abort();
+        console.log('🛑 Petición de personal cancelada al desmontar');
+      }
+    };
+  }, [cargarUnidad]);
+
+  // ✅ Manejar asignar con loading
   const handleAsignar = async () => {
     if (!personalSeleccionado) {
       toast.error('Selecciona un personal');
       return;
     }
 
+    setActionLoading(true);
     try {
       await unidadService.asignarPersonal(id, personalSeleccionado);
       toast.success('Personal asignado correctamente', {
@@ -293,9 +344,12 @@ const UnidadDetail = () => {
       } else {
         toast.error(error.error || 'Error al asignar personal');
       }
+    } finally {
+      setActionLoading(false);
     }
   };
 
+  // ✅ Manejar remover con loading
   const handleRemover = async (personalId, nombre) => {
     if (!puedeEditarUnidad) {
       toast.error('No tienes permisos para remover personal de esta unidad');
@@ -319,6 +373,7 @@ const UnidadDetail = () => {
       mensaje: `¿Estás seguro de remover a ${nombreCorregido} de esta unidad?`,
       itemNombre: nombreCorregido,
       onConfirm: async () => {
+        setActionLoading(true);
         try {
           await unidadService.removerPersonal(id, personalId);
           toast.success('Personal removido correctamente', {
@@ -334,11 +389,14 @@ const UnidadDetail = () => {
           } else {
             toast.error(error.error || 'Error al remover personal');
           }
+        } finally {
+          setActionLoading(false);
         }
       }
     });
   };
 
+  // ✅ Manejar toggle activa con loading
   const handleToggleActiva = async () => {
     if (!puedeEditarUnidad) {
       toast.error('No tienes permisos para modificar esta unidad');
@@ -368,6 +426,7 @@ const UnidadDetail = () => {
       onConfirm: async () => {
         const estadoAnterior = unidad.activa;
         setUnidad(prev => ({ ...prev, activa: !prev.activa }));
+        setActionLoading(true);
 
         try {
           await unidadService.toggleActiva(id, !unidad.activa);
@@ -385,11 +444,14 @@ const UnidadDetail = () => {
           } else {
             toast.error(error.error || 'Error al cambiar estado');
           }
+        } finally {
+          setActionLoading(false);
         }
       }
     });
   };
 
+  // ✅ Manejar eliminar con loading
   const handleEliminar = async () => {
     if (!puedeEliminarUnidad) {
       toast.error('No tienes permisos para eliminar esta unidad');
@@ -411,6 +473,7 @@ const UnidadDetail = () => {
       mensaje: `¿Estás seguro de eliminar la unidad ${unidad.codigo}?`,
       itemNombre: unidad.codigo,
       onConfirm: async () => {
+        setActionLoading(true);
         try {
           await unidadService.eliminarUnidad(id);
           toast.success('Unidad eliminada correctamente', {
@@ -426,6 +489,8 @@ const UnidadDetail = () => {
           } else {
             toast.error(error.error || 'Error al eliminar unidad');
           }
+        } finally {
+          setActionLoading(false);
         }
       }
     });
@@ -608,7 +673,8 @@ const UnidadDetail = () => {
               {puedeEditarUnidad && (
                 <button
                   onClick={cargarPersonalDisponible}
-                  className="flex items-center gap-2 px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                  disabled={actionLoading || cargandoPersonal}
+                  className="flex items-center gap-2 px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm disabled:opacity-50"
                 >
                   <Plus size={16} />
                   Asignar personal
@@ -644,9 +710,10 @@ const UnidadDetail = () => {
                     <div className="flex gap-2">
                       <button
                         onClick={handleAsignar}
-                        className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
+                        disabled={actionLoading || !personalSeleccionado}
+                        className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
                       >
-                        Asignar
+                        {actionLoading ? <Loader size={16} className="animate-spin mx-auto" /> : 'Asignar'}
                       </button>
                       <button
                         onClick={() => setMostrarAsignacion(false)}
@@ -682,7 +749,8 @@ const UnidadDetail = () => {
                     {puedeEditarUnidad && (
                       <button
                         onClick={() => handleRemover(persona.id, persona.nombre)}
-                        className="p-1 hover:bg-red-100 rounded-lg transition-colors"
+                        disabled={actionLoading}
+                        className="p-1 hover:bg-red-100 rounded-lg transition-colors disabled:opacity-50"
                         title="Remover"
                       >
                         <X size={16} className="text-red-500" />
@@ -724,25 +792,27 @@ const UnidadDetail = () => {
           </div>
         </div>
 
-        {/* Botones de acción - CORREGIDOS */}
+        {/* Botones de acción */}
         <div className="border-t px-6 py-4 bg-gray-50 flex justify-end gap-3">
           {puedeEditarUnidad && (
             <>
               <button
                 onClick={handleToggleActiva}
+                disabled={actionLoading}
                 className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${
                   unidad.activa
                     ? 'bg-yellow-600 text-white hover:bg-yellow-700'
                     : 'bg-green-600 text-white hover:bg-green-700'
-                }`}
+                } disabled:opacity-50`}
               >
-                <Power size={18} />
+                {actionLoading ? <Loader size={18} className="animate-spin" /> : <Power size={18} />}
                 {unidad.activa ? 'Desactivar' : 'Activar'}
               </button>
 
               <button
                 onClick={handleEditar}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                disabled={actionLoading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50"
               >
                 <Edit size={18} />
                 Editar
@@ -753,9 +823,10 @@ const UnidadDetail = () => {
           {puedeEliminarUnidad && (
             <button
               onClick={handleEliminar}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"
+              disabled={actionLoading}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2 disabled:opacity-50"
             >
-              <Trash2 size={18} />
+              {actionLoading ? <Loader size={18} className="animate-spin" /> : <Trash2 size={18} />}
               Eliminar
             </button>
           )}

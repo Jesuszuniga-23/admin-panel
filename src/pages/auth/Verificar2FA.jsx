@@ -1,5 +1,5 @@
 // src/pages/auth/Verificar2FA.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Shield, ArrowLeft, Mail, Loader, CheckCircle, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -16,6 +16,10 @@ const Verificar2FA = () => {
   const [email, setEmail] = useState('');
   const [tiempoEspera, setTiempoEspera] = useState(0);
   const [error, setError] = useState('');
+  
+  // ✅ REF para AbortController y timeout
+  const abortControllerRef = useRef(null);
+  const timerRef = useRef(null);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -31,12 +35,29 @@ const Verificar2FA = () => {
     }
   }, [location, navigate]);
 
+  // ✅ Efecto con limpieza para el timer de espera
   useEffect(() => {
     if (tiempoEspera > 0) {
-      const timer = setTimeout(() => setTiempoEspera(tiempoEspera - 1), 1000);
-      return () => clearTimeout(timer);
+      timerRef.current = setTimeout(() => setTiempoEspera(tiempoEspera - 1), 1000);
+      return () => {
+        if (timerRef.current) {
+          clearTimeout(timerRef.current);
+        }
+      };
     }
   }, [tiempoEspera]);
+
+  // ✅ Limpieza general al desmontar
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -45,10 +66,20 @@ const Verificar2FA = () => {
       return;
     }
 
+    // Cancelar petición anterior si existe
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      console.log('🛑 Petición 2FA anterior cancelada');
+    }
+    
+    abortControllerRef.current = new AbortController();
+    
     setLoading(true);
     try {
       console.log('🔐 Verificando código 2FA...');
-      const response = await authService.verificar2FA(codigo);
+      const response = await authService.verificar2FA(codigo, {
+        signal: abortControllerRef.current.signal
+      });
       
       console.log('📦 Respuesta del backend:', response);
       
@@ -64,32 +95,47 @@ const Verificar2FA = () => {
         }
         
         const rolesAdmin = ['superadmin', 'admin', 'operador_tecnico', 'operador_policial', 'operador_medico', 'operador_general'];
+        
+        // ✅ Usar navigate en lugar de window.location.href
         if (rolesAdmin.includes(response.usuario?.rol)) {
           console.log('✅ Redirigiendo a /admin/dashboard');
-          window.location.href = '/admin/dashboard';
+          navigate('/admin/dashboard', { replace: true });
         } else {
           console.log('✅ Redirigiendo a /mobile');
-          window.location.href = '/mobile';
+          navigate('/mobile', { replace: true });
         }
       } else {
         toast.error(response.error || 'Código incorrecto');
       }
     } catch (error) {
-      console.error('Error verificando código:', error);
-      const errorMsg = error.response?.data?.error || 'Error al verificar código';
-      toast.error(errorMsg);
+      // ✅ Ignorar errores de cancelación
+      if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
+        console.error('Error verificando código:', error);
+        const errorMsg = error.response?.data?.error || 'Error al verificar código';
+        toast.error(errorMsg);
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleReenviar = async () => {
+  const handleReenviar = useCallback(async () => {
     if (tiempoEspera > 0) return;
 
+    // Cancelar petición anterior si existe
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      console.log('🛑 Petición de reenvío anterior cancelada');
+    }
+    
+    abortControllerRef.current = new AbortController();
+    
     setReenviando(true);
     try {
       console.log('📧 Reenviando código 2FA...');
-      const response = await authService.reenviarCodigo2FA();
+      const response = await authService.reenviarCodigo2FA({
+        signal: abortControllerRef.current.signal
+      });
       
       if (response.success) {
         toast.success(response.message || 'Código reenviado correctamente');
@@ -98,12 +144,15 @@ const Verificar2FA = () => {
         toast.error(response.error || 'Error al reenviar código');
       }
     } catch (error) {
-      console.error('Error reenviando código:', error);
-      toast.error(error.response?.data?.error || 'Error al reenviar código');
+      // ✅ Ignorar errores de cancelación
+      if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
+        console.error('Error reenviando código:', error);
+        toast.error(error.response?.data?.error || 'Error al reenviar código');
+      }
     } finally {
       setReenviando(false);
     }
-  };
+  }, [tiempoEspera]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">

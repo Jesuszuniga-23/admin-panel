@@ -30,8 +30,8 @@ class PersonalService {
       console.log("✅ Personal recibido:", response.data);
       return response.data;
     } catch (error) {
-      // ✅ Propagar error de cancelación para que el componente lo maneje
-      if (error.name === 'AbortError') {
+      // ✅ Propagar error de cancelación (tanto AbortError como ERR_CANCELED)
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
       console.error('Error listando personal:', error);
@@ -54,7 +54,8 @@ class PersonalService {
       console.log("✅ Personal obtenido:", response.data);
       return response.data;
     } catch (error) {
-      if (error.name === 'AbortError') {
+      // ✅ Propagar error de cancelación
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
       console.error('Error obteniendo personal:', error);
@@ -76,7 +77,8 @@ class PersonalService {
       console.log("✅ Personal creado:", response.data);
       return response.data;
     } catch (error) {
-      if (error.name === 'AbortError') {
+      // ✅ Propagar error de cancelación
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
       console.error('Error creando personal:', error);
@@ -95,7 +97,8 @@ class PersonalService {
       const response = await axiosInstance.put(ENDPOINTS.PERSONAL.UPDATE(id), datos, config);
       return response.data;
     } catch (error) {
-      if (error.name === 'AbortError') {
+      // ✅ Propagar error de cancelación
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
       console.error('Error actualizando personal:', error);
@@ -117,7 +120,8 @@ class PersonalService {
       console.log("✅ Personal eliminado:", response.data);
       return response.data;
     } catch (error) {
-      if (error.name === 'AbortError') {
+      // ✅ Propagar error de cancelación
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
       console.error('Error eliminando personal:', error);
@@ -139,7 +143,8 @@ class PersonalService {
       console.log("✅ Estado cambiado:", response.data);
       return response.data;
     } catch (error) {
-      if (error.name === 'AbortError') {
+      // ✅ Propagar error de cancelación
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
       console.error('Error cambiando estado:', error);
@@ -161,7 +166,8 @@ class PersonalService {
       console.log("✅ Personal restaurado:", response.data);
       return response.data;
     } catch (error) {
-      if (error.name === 'AbortError') {
+      // ✅ Propagar error de cancelación
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
       console.error('Error restaurando personal:', error);

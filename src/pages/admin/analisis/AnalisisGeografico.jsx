@@ -1,5 +1,5 @@
 // src/pages/admin/analisis/AnalisisGeografico.jsx
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Globe, MapPin, BarChart3, PieChart, TrendingUp,
@@ -53,6 +53,9 @@ const AnalisisGeografico = () => {
   const graficaEstadosRef = useRef(null);
   const mapaRef = useRef(null);
   
+  // ✅ REF para AbortController
+  const abortControllerRef = useRef(null);
+  
   const [cargando, setCargando] = useState(true);
   const [exportando, setExportando] = useState(false);
   const [datosOriginales, setDatosOriginales] = useState([]);
@@ -80,7 +83,7 @@ const AnalisisGeografico = () => {
     zona: 'todas'
   });
 
-  const calcularZona = (lat, lng) => {
+  const calcularZona = useCallback((lat, lng) => {
     if (!lat || !lng || isNaN(lat) || isNaN(lng)) return 'Sin ubicación';
     if (lat > 19.6) return 'Zona Norte';
     if (lat > 19.4 && lat <= 19.6) {
@@ -90,86 +93,10 @@ const AnalisisGeografico = () => {
     }
     if (lat <= 19.4) return 'Zona Sur';
     return 'Otra zona';
-  };
-
-  useEffect(() => {
-    cargarDatosAnalisis();
   }, []);
 
-  useEffect(() => {
-    aplicarFiltros();
-  }, [filtros, datosOriginales]);
-
-  const cargarDatosAnalisis = async () => {
-    setCargando(true);
-    try {
-      const params = {};
-      if (tipoAlertaPermitido) {
-        params.tipo = tipoAlertaPermitido;
-      }
-      
-      const respuesta = await alertasService.obtenerAlertasGeograficas({ limite: 5000, ...params });
-      const alertas = respuesta.data || [];
-      
-      setDatosOriginales(alertas);
-      
-      const conUbicacion = alertas.filter(a => a.lat && a.lng).length;
-      setEstadisticas({
-        total: alertas.length,
-        conUbicacion,
-        sinUbicacion: alertas.length - conUbicacion,
-        panico: alertas.filter(a => a.tipo === 'panico').length,
-        medica: alertas.filter(a => a.tipo === 'medica').length,
-        activas: alertas.filter(a => a.estado === 'activa').length,
-        proceso: alertas.filter(a => ['asignada', 'atendiendo'].includes(a.estado)).length,
-        cerradas: alertas.filter(a => a.estado === 'cerrada').length,
-        expiradas: alertas.filter(a => a.estado === 'expirada').length
-      });
-
-      aplicarFiltros(alertas);
-    } catch (error) {
-      console.error('Error cargando datos:', error);
-      toast.error('Error al cargar datos');
-    } finally {
-      setCargando(false);
-    }
-  };
-
-  const aplicarFiltros = (datos = datosOriginales) => {
-    let filtrados = [...datos];
-
-    if (filtros.fechaInicio && filtros.fechaFin) {
-      const inicio = new Date(filtros.fechaInicio);
-      inicio.setHours(0, 0, 0, 0);
-      const fin = new Date(filtros.fechaFin);
-      fin.setHours(23, 59, 59, 999);
-      
-      filtrados = filtrados.filter(item => {
-        const fecha = new Date(item.fecha_creacion);
-        return fecha >= inicio && fecha <= fin;
-      });
-    }
-
-    if (filtros.tipo !== 'todos') {
-      filtrados = filtrados.filter(item => item.tipo === filtros.tipo);
-    }
-
-    if (filtros.estado !== 'todos') {
-      filtrados = filtrados.filter(item => {
-        if (filtros.estado === 'activa') return item.estado === 'activa';
-        if (filtros.estado === 'proceso') return ['asignada', 'atendiendo'].includes(item.estado);
-        if (filtros.estado === 'cerrada') return item.estado === 'cerrada';
-        if (filtros.estado === 'expirada') return item.estado === 'expirada';
-        return true;
-      });
-    }
-
-    setDatosFiltrados(filtrados);
-    procesarDatosPorZona(filtrados);
-    procesarTendencias(filtrados);
-  };
-
-  const procesarDatosPorZona = (alertas) => {
+  // ✅ Procesar datos por zona con useCallback
+  const procesarDatosPorZona = useCallback((alertas) => {
     const zonas = {};
 
     alertas.forEach(alerta => {
@@ -209,15 +136,16 @@ const AnalisisGeografico = () => {
 
     const zonasArray = Object.values(zonas).map(z => ({
       ...z,
-      porcentaje: Math.round((z.total / alertas.length) * 100) || 0,
+      porcentaje: alertas.length > 0 ? Math.round((z.total / alertas.length) * 100) : 0,
       lat: z.count > 0 ? z.latSum / z.count : null,
       lng: z.count > 0 ? z.lngSum / z.count : null
     }));
 
     setDatosPorZona(zonasArray.sort((a, b) => b.total - a.total));
-  };
+  }, [calcularZona]);
 
-  const procesarTendencias = (alertas) => {
+  // ✅ Procesar tendencias con useCallback
+  const procesarTendencias = useCallback((alertas) => {
     const meses = {};
 
     alertas.forEach(alerta => {
@@ -247,7 +175,116 @@ const AnalisisGeografico = () => {
       .slice(-12);
 
     setTendencias(tendenciasArray);
-  };
+  }, []);
+
+  // ✅ Función para aplicar filtros con useCallback
+  const aplicarFiltros = useCallback((datos = datosOriginales) => {
+    let filtrados = [...datos];
+
+    if (filtros.fechaInicio && filtros.fechaFin) {
+      const inicio = new Date(filtros.fechaInicio);
+      inicio.setHours(0, 0, 0, 0);
+      const fin = new Date(filtros.fechaFin);
+      fin.setHours(23, 59, 59, 999);
+      
+      filtrados = filtrados.filter(item => {
+        const fecha = new Date(item.fecha_creacion);
+        return fecha >= inicio && fecha <= fin;
+      });
+    }
+
+    if (filtros.tipo !== 'todos') {
+      filtrados = filtrados.filter(item => item.tipo === filtros.tipo);
+    }
+
+    if (filtros.estado !== 'todos') {
+      filtrados = filtrados.filter(item => {
+        if (filtros.estado === 'activa') return item.estado === 'activa';
+        if (filtros.estado === 'proceso') return ['asignada', 'atendiendo'].includes(item.estado);
+        if (filtros.estado === 'cerrada') return item.estado === 'cerrada';
+        if (filtros.estado === 'expirada') return item.estado === 'expirada';
+        return true;
+      });
+    }
+
+    if (filtros.zona !== 'todas') {
+      filtrados = filtrados.filter(item => {
+        const zona = calcularZona(item.lat, item.lng);
+        return zona === filtros.zona;
+      });
+    }
+
+    setDatosFiltrados(filtrados);
+    procesarDatosPorZona(filtrados);
+    procesarTendencias(filtrados);
+  }, [filtros, datosOriginales, calcularZona, procesarDatosPorZona, procesarTendencias]);
+
+  // ✅ Cargar datos con AbortController
+  const cargarDatosAnalisis = useCallback(async () => {
+    // Cancelar petición anterior si existe
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      console.log('🛑 Petición anterior cancelada en AnalisisGeografico');
+    }
+    
+    // Crear nuevo AbortController
+    abortControllerRef.current = new AbortController();
+    
+    setCargando(true);
+    try {
+      const params = { limite: 5000, signal: abortControllerRef.current.signal };
+      if (tipoAlertaPermitido) {
+        params.tipo = tipoAlertaPermitido;
+      }
+      
+      const respuesta = await alertasService.obtenerAlertasGeograficas(params);
+      const alertas = respuesta.data || [];
+      
+      setDatosOriginales(alertas);
+      
+      const conUbicacion = alertas.filter(a => a.lat && a.lng).length;
+      setEstadisticas({
+        total: alertas.length,
+        conUbicacion,
+        sinUbicacion: alertas.length - conUbicacion,
+        panico: alertas.filter(a => a.tipo === 'panico').length,
+        medica: alertas.filter(a => a.tipo === 'medica').length,
+        activas: alertas.filter(a => a.estado === 'activa').length,
+        proceso: alertas.filter(a => ['asignada', 'atendiendo'].includes(a.estado)).length,
+        cerradas: alertas.filter(a => a.estado === 'cerrada').length,
+        expiradas: alertas.filter(a => a.estado === 'expirada').length
+      });
+
+      aplicarFiltros(alertas);
+    } catch (error) {
+      // ✅ Ignorar errores de cancelación
+      if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
+        console.error('Error cargando datos:', error);
+        toast.error('Error al cargar datos');
+      }
+    } finally {
+      setCargando(false);
+    }
+  }, [tipoAlertaPermitido, aplicarFiltros]);
+
+  // ✅ Efecto con limpieza
+  useEffect(() => {
+    cargarDatosAnalisis();
+    
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        console.log('🛑 Componente AnalisisGeografico desmontado - peticiones canceladas');
+      }
+    };
+  }, [cargarDatosAnalisis]);
+
+  // ✅ Efecto para aplicar filtros cuando cambian
+  useEffect(() => {
+    if (datosOriginales.length > 0) {
+      aplicarFiltros();
+    }
+  }, [filtros, aplicarFiltros, datosOriginales]);
 
   const limpiarFiltros = () => {
     setFiltros({
@@ -435,7 +472,7 @@ const AnalisisGeografico = () => {
               <Filter size={18} className="text-indigo-600" />
             </div>
             <h2 className="text-base font-semibold text-gray-800">Filtros de análisis</h2>
-            {(filtros.fechaInicio || filtros.fechaFin || filtros.tipo !== 'todos' || filtros.estado !== 'todos') && (
+            {(filtros.fechaInicio || filtros.fechaFin || filtros.tipo !== 'todos' || filtros.estado !== 'todos' || filtros.zona !== 'todas') && (
               <button
                 onClick={limpiarFiltros}
                 className="ml-auto text-xs text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-3 py-1 rounded-full"
@@ -748,9 +785,6 @@ const AnalisisGeografico = () => {
           </div>
         </div>
 
-        {/* Resto del componente sin cambios... */}
-        {/* (Mantener el resto del componente igual pero con el filtro de tipo ya aplicado) */}
-        
         {/* Nota informativa */}
         <div className="mt-8 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl p-6 border border-indigo-200">
           <div className="flex items-start gap-4">
@@ -773,7 +807,7 @@ const AnalisisGeografico = () => {
   );
 };
 
-// Componente de tarjeta de resumen avanzada
+// Componente de tarjeta de resumen avanzada (sin cambios)
 const ResumenCardAvanzado = ({ label, value, icon: Icon, color, subValue }) => {
   const colors = {
     indigo: 'from-indigo-50 to-indigo-100 border-indigo-200 text-indigo-600',

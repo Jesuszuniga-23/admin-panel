@@ -1,5 +1,5 @@
 // src/components/layout/Sidebar.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -62,12 +62,14 @@ const ConfirmacionModal = ({ isOpen, onClose, onConfirm, onCancel }) => {
             <button
               onClick={onCancel}
               className="px-4 py-2 border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-all text-sm font-medium"
+              aria-label="Descartar cambios y salir"
             >
               No, descartar
             </button>
             <button
               onClick={onConfirm}
               className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all text-sm font-medium shadow-md"
+              aria-label="Guardar progreso y salir"
             >
               Sí, guardar
             </button>
@@ -166,38 +168,44 @@ const Sidebar = () => {
     }
   }, [location.pathname]);
 
-  const handleLogout = async () => {
-    if (hasUnsavedChanges && isPersonalFormActive) {
-      setPendingPath('logout');
-      setShowConfirmModal(true);
-    } else {
-      await performLogout();
-    }
-  };
-
-  const performLogout = async () => {
+  // ✅ Memoizar funciones
+  const performLogout = useCallback(async () => {
     try {
       console.log("Cerrando sesión...");
       await authService.logout();
       logout();
-      navigate('/');
+      navigate('/', { replace: true });
     } catch (error) {
+      // ✅ Ignorar errores de cancelación
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
+        console.log('🛑 Logout cancelado');
+        return;
+      }
       console.error("Error al cerrar sesión:", error);
       toast.error('Error al cerrar sesión');
       window.location.href = '/';
     }
-  };
+  }, [logout, navigate]);
 
-  const handleNavigation = (path) => {
+  const handleNavigation = useCallback((path) => {
     if (hasUnsavedChanges && isPersonalFormActive && path !== location.pathname) {
       setPendingPath(path);
       setShowConfirmModal(true);
     } else {
       navigate(path);
     }
-  };
+  }, [hasUnsavedChanges, isPersonalFormActive, location.pathname, navigate]);
 
-  const handleConfirmSave = () => {
+  const handleLogout = useCallback(() => {
+    if (hasUnsavedChanges && isPersonalFormActive) {
+      setPendingPath('logout');
+      setShowConfirmModal(true);
+    } else {
+      performLogout();
+    }
+  }, [hasUnsavedChanges, isPersonalFormActive, performLogout]);
+
+  const handleConfirmSave = useCallback(() => {
     setShowConfirmModal(false);
     
     const saveEvent = new CustomEvent('saveFormProgress');
@@ -211,9 +219,9 @@ const Sidebar = () => {
       }
       setPendingPath(null);
     }, 100);
-  };
+  }, [pendingPath, performLogout, navigate]);
 
-  const handleConfirmDiscard = () => {
+  const handleConfirmDiscard = useCallback(() => {
     setShowConfirmModal(false);
     
     const discardEvent = new CustomEvent('discardFormProgress');
@@ -228,19 +236,19 @@ const Sidebar = () => {
       navigate(pendingPath);
     }
     setPendingPath(null);
-  };
+  }, [pendingPath, performLogout, navigate]);
 
-  const handleCancel = () => {
+  const handleCancel = useCallback(() => {
     setShowConfirmModal(false);
     setPendingPath(null);
-  };
+  }, []);
 
-  const toggleMenu = (menu) => {
+  const toggleMenu = useCallback((menu) => {
     setOpenMenus(prev => ({
       ...prev,
       [menu]: !prev[menu]
     }));
-  };
+  }, []);
 
   if (!user) return null;
 
@@ -264,7 +272,6 @@ const Sidebar = () => {
         </div>
 
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-
           {/* DASHBOARD - Todos pueden ver */}
           <button
             onClick={() => handleNavigation("/admin/dashboard")}
@@ -273,6 +280,7 @@ const Sidebar = () => {
                 ? 'bg-blue-50 text-blue-600 font-semibold border-l-4 border-blue-600'
                 : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600'
             }`}
+            aria-label="Ir al dashboard"
           >
             <LayoutDashboard size={18} />
             <span>Dashboard</span>
@@ -286,6 +294,7 @@ const Sidebar = () => {
                 ? 'bg-blue-50 text-blue-600 font-semibold border-l-4 border-blue-600'
                 : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600'
             }`}
+            aria-label="Ver mi perfil"
           >
             <UserCog size={18} />
             <span>Perfil</span>
@@ -297,6 +306,8 @@ const Sidebar = () => {
               <button
                 onClick={() => toggleMenu('alertas')}
                 className="w-full flex items-center justify-between px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg transition-all"
+                aria-label="Abrir menú de alertas"
+                aria-expanded={openMenus.alertas}
               >
                 <div className="flex items-center gap-3">
                   <Bell size={18} className="text-gray-500" />
@@ -314,6 +325,7 @@ const Sidebar = () => {
                         ? 'bg-blue-50 text-blue-600 font-semibold'
                         : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
                     }`}
+                    aria-label="Ver alertas activas"
                   >
                     <Bell size={16} />
                     <span>Activas</span>
@@ -326,6 +338,7 @@ const Sidebar = () => {
                         ? 'bg-blue-50 text-blue-600 font-semibold'
                         : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
                     }`}
+                    aria-label="Ver alertas en proceso"
                   >
                     <Activity size={16} />
                     <span>En Proceso</span>
@@ -338,6 +351,7 @@ const Sidebar = () => {
                         ? 'bg-blue-50 text-blue-600 font-semibold'
                         : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
                     }`}
+                    aria-label="Ver alertas cerradas"
                   >
                     <CheckCircle size={16} />
                     <span>Cerradas</span>
@@ -350,6 +364,7 @@ const Sidebar = () => {
                         ? 'bg-blue-50 text-blue-600 font-semibold'
                         : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
                     }`}
+                    aria-label="Ver alertas expiradas"
                   >
                     <Clock size={16} />
                     <span>Expiradas</span>
@@ -362,6 +377,7 @@ const Sidebar = () => {
                         ? 'bg-blue-50 text-blue-600 font-semibold'
                         : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
                     }`}
+                    aria-label="Ver alertas cerradas manualmente"
                   >
                     <CheckCircle size={16} />
                     <span>Cerradas Manualmente</span>
@@ -380,6 +396,7 @@ const Sidebar = () => {
                   ? 'bg-blue-50 text-blue-600 font-semibold border-l-4 border-blue-600'
                   : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600'
               }`}
+              aria-label="Ver reasignaciones pendientes"
             >
               <RefreshCw size={18} />
               <span>Reasignaciones</span>
@@ -392,6 +409,8 @@ const Sidebar = () => {
               <button
                 onClick={() => toggleMenu('usuarios')}
                 className="w-full flex items-center justify-between px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg transition-all"
+                aria-label="Abrir menú de gestión de usuarios"
+                aria-expanded={openMenus.usuarios}
               >
                 <div className="flex items-center gap-3">
                   <Users size={18} className="text-gray-500" />
@@ -409,6 +428,7 @@ const Sidebar = () => {
                         ? 'bg-blue-50 text-blue-600 font-semibold'
                         : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
                     }`}
+                    aria-label="Ver personal"
                   >
                     <UserPlus size={16} />
                     <span>Personal</span>
@@ -423,6 +443,7 @@ const Sidebar = () => {
                           ? 'bg-blue-50 text-blue-600 font-semibold'
                           : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
                       }`}
+                      aria-label="Ver recuperaciones pendientes"
                     >
                       <Key size={16} />
                       <span>Recuperaciones</span>
@@ -442,6 +463,7 @@ const Sidebar = () => {
                   ? 'bg-blue-50 text-blue-600 font-semibold border-l-4 border-blue-600'
                   : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600'
               }`}
+              aria-label="Ver unidades"
             >
               <Truck size={18} />
               <span>Unidades</span>
@@ -456,6 +478,7 @@ const Sidebar = () => {
                 ? 'bg-blue-50 text-blue-600 font-semibold border-l-4 border-blue-600'
                 : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600'
             }`}
+            aria-label="Ir al centro de reportes"
           >
             <FileText size={18} />
             <span>Centro de Reportes</span>
@@ -470,6 +493,7 @@ const Sidebar = () => {
                   ? 'bg-indigo-50 text-indigo-600 font-semibold border-l-4 border-indigo-600'
                   : 'text-gray-700 hover:bg-gray-50 hover:text-indigo-600'
               }`}
+              aria-label="Ver análisis geográfico"
             >
               <Globe size={18} />
               <span>Análisis Geográfico</span>
@@ -493,6 +517,7 @@ const Sidebar = () => {
           <button
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-4 py-3 text-red-600 hover:bg-red-50 rounded-lg transition-all font-medium"
+            aria-label="Cerrar sesión"
           >
             <LogOut size={18} />
             <span>Cerrar Sesión</span>

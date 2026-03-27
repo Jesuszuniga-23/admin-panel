@@ -1,12 +1,11 @@
 // src/pages/admin/Dashboard.jsx
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Bell, Users, Truck,
   AlertTriangle, Activity, Clock, User, Phone,
   ChevronRight, AlertCircle, CheckCircle, XCircle,
-  TrendingUp, TrendingDown, Minus,
-  PieChart
+  TrendingUp, TrendingDown, Minus
 } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
 import { AreaChart, Area, PieChart as RePieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -98,6 +97,42 @@ const Dashboard = () => {
   const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
   const rolPersonalPermitido = authService.getRolPersonalPermitido();
 
+  // ✅ Memoizar funciones de variación
+  const getVariacionColor = useCallback((tendencia) => {
+    switch (tendencia) {
+      case 'up': return 'text-emerald-600 bg-emerald-50';
+      case 'down': return 'text-rose-600 bg-rose-50';
+      default: return 'text-gray-600 bg-gray-50';
+    }
+  }, []);
+
+  const getVariacionIcon = useCallback((tendencia) => {
+    switch (tendencia) {
+      case 'up': return <TrendingUp size={14} />;
+      case 'down': return <TrendingDown size={14} />;
+      default: return <Minus size={14} />;
+    }
+  }, []);
+
+  // ✅ Memoizar datos de distribución de personal
+  const getPersonalDistributionData = useCallback(() => {
+    if (rolPersonalPermitido === 'policia') {
+      return [{ name: 'Policía', value: stats?.personal?.porRol?.policia || 0 }];
+    }
+    if (rolPersonalPermitido === 'ambulancia') {
+      return [{ name: 'Ambulancia', value: stats?.personal?.porRol?.ambulancia || 0 }];
+    }
+    return [
+      { name: 'Policía', value: stats?.personal?.porRol?.policia || 0 },
+      { name: 'Ambulancia', value: stats?.personal?.porRol?.ambulancia || 0 },
+      { name: 'Admin', value: stats?.personal?.porRol?.admin || 0 },
+      { name: 'Super Admin', value: stats?.personal?.porRol?.superadmin || 0 }
+    ];
+  }, [rolPersonalPermitido, stats?.personal?.porRol]);
+
+  // ✅ Memoizar COLORS
+  const COLORS = useMemo(() => ['#3b82f6', '#ef4444', '#f59e0b', '#10b981', '#8b5cf6'], []);
+
   // Actualizar estado cuando llegan los datos
   useEffect(() => {
     if (data) {
@@ -123,38 +158,8 @@ const Dashboard = () => {
     }
   }, [user, authLoading, navigate]);
 
-  const getVariacionColor = (tendencia) => {
-    switch (tendencia) {
-      case 'up': return 'text-emerald-600 bg-emerald-50';
-      case 'down': return 'text-rose-600 bg-rose-50';
-      default: return 'text-gray-600 bg-gray-50';
-    }
-  };
-
-  const getVariacionIcon = (tendencia) => {
-    switch (tendencia) {
-      case 'up': return <TrendingUp size={14} />;
-      case 'down': return <TrendingDown size={14} />;
-      default: return <Minus size={14} />;
-    }
-  };
-
-  const COLORS = ['#3b82f6', '#ef4444', '#f59e0b', '#10b981', '#8b5cf6'];
-
-  const getPersonalDistributionData = () => {
-    if (rolPersonalPermitido === 'policia') {
-      return [{ name: 'Policía', value: stats?.personal?.porRol?.policia || 0 }];
-    }
-    if (rolPersonalPermitido === 'ambulancia') {
-      return [{ name: 'Ambulancia', value: stats?.personal?.porRol?.ambulancia || 0 }];
-    }
-    return [
-      { name: 'Policía', value: stats?.personal?.porRol?.policia || 0 },
-      { name: 'Ambulancia', value: stats?.personal?.porRol?.ambulancia || 0 },
-      { name: 'Admin', value: stats?.personal?.porRol?.admin || 0 },
-      { name: 'Super Admin', value: stats?.personal?.porRol?.superadmin || 0 }
-    ];
-  };
+  // ✅ Memoizar distribución de personal para evitar recálculos
+  const personalDistributionData = useMemo(() => getPersonalDistributionData(), [getPersonalDistributionData]);
 
   if (error) {
     return (
@@ -283,7 +288,7 @@ const Dashboard = () => {
               <ResponsiveContainer width="100%" height="100%">
                 <RePieChart>
                   <Pie
-                    data={getPersonalDistributionData()}
+                    data={personalDistributionData}
                     cx="50%"
                     cy="50%"
                     innerRadius={30}
@@ -291,7 +296,7 @@ const Dashboard = () => {
                     paddingAngle={2}
                     dataKey="value"
                   >
-                    {getPersonalDistributionData().map((entry, index) => (
+                    {personalDistributionData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="white" strokeWidth={2} />
                     ))}
                   </Pie>
@@ -300,7 +305,7 @@ const Dashboard = () => {
               </ResponsiveContainer>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3 md:mt-4">
-              {getPersonalDistributionData().map((item, idx) => (
+              {personalDistributionData.map((item, idx) => (
                 <div key={idx} className="flex items-center gap-2">
                   <div className={`w-2 h-2 md:w-3 md:h-3 rounded-full`} style={{ backgroundColor: COLORS[idx % COLORS.length] }}></div>
                   <span className="text-xs text-slate-500">{item.name}: {item.value}</span>

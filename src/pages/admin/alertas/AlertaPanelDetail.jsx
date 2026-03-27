@@ -1,5 +1,5 @@
 // src/pages/admin/alertas/AlertaPanelDetail.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, MapPin, Phone, Mail, AlertTriangle,
@@ -39,6 +39,9 @@ const AlertaPanelDetail = () => {
   const [requiereOtp, setRequiereOtp] = useState(true);
   const [datosCompletos, setDatosCompletos] = useState(null);
 
+  // ✅ REF para AbortController
+  const abortControllerRef = useRef(null);
+
   // Usar el hook useOtp
   const {
     solicitando,
@@ -53,14 +56,25 @@ const AlertaPanelDetail = () => {
     cerrarModal
   } = useOtp();
 
-  useEffect(() => {
-    cargarAlerta();
-  }, [id]);
-
-  const cargarAlerta = async () => {
+  // ✅ Función para cargar alerta con AbortController y useCallback
+  const cargarAlerta = useCallback(async () => {
+    if (!id) return;
+    
+    // Cancelar petición anterior si existe
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      console.log('🛑 Petición anterior cancelada en AlertaPanelDetail');
+    }
+    
+    // Crear nuevo AbortController
+    abortControllerRef.current = new AbortController();
+    
+    setLoading(true);
+    
     try {
-      setLoading(true);
-      const response = await alertasPanelService.obtenerDetalle(id);
+      const response = await alertasPanelService.obtenerDetalle(id, {
+        signal: abortControllerRef.current.signal
+      });
 
       // Guardar datos completos para cuando se verifique OTP
       setDatosCompletos(response.data);
@@ -78,26 +92,44 @@ const AlertaPanelDetail = () => {
           }
         };
         setAlerta(dataOfuscada);
-        toast.custom((t) => (
+        // ✅ CORREGIDO: toast sin parámetro no usado
+        toast.custom(
           <div className="bg-blue-50 border-l-4 border-blue-500 rounded-lg shadow-lg p-4">
             <div className="flex items-center gap-2">
               <Lock size={18} className="text-blue-600" />
               <p className="text-sm text-blue-800">Los datos sensibles están ocultos. Solicita un código para verlos.</p>
             </div>
-          </div>
-        ), { duration: 5000 });
+          </div>,
+          { duration: 5000 }
+        );
       } else {
         setAlerta(response.data);
       }
 
     } catch (error) {
-      console.error('Error cargando alerta:', error);
-      toast.error('Error al cargar los detalles de la alerta');
-      navigate('/admin/alertas/activas');
+      // ✅ Ignorar errores de cancelación
+      if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
+        console.error('Error cargando alerta:', error);
+        toast.error('Error al cargar los detalles de la alerta');
+        navigate('/admin/alertas/activas');
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, navigate]);
+
+  // ✅ Efecto con limpieza
+  useEffect(() => {
+    cargarAlerta();
+    
+    // ✅ LIMPIAR al desmontar el componente
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        console.log('🛑 Componente AlertaPanelDetail desmontado - petición cancelada');
+      }
+    };
+  }, [cargarAlerta]);
 
   const handleSolicitarOtp = async () => {
     const result = await solicitarOtp(id);
@@ -277,7 +309,7 @@ const AlertaPanelDetail = () => {
         </div>
       </div>
 
-      {/* Modal OTP - CORREGIDO con z-index alto */}
+      {/* Modal OTP - z-index alto */}
       {showModal && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl">

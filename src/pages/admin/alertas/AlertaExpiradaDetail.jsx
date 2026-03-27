@@ -1,5 +1,5 @@
 // src/pages/admin/alertas/AlertaExpiradaDetail.jsx
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
   AlertTriangle, Clock, MapPin, User, Calendar, ChevronLeft,
@@ -13,7 +13,7 @@ import BotonUbicacion from '../../../components/ui/BotonUbicacion';
 import authService from '../../../services/auth.service';
 import { useOtp } from '../../../hooks/useOtp';
 
-// Función para normalizar texto
+// Función para normalizar texto (mantener igual)
 const normalizarTexto = (texto) => {
   if (!texto) return '';
   
@@ -56,6 +56,9 @@ const AlertaExpiradaDetail = () => {
   const [mostrarModalOtp, setMostrarModalOtp] = useState(false);
   const [codigoOtp, setCodigoOtp] = useState('');
   
+  // ✅ REF para AbortController
+  const abortControllerRef = useRef(null);
+  
   // Obtener tipo de alerta permitido según rol (para validar acceso)
   const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
   
@@ -81,8 +84,64 @@ const AlertaExpiradaDetail = () => {
     tipo: null
   });
 
+  // ✅ Función para cargar alerta con AbortController y useCallback
+  const cargarAlerta = useCallback(async () => {
+    if (!id) return;
+    
+    // Cancelar petición anterior si existe
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      console.log('🛑 Petición anterior cancelada en AlertaExpiradaDetail');
+    }
+    
+    // Crear nuevo AbortController
+    abortControllerRef.current = new AbortController();
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      console.log("Cargando alerta expirada ID:", id);
+      
+      const response = await alertasPanelService.obtenerDetalle(id, {
+        signal: abortControllerRef.current.signal
+      });
+      console.log("Respuesta del backend:", response);
+      
+      if (response.success && response.data) {
+        setDatosCompletos(response.data);
+        
+        if (response.requiere_otp) {
+          setMostrarModalOtp(true);
+        } else {
+          const alertaFormateada = {
+            ...response.data,
+            ciudadano: response.data.ciudadano ? {
+              ...response.data.ciudadano,
+              nombre: formatearNombre(response.data.ciudadano.nombre)
+            } : null
+          };
+          setAlerta(alertaFormateada);
+        }
+      } else {
+        setError('Alerta expirada no encontrada');
+        toast.error('Alerta no encontrada');
+      }
+    } catch (error) {
+      // ✅ Ignorar errores de cancelación
+      if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
+        console.error("Error cargando alerta:", error);
+        const errorMsg = error.response?.data?.error || error.message || 'Error al cargar la alerta';
+        setError(errorMsg);
+        toast.error(errorMsg);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
+  // ✅ Efecto con limpieza y manejo de datos desde navegación
   useEffect(() => {
-    // Verificar si hay datos completos pasados desde el listado
     const state = location.state;
     if (state?.datosCompletos) {
       console.log('📦 Datos completos recibidos desde estado de navegación');
@@ -92,38 +151,15 @@ const AlertaExpiradaDetail = () => {
     } else {
       cargarAlerta();
     }
-  }, [id]);
-
-  const cargarAlerta = async () => {
-    try {
-      setLoading(true);
-      console.log("Cargando alerta expirada ID:", id);
-      
-      const response = await alertasPanelService.obtenerDetalle(id);
-      console.log("Respuesta del backend:", response);
-      
-      if (response.success && response.data) {
-        setDatosCompletos(response.data);
-        
-        if (response.requiere_otp) {
-          // Si requiere OTP, mostrar modal para solicitar código
-          setMostrarModalOtp(true);
-        } else {
-          setAlerta(response.data);
-        }
-      } else {
-        setError('Alerta expirada no encontrada');
-        toast.error('Alerta no encontrada');
+    
+    // ✅ LIMPIAR al desmontar el componente
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        console.log('🛑 Componente AlertaExpiradaDetail desmontado - petición cancelada');
       }
-    } catch (error) {
-      console.error("Error cargando alerta:", error);
-      const errorMsg = error.response?.data?.error || error.message || 'Error al cargar la alerta';
-      setError(errorMsg);
-      toast.error(errorMsg);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+  }, [id, location.state, cargarAlerta]);
 
   const handleSolicitarOtp = async () => {
     if (!id) return;
@@ -524,18 +560,28 @@ const AlertaExpiradaDetail = () => {
   );
 };
 
-// Componente para tarjetas de información
+// ✅ CORREGIDO: Componente para tarjetas de información con colores fijos
 const InfoCard = ({ icon: Icon, label, value, color = 'blue' }) => {
-  const colorClasses = {
-    blue: 'bg-blue-50 border-blue-100',
-    gray: 'bg-gray-50 border-gray-200'
+  const colorStyles = {
+    blue: {
+      bg: 'bg-blue-50',
+      border: 'border-blue-100',
+      iconColor: 'text-blue-600'
+    },
+    gray: {
+      bg: 'bg-gray-50',
+      border: 'border-gray-200',
+      iconColor: 'text-gray-600'
+    }
   };
 
+  const style = colorStyles[color] || colorStyles.blue;
+
   return (
-    <div className={`p-4 rounded-xl border ${colorClasses[color]}`}>
+    <div className={`p-4 rounded-xl border ${style.bg} ${style.border}`}>
       <div className="flex items-start gap-3">
         <div className="p-2 bg-white rounded-lg">
-          <Icon size={18} className={`text-${color === 'gray' ? 'gray' : 'blue'}-600`} />
+          <Icon size={18} className={style.iconColor} />
         </div>
         <div>
           <p className="text-xs text-gray-500 uppercase tracking-wider">{label}</p>
@@ -546,7 +592,7 @@ const InfoCard = ({ icon: Icon, label, value, color = 'blue' }) => {
   );
 };
 
-// Componente para contactos con acción
+// Componente para contactos con acción (mantener igual)
 const ContactCard = ({ icon: Icon, label, value, action, actionIcon: ActionIcon }) => (
   <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-200">
     <div className="flex items-center gap-3">

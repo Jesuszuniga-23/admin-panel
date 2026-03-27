@@ -36,7 +36,28 @@ axiosInstance.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
     
-    // Log detallado del error
+    // ✅ Manejar peticiones canceladas (AbortController)
+    if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
+      console.log(`🛑 [CANCELED] ${originalRequest?.url} - Petición cancelada`);
+      // No mostrar toast para cancelaciones, solo propagar el error
+      return Promise.reject(error);
+    }
+    
+    // ✅ Manejar errores de red (sin conexión)
+    if (error.message === 'Network Error' || !error.response) {
+      console.error('🌐 [NETWORK ERROR] No hay conexión con el servidor');
+      toast.error('Error de conexión. Verifica tu internet.', {
+        duration: 5000,
+        icon: '🌐'
+      });
+      return Promise.reject({
+        ...error,
+        networkError: true,
+        message: 'No hay conexión con el servidor'
+      });
+    }
+    
+    // Log detallado del error para otros errores
     console.error('❌ [RESPONSE ERROR]', {
       url: error.config?.url,
       status: error.response?.status,
@@ -46,7 +67,7 @@ axiosInstance.interceptors.response.use(
 
     // Manejo de rate limit (429)
     if (error.response?.status === 429) {
-      console.log('Rate limit alcanzado:', error.response.data);
+      console.log('⏱️ Rate limit alcanzado:', error.response.data);
 
       const errorData = error.response.data || {};
       const retryAfter = errorData.retryAfter || 60;
@@ -65,14 +86,25 @@ axiosInstance.interceptors.response.use(
       localStorage.setItem('rate_limit_info', JSON.stringify(rateLimitInfo));
       window.dispatchEvent(new CustomEvent('rate-limit-activated', { detail: rateLimitInfo }));
 
-      toast.error(mensaje, { duration: Math.min(retryAfter * 1000, 10000) });
+      // ✅ Mostrar toast con tiempo de espera
+      toast.error(`${mensaje} Espera ${retryAfter} segundos.`, { 
+        duration: Math.min(retryAfter * 1000, 10000) 
+      });
 
+      // ✅ Solo reintentar si es admin y no es un reintento ya
       if (!originalRequest._retry && esAdmin) {
         originalRequest._retry = true;
-        setTimeout(() => {
-          toast.loading('Reintentando...', { duration: 2000 });
-          return axiosInstance(originalRequest);
-        }, retryAfter * 1000);
+        
+        // ✅ Crear promesa de reintento con timeout
+        const retryPromise = new Promise((resolve, reject) => {
+          setTimeout(() => {
+            console.log(`🔄 Reintentando petición a ${originalRequest.url}...`);
+            toast.loading('Reintentando...', { duration: 2000 });
+            resolve(axiosInstance(originalRequest));
+          }, retryAfter * 1000);
+        });
+        
+        return retryPromise;
       }
 
       return Promise.reject({
@@ -85,13 +117,50 @@ axiosInstance.interceptors.response.use(
     // Manejo de errores de autenticación (401)
     if (error.response?.status === 401) {
       console.warn('⚠️ Sesión expirada o no autenticado');
-      // No redirigir automáticamente, dejar que el componente maneje
+      
+      // ✅ Verificar si hay información de rate limit activa
+      const rateLimitInfo = checkRateLimit();
+      if (rateLimitInfo) {
+        console.log('⏱️ Rate limit activo, no mostrar error 401');
+        return Promise.reject({
+          ...error,
+          rateLimit: true,
+          rateLimitInfo
+        });
+      }
+      
+      // ✅ No redirigir automáticamente, dejar que el componente maneje
+      // Solo agregar información adicional al error
+      error.authError = true;
+      error.message = error.response?.data?.message || 'Sesión expirada';
+    }
+
+    // ✅ Manejo de errores de timeout
+    if (error.code === 'ECONNABORTED') {
+      console.error('⏰ [TIMEOUT] La petición tardó demasiado tiempo');
+      toast.error('La petición ha tardado demasiado. Intenta nuevamente.', {
+        duration: 5000
+      });
+      return Promise.reject({
+        ...error,
+        timeoutError: true,
+        message: 'Tiempo de espera agotado'
+      });
+    }
+
+    // ✅ Manejo de errores 500 (Internal Server Error)
+    if (error.response?.status === 500) {
+      console.error('🔥 [SERVER ERROR] Error interno del servidor');
+      toast.error('Error en el servidor. Intenta más tarde.', {
+        duration: 5000
+      });
     }
 
     return Promise.reject(error);
   }
 );
 
+// ✅ Función para verificar estado de rate limit
 export const checkRateLimit = () => {
   const stored = localStorage.getItem('rate_limit_info');
   if (!stored) return null;
@@ -99,6 +168,7 @@ export const checkRateLimit = () => {
   try {
     const info = JSON.parse(stored);
     if (Date.now() > info.expira) {
+      // ✅ Limpiar si expiró
       localStorage.removeItem('rate_limit_info');
       window.dispatchEvent(new CustomEvent('rate-limit-cleared'));
       return null;
@@ -108,6 +178,22 @@ export const checkRateLimit = () => {
     localStorage.removeItem('rate_limit_info');
     return null;
   }
+};
+
+// ✅ Función para limpiar manualmente el rate limit (útil para logout)
+export const clearRateLimit = () => {
+  localStorage.removeItem('rate_limit_info');
+  window.dispatchEvent(new CustomEvent('rate-limit-cleared'));
+  console.log('🧹 Rate limit info limpiado manualmente');
+};
+
+// ✅ Función para obtener tiempo restante de rate limit
+export const getRateLimitRemainingTime = () => {
+  const info = checkRateLimit();
+  if (!info) return 0;
+  
+  const remaining = Math.max(0, Math.ceil((info.expira - Date.now()) / 1000));
+  return remaining;
 };
 
 export default axiosInstance;

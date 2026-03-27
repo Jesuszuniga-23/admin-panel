@@ -1,16 +1,59 @@
-import { useState, useEffect } from 'react';
+// src/components/common/RateLimitBanner.jsx
+import { useState, useEffect, useCallback } from 'react';
 import { AlertCircle, Clock, X, Shield } from 'lucide-react';
 import { useRateLimit } from '../../hooks/useRateLimit';
 
-const RateLimitBanner = () => {
-  const { isLimited, timeFormatted, message, esAdmin } = useRateLimit();
+const RateLimitBanner = ({ onDismiss, autoHide = true, autoHideDelay = 5000 }) => {
+  const { isLimited, timeFormatted, timeRemaining, message, esAdmin } = useRateLimit();
   const [dismissed, setDismissed] = useState(false);
+  const [autoHideTimer, setAutoHideTimer] = useState(null);
 
+  // ✅ Resetear dismissed cuando se activa un nuevo rate limit
   useEffect(() => {
-    if (!isLimited) setDismissed(false);
+    if (isLimited) {
+      setDismissed(false);
+    }
   }, [isLimited]);
 
+  // ✅ Auto-hide después de cierto tiempo (opcional)
+  useEffect(() => {
+    if (autoHide && isLimited && !dismissed) {
+      if (autoHideTimer) clearTimeout(autoHideTimer);
+      
+      const timer = setTimeout(() => {
+        handleDismiss();
+      }, autoHideDelay);
+      
+      setAutoHideTimer(timer);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [autoHide, isLimited, dismissed, autoHideDelay]);
+
+  // ✅ Limpiar timer al desmontar
+  useEffect(() => {
+    return () => {
+      if (autoHideTimer) {
+        clearTimeout(autoHideTimer);
+      }
+    };
+  }, [autoHideTimer]);
+
+  const handleDismiss = useCallback(() => {
+    setDismissed(true);
+    if (onDismiss) {
+      onDismiss();
+    }
+    if (autoHideTimer) {
+      clearTimeout(autoHideTimer);
+    }
+  }, [onDismiss, autoHideTimer]);
+
   if (!isLimited || dismissed) return null;
+
+  // ✅ Formatear tiempo de forma segura
+  const displayTime = timeFormatted || 
+    (timeRemaining ? `${Math.ceil(timeRemaining)} segundos` : 'un momento');
 
   return (
     <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 w-full max-w-md animate-slideDown">
@@ -30,13 +73,13 @@ const RateLimitBanner = () => {
             <h4 className={`font-semibold text-sm ${
               esAdmin ? 'text-blue-800' : 'text-amber-800'
             }`}>
-              {esAdmin ? ' Límite temporal' : 'Sistema limitado'}
+              {esAdmin ? 'Límite temporal' : 'Sistema limitado'}
             </h4>
             
             <p className={`text-xs mt-1 ${
               esAdmin ? 'text-blue-700' : 'text-amber-700'
             }`}>
-              {message || 'Demasiadas peticiones'}
+              {message || 'Demasiadas peticiones. Por favor espera un momento.'}
             </p>
             
             <div className="flex items-center gap-2 mt-2">
@@ -44,7 +87,7 @@ const RateLimitBanner = () => {
               <span className={`text-xs font-medium ${
                 esAdmin ? 'text-blue-700' : 'text-amber-700'
               }`}>
-                {esAdmin ? 'Espera' : 'Tiempo de espera'}: {timeFormatted}
+                {esAdmin ? 'Espera' : 'Tiempo de espera'}: {displayTime}
               </span>
             </div>
 
@@ -54,11 +97,20 @@ const RateLimitBanner = () => {
                 Reintentando automáticamente...
               </p>
             )}
+
+            {/* ✅ Mostrar consejo para usuarios normales */}
+            {!esAdmin && (
+              <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
+                <AlertCircle size={12} />
+                Si el problema persiste, contacta al administrador.
+              </p>
+            )}
           </div>
 
           <button
-            onClick={() => setDismissed(true)}
+            onClick={handleDismiss}
             className={esAdmin ? 'text-blue-400 hover:text-blue-600' : 'text-amber-400 hover:text-amber-600'}
+            aria-label="Cerrar notificación"
           >
             <X size={16} />
           </button>

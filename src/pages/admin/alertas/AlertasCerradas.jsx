@@ -1,5 +1,5 @@
 // src/pages/admin/alertas/AlertasCerradas.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   CheckCircle, Filter, Calendar, ChevronLeft, ChevronRight,
@@ -62,10 +62,15 @@ const AlertasCerradas = () => {
   const [alertas, setAlertas] = useState([]);
   const [alertasOriginal, setAlertasOriginal] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [detalleLoading, setDetalleLoading] = useState(false); // ✅ Estado separado
   const [searchTerm, setSearchTerm] = useState('');
   const [tipoFiltro, setTipoFiltro] = useState('todos');
   const [tiempoMinimo, setTiempoMinimo] = useState('');
   const [tiempoMaximo, setTiempoMaximo] = useState('');
+  
+  // ✅ REF para AbortControllers
+  const abortControllerRef = useRef(null);
+  const detalleAbortControllerRef = useRef(null);
   
   // Obtener tipo de alerta permitido según rol
   const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
@@ -109,19 +114,29 @@ const AlertasCerradas = () => {
     total_paginas: 1
   });
 
-  useEffect(() => {
-    cargarAlertas();
-  }, []);
-
-  const cargarAlertas = async () => {
+  // ✅ Función para cargar alertas con AbortController
+  const cargarAlertas = useCallback(async () => {
+    // Cancelar petición anterior si existe
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      console.log('🛑 Petición anterior cancelada en AlertasCerradas');
+    }
+    
+    // Crear nuevo AbortController
+    abortControllerRef.current = new AbortController();
+    
+    setLoading(true);
     try {
-      setLoading(true);
       const params = {};
       if (tipoAlertaPermitido) {
         params.tipo = tipoAlertaPermitido;
       }
       
-      const response = await alertasPanelService.obtenerCerradas({ limite: 1000, ...params });
+      const response = await alertasPanelService.obtenerCerradas({ 
+        limite: 1000, 
+        ...params,
+        signal: abortControllerRef.current.signal 
+      });
 
       if (response.success) {
         const alertasFormateadas = (response.data || []).map(alerta => ({
@@ -139,12 +154,15 @@ const AlertasCerradas = () => {
         setAlertas([]);
       }
     } catch (error) {
-      console.error('Error:', error);
-      toast.error('Error al cargar alertas');
+      // ✅ Ignorar errores de cancelación
+      if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
+        console.error('Error:', error);
+        toast.error('Error al cargar alertas');
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [tipoAlertaPermitido]);
 
   const aplicarFiltrosLocal = (datos = alertasOriginal) => {
     let datosFiltrados = datos;
@@ -240,11 +258,38 @@ const AlertasCerradas = () => {
     }
   }, [filtros.desde, filtros.hasta, filtros.pagina, searchTerm, tipoFiltro, tiempoMinimo, tiempoMaximo]);
 
-  // ✅ Manejar clic en alerta
-  const handleRowClick = async (alerta) => {
+  // ✅ Efecto con limpieza
+  useEffect(() => {
+    cargarAlertas();
+    
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        console.log('🛑 Componente AlertasCerradas desmontado - peticiones canceladas');
+      }
+      if (detalleAbortControllerRef.current) {
+        detalleAbortControllerRef.current.abort();
+        console.log('🛑 Petición de detalle cancelada');
+      }
+    };
+  }, [cargarAlertas]);
+
+  // ✅ Manejar clic en alerta con AbortController
+  const handleRowClick = useCallback(async (alerta) => {
+    // Cancelar petición de detalle anterior si existe
+    if (detalleAbortControllerRef.current) {
+      detalleAbortControllerRef.current.abort();
+      console.log('🛑 Petición de detalle anterior cancelada');
+    }
+    
+    // Crear nuevo AbortController para detalle
+    detalleAbortControllerRef.current = new AbortController();
+    
+    setDetalleLoading(true);
     try {
-      setLoading(true);
-      const response = await alertasPanelService.obtenerDetalle(alerta.id);
+      const response = await alertasPanelService.obtenerDetalle(alerta.id, {
+        signal: detalleAbortControllerRef.current.signal
+      });
       
       if (response.success) {
         setDatosCompletosAlerta(response.data);
@@ -259,12 +304,15 @@ const AlertasCerradas = () => {
         toast.error('Error al cargar la alerta');
       }
     } catch (error) {
-      console.error('Error:', error);
-      toast.error('Error al cargar la alerta');
+      // ✅ Ignorar errores de cancelación
+      if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
+        console.error('Error al cargar detalle:', error);
+        toast.error('Error al cargar la alerta');
+      }
     } finally {
-      setLoading(false);
+      setDetalleLoading(false);
     }
-  };
+  }, [navigate]);
 
   const handleSolicitarOtp = async () => {
     if (!alertaSeleccionada) return;
@@ -465,9 +513,10 @@ const AlertasCerradas = () => {
 
         {/* Tabla de Alertas */}
         <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-          {loading ? (
+          {detalleLoading ? (
             <div className="p-12 text-center">
-              <Loader />
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-green-200 border-t-green-600"></div>
+              <p className="mt-3 text-sm text-gray-500">Cargando detalles...</p>
             </div>
           ) : alertas.length === 0 ? (
             <div className="p-16 text-center">

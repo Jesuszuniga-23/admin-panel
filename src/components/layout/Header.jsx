@@ -2,8 +2,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, Bell, UserCircle, Settings, LogOut
-} from 'lucide-react';
+  LayoutDashboard, UserCircle, LogOut
+} from 'lucide-react'; // ✅ Eliminados Settings y Bell (no usados)
 import useAuthStore from '../../store/authStore';
 import toast from 'react-hot-toast';
 
@@ -68,12 +68,14 @@ const ConfirmacionModal = ({ isOpen, onClose, onConfirm, onCancel }) => {
             <button
               onClick={onCancel}
               className="px-4 py-2 border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-all text-sm font-medium"
+              aria-label="Cancelar cierre de sesión"
             >
               Cancelar
             </button>
             <button
               onClick={onConfirm}
               className="px-4 py-2 bg-gradient-to-r from-red-600 to-rose-600 text-white rounded-xl hover:from-red-700 hover:to-rose-700 transition-all text-sm font-medium shadow-md"
+              aria-label="Confirmar cierre de sesión"
             >
               Cerrar sesión
             </button>
@@ -93,6 +95,7 @@ const Header = ({ titulo = 'Panel de Administración', subtitulo = 'Gestión del
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isPersonalFormActive, setIsPersonalFormActive] = useState(false);
   const menuRef = useRef(null);
+  const logoutTimeoutRef = useRef(null); // ✅ Ref para timeout
 
   // Escuchar eventos de cambios sin guardar
   useEffect(() => {
@@ -108,7 +111,7 @@ const Header = ({ titulo = 'Panel de Administración', subtitulo = 'Gestión del
     };
   }, []);
 
-  // Resetear estado cuando se sale de la ruta del formulario
+  // ✅ Resetear estado cuando se sale de la ruta del formulario
   useEffect(() => {
     if (!location.pathname.includes('/admin/personal')) {
       setHasUnsavedChanges(false);
@@ -130,6 +133,15 @@ const Header = ({ titulo = 'Panel de Administración', subtitulo = 'Gestión del
     };
   }, []);
 
+  // ✅ Limpiar timeout al desmontar
+  useEffect(() => {
+    return () => {
+      if (logoutTimeoutRef.current) {
+        clearTimeout(logoutTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const handleLogoutClick = () => {
     if (hasUnsavedChanges && isPersonalFormActive) {
       setShowConfirmModal(true);
@@ -143,8 +155,14 @@ const Header = ({ titulo = 'Panel de Administración', subtitulo = 'Gestión del
     try {
       await logout();
       toast.success('Sesión cerrada correctamente');
-      navigate('/login');
+      navigate('/login', { replace: true });
     } catch (error) {
+      // ✅ Ignorar errores de cancelación
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
+        console.log('🛑 Logout cancelado');
+        return;
+      }
+      console.error('Error al cerrar sesión:', error);
       toast.error('Error al cerrar sesión');
     }
   };
@@ -154,7 +172,12 @@ const Header = ({ titulo = 'Panel de Administración', subtitulo = 'Gestión del
     const discardEvent = new CustomEvent('discardFormProgress');
     window.dispatchEvent(discardEvent);
     
-    setTimeout(() => {
+    // ✅ Limpiar timeout anterior si existe
+    if (logoutTimeoutRef.current) {
+      clearTimeout(logoutTimeoutRef.current);
+    }
+    
+    logoutTimeoutRef.current = setTimeout(() => {
       performLogout();
     }, 100);
   };
@@ -187,6 +210,8 @@ const Header = ({ titulo = 'Panel de Administración', subtitulo = 'Gestión del
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
                   className="flex items-center gap-2 md:gap-3 hover:bg-slate-100 p-1.5 md:p-2 rounded-xl transition-all"
+                  aria-label="Menú de usuario"
+                  aria-expanded={userMenuOpen}
                 >
                   <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-200 flex-shrink-0">
                     <span className="text-white text-base md:text-lg font-semibold">
@@ -216,6 +241,7 @@ const Header = ({ titulo = 'Panel de Administración', subtitulo = 'Gestión del
                           setUserMenuOpen(false);
                         }}
                         className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                        aria-label="Ir a mi perfil"
                       >
                         <UserCircle size={16} className="text-slate-400 flex-shrink-0" />
                         <span className="truncate">Mi Perfil</span>
@@ -225,6 +251,7 @@ const Header = ({ titulo = 'Panel de Administración', subtitulo = 'Gestión del
                       <button
                         onClick={handleLogoutClick}
                         className="w-full flex items-center gap-3 px-4 py-2 text-sm text-rose-600 hover:bg-rose-50 transition-colors"
+                        aria-label="Cerrar sesión"
                       >
                         <LogOut size={16} className="flex-shrink-0" />
                         <span className="truncate">Cerrar Sesión</span>

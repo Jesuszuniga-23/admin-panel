@@ -73,7 +73,25 @@ export const ENDPOINTS = {
     REPORT_VIOLATION: `${BASE_URL}/security/report-violation`,
     SCRIPT: `${BASE_URL}/security/script.js`
   },
+  
+  // ✅ Mejor organizado como los demás módulos
   DASHBOARD: {
-  COMPLETO: `${BASE_URL}/admin/dashboard/completo`
-}
+    COMPLETO: `${BASE_URL}/admin/dashboard/completo`,
+    // Puedes agregar más endpoints de dashboard aquí si es necesario
+    // ESTADISTICAS: `${BASE_URL}/admin/dashboard/estadisticas`,
+    // ACTIVIDAD_RECIENTE: `${BASE_URL}/admin/dashboard/actividad-reciente`,
+  }
+};
+
+// ✅ Función de utilidad para verificar endpoints
+export const isValidEndpoint = (endpoint) => {
+  return endpoint && typeof endpoint === 'string' && endpoint.startsWith(BASE_URL);
+};
+
+// ✅ Función para obtener la URL completa (útil para debugging)
+export const getFullUrl = (endpoint) => {
+  if (typeof endpoint === 'function') {
+    return endpoint;
+  }
+  return endpoint;
 };

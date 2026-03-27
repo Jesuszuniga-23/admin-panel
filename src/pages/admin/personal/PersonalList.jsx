@@ -1,5 +1,5 @@
 // src/pages/admin/personal/PersonalList.jsx
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Users, Plus, Search, Filter, ChevronLeft, ChevronRight,
@@ -59,12 +59,16 @@ const rolToEntidad = {
   admin: 'ADMIN',
   superadmin: 'SUPERADMIN',
   policia: 'POLICIA',
-  ambulancia: 'PERSONAL_AMBULANCIA'
+  ambulancia: 'PERSONAL_AMBULANCIA',
+  operador_tecnico: 'OPERADOR_TECNICO',
+  operador_policial: 'OPERADOR_POLICIAL',
+  operador_medico: 'OPERADOR_MEDICO',
+  operador_general: 'OPERADOR_GENERAL'
 };
 
 const PersonalList = () => {
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  // ✅ Eliminada variable no usada 'user'
   const [personal, setPersonal] = useState([]);
   const [personalOriginal, setPersonalOriginal] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -76,10 +80,15 @@ const PersonalList = () => {
     onConfirm: null
   });
   
+  // ✅ REF para AbortController
+  const abortControllerRef = useRef(null);
+  
   // Obtener permisos según rol
   const rolPersonalPermitido = authService.getRolPersonalPermitido();
-  const puedeEditar = authService.puedeEditarPersonal;
-  const puedeEliminar = authService.puedeEliminarPersonal;
+  
+  // ✅ CORREGIDO: usar las funciones correctamente
+  const puedeEditarPersonal = (rol) => authService.puedeEditarPersonal(rol);
+  const puedeEliminarPersonal = (rol) => authService.puedeEliminarPersonal(rol);
   
   // ✅ NUEVO: Verificar si puede crear personal
   const puedeCrearPersonal = () => {
@@ -109,11 +118,8 @@ const PersonalList = () => {
   
   const searchTerm = useDebounce(filtros.search, 500);
 
-  useEffect(() => {
-    cargarPersonal();
-  }, []);
-
-  const filtrarDatos = (datos) => {
+  // ✅ Función para filtrar datos (sin cambios)
+  const filtrarDatos = useCallback((datos) => {
     return datos.filter(item => {
       if (filtros.search) {
         const termino = filtros.search.toLowerCase().trim();
@@ -137,12 +143,22 @@ const PersonalList = () => {
       
       return true;
     });
-  };
+  }, [filtros.search, filtros.rol, filtros.activo, filtros.disponible]);
 
-  const cargarPersonal = async () => {
+  // ✅ Función para cargar personal con AbortController
+  const cargarPersonal = useCallback(async () => {
+    // Cancelar petición anterior si existe
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      console.log('🛑 Petición anterior cancelada en PersonalList');
+    }
+    
+    // Crear nuevo AbortController
+    abortControllerRef.current = new AbortController();
+    
     setLoading(true);
     try {
-      const params = {};
+      const params = { signal: abortControllerRef.current.signal };
       if (rolPersonalPermitido) {
         params.rol = rolPersonalPermitido;
       }
@@ -181,12 +197,27 @@ const PersonalList = () => {
         total_paginas: totalPaginas
       });
     } catch (error) {
-      console.error("Error:", error);
-      toast.error("Error al cargar personal");
+      // ✅ Ignorar errores de cancelación
+      if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
+        console.error("Error:", error);
+        toast.error("Error al cargar personal");
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [rolPersonalPermitido, filtros.limite, filtros.pagina, filtrarDatos]);
+
+  // ✅ Efecto con limpieza
+  useEffect(() => {
+    cargarPersonal();
+    
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        console.log('🛑 Componente PersonalList desmontado - peticiones canceladas');
+      }
+    };
+  }, [cargarPersonal]);
 
   const handleSearch = (value) => {
     setFiltros(prev => ({ ...prev, search: value, pagina: 1 }));
@@ -207,6 +238,7 @@ const PersonalList = () => {
     });
   };
 
+  // ✅ Efecto para aplicar filtros locales
   useEffect(() => {
     if (personalOriginal.length) {
       const datosFiltrados = filtrarDatos(personalOriginal);
@@ -224,10 +256,10 @@ const PersonalList = () => {
         total_paginas: totalPaginas
       });
     }
-  }, [filtros.rol, filtros.activo, filtros.disponible, filtros.search, filtros.pagina, personalOriginal]);
+  }, [filtros.rol, filtros.activo, filtros.disponible, filtros.search, filtros.pagina, filtros.limite, personalOriginal, filtrarDatos]);
 
   const handleEliminar = async (id, nombreCompleto, disponible, rolPersonal) => {
-    if (!authService.puedeEliminarPersonal(rolPersonal)) {
+    if (!puedeEliminarPersonal(rolPersonal)) {
       toast.error('No tienes permisos para eliminar este personal');
       return;
     }
@@ -253,7 +285,7 @@ const PersonalList = () => {
         try {
           await personalService.eliminarPersonal(id);
           setModalInfo({ show: false, tipo: '', titulo: '', mensaje: '', onConfirm: null });
-          await cargarPersonal();
+          await cargarPersonal(); // ✅ Recargar después de eliminar
           toast.success(`Personal "${nombreCompleto}" eliminado correctamente`);
         } catch (error) {
           console.error("Error eliminando:", error);
@@ -266,7 +298,7 @@ const PersonalList = () => {
   };
 
   const handleToggleActivo = async (id, nombreCompleto, estadoActual, disponible, rolPersonal) => {
-    if (!authService.puedeEditarPersonal(rolPersonal)) {
+    if (!puedeEditarPersonal(rolPersonal)) {
       toast.error('No tienes permisos para modificar este personal');
       return;
     }
@@ -300,7 +332,7 @@ const PersonalList = () => {
         try {
           await personalService.toggleActivo(id, nuevoEstado);
           setModalInfo({ show: false, tipo: '', titulo: '', mensaje: '', onConfirm: null });
-          await cargarPersonal();
+          await cargarPersonal(); // ✅ Recargar después de cambiar estado
           toast.success(`Personal "${nombreCompleto}" ${accion}do correctamente`);
         } catch (error) {
           console.error(`Error al ${accion}:`, error);
@@ -332,7 +364,6 @@ const PersonalList = () => {
               </p>
             </div>
           </div>
-          {/* ✅ Botón Nuevo Personal corregido */}
           {puedeCrearPersonal() && (
             <button
               onClick={() => navigate('/admin/personal/crear')}
@@ -512,7 +543,7 @@ const PersonalList = () => {
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-2">
-                            {authService.puedeEditarPersonal(persona.rol) && (
+                            {puedeEditarPersonal(persona.rol) && (
                               <button
                                 onClick={() => handleToggleActivo(persona.id, persona.nombreCompleto, persona.activo, persona.disponible, persona.rol)}
                                 className={`p-1.5 rounded-lg transition-colors ${
@@ -530,7 +561,7 @@ const PersonalList = () => {
                             >
                               <Eye size={16} className="text-gray-500" />
                             </button>
-                            {authService.puedeEditarPersonal(persona.rol) && (
+                            {puedeEditarPersonal(persona.rol) && (
                               <button
                                 onClick={() => navigate(`/admin/personal/editar/${persona.id}`)}
                                 className="p-1.5 hover:bg-gray-100 rounded-lg"
@@ -539,7 +570,7 @@ const PersonalList = () => {
                                 <Edit size={16} className="text-gray-500" />
                               </button>
                             )}
-                            {authService.puedeEliminarPersonal(persona.rol) && (
+                            {puedeEliminarPersonal(persona.rol) && (
                               <button
                                 onClick={() => handleEliminar(persona.id, persona.nombreCompleto, persona.disponible, persona.rol)}
                                 className="p-1.5 hover:bg-red-50 rounded-lg"
@@ -587,7 +618,7 @@ const PersonalList = () => {
         </div>
       </div>
 
-      {/* Modal Genérico */}
+      {/* Modal Genérico (sin cambios) */}
       {modalInfo.show && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full animate-fadeIn">

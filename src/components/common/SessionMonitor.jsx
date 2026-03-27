@@ -14,9 +14,10 @@ const SessionMonitor = () => {
   const [sessionActive, setSessionActive] = useState(true);
   const sessionActiveRef = useRef(sessionActive);
   
-  // ✅ Ref para debounce de actividad
+  // ✅ Ref para debounce/throttle de actividad
   const actividadTimeoutRef = useRef(null);
   const ultimaActividadRef = useRef(Date.now());
+  const abortControllerRef = useRef(null);
 
   // Mantener la referencia actualizada
   useEffect(() => {
@@ -24,14 +25,25 @@ const SessionMonitor = () => {
   }, [sessionActive]);
 
   const verificarSesion = useCallback(async () => {
+    // Cancelar petición anterior si existe
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    abortControllerRef.current = new AbortController();
+    
     try {
-      const estado = await authService.obtenerEstadoSesion();
+      const estado = await authService.obtenerEstadoSesion({
+        signal: abortControllerRef.current.signal
+      });
       
       if (!estado.activa) {
         if (sessionActiveRef.current) {
           setSessionActive(false);
           setShowWarning(true);
-          setCountdown(estado.minutos_restantes * 60 || 30);
+          // ✅ Calcular countdown en segundos
+          const segundosRestantes = (estado.minutos_restantes || 0.5) * 60;
+          setCountdown(Math.max(10, Math.floor(segundosRestantes)));
           
           toast.error(estado.motivo || 'Sesión expirada por inactividad', {
             duration: 5000
@@ -42,11 +54,14 @@ const SessionMonitor = () => {
         setShowWarning(false);
       }
     } catch (error) {
-      console.error('Error verificando sesión:', error);
+      // ✅ Ignorar errores de cancelación
+      if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
+        console.error('Error verificando sesión:', error);
+      }
     }
   }, []);
 
-  // ✅ FUNCIÓN CON DEBOUNCE - Solo registra actividad cada 30 segundos
+  // ✅ FUNCIÓN CON DEBOUNCE Y THROTTLE - Solo registra actividad cada 30 segundos
   const registrarActividad = useCallback(async () => {
     // Limpiar timeout anterior
     if (actividadTimeoutRef.current) {
@@ -62,13 +77,24 @@ const SessionMonitor = () => {
       // ✅ Solo registrar si pasaron al menos 30 segundos desde la última vez
       if (tiempoDesdeUltima >= 30000) {
         ultimaActividadRef.current = ahora;
+        
+        // ✅ Cancelar petición anterior si existe
+        if (abortControllerRef.current) {
+          abortControllerRef.current.abort();
+        }
+        abortControllerRef.current = new AbortController();
+        
         try {
-          await authService.registrarActividad();
+          await authService.registrarActividad({
+            signal: abortControllerRef.current.signal
+          });
           console.log('🔄 Actividad registrada');
         } catch (error) {
-          // Ignorar errores de rate limit
-          if (error.response?.status !== 429) {
-            console.error('Error registrando actividad:', error);
+          // ✅ Ignorar errores de cancelación y rate limit
+          if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
+            if (error.response?.status !== 429) {
+              console.error('Error registrando actividad:', error);
+            }
           }
         }
       }
@@ -99,27 +125,23 @@ const SessionMonitor = () => {
       eventos.forEach(evento => {
         window.removeEventListener(evento, handleActivity);
       });
+      // ✅ Limpiar timeout al desmontar
       if (actividadTimeoutRef.current) {
         clearTimeout(actividadTimeoutRef.current);
       }
     };
   }, [registrarActividad]);
 
-  // ✅ SIMULACIÓN: Sesión expirada después de 10 segundos (para pruebas)
+  // ✅ Limpiar abort controllers al desmontar
   useEffect(() => {
-    const timer = setTimeout(() => {
-      console.log('🔴 SIMULACIÓN: Sesión expirada por inactividad (prueba)');
-      if (sessionActiveRef.current) {
-        setSessionActive(false);
-        setShowWarning(true);
-        setCountdown(30);
-        toast.error('Sesión expirada por inactividad (SIMULACIÓN)', {
-          duration: 5000
-        });
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
       }
-    }, 10000);
-    
-    return () => clearTimeout(timer);
+      if (actividadTimeoutRef.current) {
+        clearTimeout(actividadTimeoutRef.current);
+      }
+    };
   }, []);
 
   // Cuenta regresiva del warning
@@ -130,6 +152,7 @@ const SessionMonitor = () => {
         setCountdown(prev => prev - 1);
       }, 1000);
     } else if (showWarning && countdown === 0) {
+      // ✅ Cerrar sesión y redirigir
       logout();
       navigate('/login');
     }

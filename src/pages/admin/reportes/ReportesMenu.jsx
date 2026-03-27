@@ -2,66 +2,104 @@
 import { useNavigate } from 'react-router-dom';
 import { 
   FileText, Users, Truck, Bell, ChevronLeft,
-  BarChart3, PieChart, Calendar, Download, FileSpreadsheet, FilePieChart
+  BarChart3, PieChart, Calendar, Download, FileSpreadsheet, FilePieChart,
+  AlertCircle
 } from 'lucide-react';
 import IconoEntidad from '../../../components/ui/IconoEntidad';
 import authService from '../../../services/auth.service';
 
+// ✅ Constante con todas las opciones de reporte
+const OPCIONES_REPORTE = [
+  {
+    id: 'personal',
+    titulo: 'Personal',
+    descripcion: 'Personal operativo y administrativo',
+    icono: Users,
+    entidad: 'ADMIN',
+    color: 'blue',
+    gradient: 'from-blue-600 to-indigo-700',
+    stats: ['Total', 'Activos/Inactivos', 'Disponibilidad'],
+    // ✅ Función para verificar si el usuario puede ver este reporte
+    puedeVer: (user, tipoAlertaPermitido, rolPersonalPermitido) => {
+      // Todos pueden ver personal, pero con filtros según rol
+      return true;
+    }
+  },
+  {
+    id: 'unidades',
+    titulo: 'Unidades',
+    descripcion: 'Estado y asignación de unidades',
+    icono: Truck,
+    entidad: 'PATRULLA',
+    color: 'purple',
+    gradient: 'from-purple-600 to-indigo-700',
+    stats: ['Activas', 'Disponibles/Ocupadas', 'Personal asignado'],
+    puedeVer: () => {
+      // Todos pueden ver unidades
+      return true;
+    }
+  },
+  {
+    id: 'alertas',
+    titulo: 'Alertas',
+    descripcion: 'Alertas expiradas y cerradas manualmente',
+    icono: Bell,
+    entidad: 'ALERTA_PANICO',
+    color: 'amber',
+    gradient: 'from-amber-600 to-orange-700',
+    stats: ['Por mes', 'Tiempo respuesta', 'Motivos cierre'],
+    puedeVer: () => {
+      // Todos pueden ver alertas, pero con filtros según rol
+      return true;
+    }
+  }
+];
+
 const ReportesMenu = () => {
   const navigate = useNavigate();
+  const user = authService.getCurrentUser();
   
-  // Obtener tipo de alerta permitido según rol (para mostrar solo los reportes relevantes)
+  // Obtener permisos según rol
   const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
   const rolPersonalPermitido = authService.getRolPersonalPermitido();
-
-  const opcionesReporte = [
-    {
-      id: 'personal',
-      titulo: 'Personal',
-      descripcion: 'Personal operativo y administrativo',
-      icono: Users,
-      entidad: 'ADMIN',
-      color: 'blue',
-      gradient: 'from-blue-600 to-indigo-700',
-      stats: ['Total', 'Activos/Inactivos', 'Disponibilidad'],
-      visible: true
-    },
-    {
-      id: 'unidades',
-      titulo: 'Unidades',
-      descripcion: 'Estado y asignación de unidades',
-      icono: Truck,
-      entidad: 'PATRULLA',
-      color: 'purple',
-      gradient: 'from-purple-600 to-indigo-700',
-      stats: ['Activas', 'Disponibles/Ocupadas', 'Personal asignado'],
-      visible: true
-    },
-    {
-      id: 'alertas',
-      titulo: 'Alertas',
-      descripcion: 'Alertas expiradas y cerradas manualmente',
-      icono: Bell,
-      entidad: 'ALERTA_PANICO',
-      color: 'amber',
-      gradient: 'from-amber-600 to-orange-700',
-      stats: ['Por mes', 'Tiempo respuesta', 'Motivos cierre'],
-      visible: true
+  
+  // ✅ Filtrar opciones según rol
+  const opcionesFiltradas = OPCIONES_REPORTE.filter(opcion => {
+    // Verificar si el usuario puede ver este reporte
+    if (!opcion.puedeVer(user, tipoAlertaPermitido, rolPersonalPermitido)) {
+      return false;
     }
-  ];
-
-  // Filtrar opciones según rol (opcional: ocultar reportes que no corresponden)
-  const opcionesFiltradas = opcionesReporte.filter(opcion => {
-    if (opcion.id === 'personal' && rolPersonalPermitido) {
-      // Si es operador policial o médico, solo ve personal de su tipo
-      return true;
-    }
+    
+    // ✅ Filtro adicional: si es operador policial o médico, solo ve alertas de su tipo
     if (opcion.id === 'alertas' && tipoAlertaPermitido) {
-      // Si es operador policial o médico, solo ve alertas de su tipo
+      // Si el usuario solo puede ver un tipo de alerta, mostramos el reporte
+      // pero luego en el generador se filtrarán los datos
       return true;
     }
+    
+    // ✅ Filtro adicional: si es operador policial o médico, solo ve personal de su tipo
+    if (opcion.id === 'personal' && rolPersonalPermitido) {
+      // Si el usuario solo puede ver personal de un tipo, mostramos el reporte
+      // pero luego en el generador se filtrarán los datos
+      return true;
+    }
+    
     return true;
   });
+
+  // ✅ Obtener texto de filtro para mostrar en el header
+  const getFiltroTexto = () => {
+    if (tipoAlertaPermitido && rolPersonalPermitido) {
+      return ` (Filtros: ${tipoAlertaPermitido === 'panico' ? 'Solo Pánico' : 'Solo Médicas'} | Personal: ${rolPersonalPermitido === 'policia' ? 'Solo Policía' : 'Solo Ambulancia'})`;
+    }
+    if (tipoAlertaPermitido) {
+      return ` (Filtro: ${tipoAlertaPermitido === 'panico' ? 'Solo Pánico' : 'Solo Médicas'})`;
+    }
+    if (rolPersonalPermitido) {
+      return ` (Personal: ${rolPersonalPermitido === 'policia' ? 'Solo Policía' : 'Solo Ambulancia'})`;
+    }
+    return '';
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 sm:p-6 max-w-6xl mx-auto">
@@ -70,6 +108,7 @@ const ReportesMenu = () => {
         <button
           onClick={() => navigate('/admin/dashboard')}
           className="p-2 hover:bg-white rounded-xl transition-colors"
+          aria-label="Volver al dashboard"
         >
           <ChevronLeft size={20} className="text-gray-500" />
         </button>
@@ -77,72 +116,117 @@ const ReportesMenu = () => {
           <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Centro de Reportes</h1>
           <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
             Selecciona el tipo de reporte que deseas generar
-            {tipoAlertaPermitido && ` (Filtro: ${tipoAlertaPermitido === 'panico' ? 'Solo Pánico' : 'Solo Médicas'})`}
-            {rolPersonalPermitido && ` (Personal: ${rolPersonalPermitido === 'policia' ? 'Solo Policía' : 'Solo Ambulancia'})`}
+            {getFiltroTexto()}
           </p>
         </div>
       </div>
 
-      {/* Grid de opciones */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {opcionesFiltradas.map((opcion) => {
-          return (
-            <div
-              key={opcion.id}
-              onClick={() => navigate(`/admin/reportes/${opcion.id}`)}
-              className={`bg-gradient-to-br ${opcion.gradient} rounded-2xl p-6 cursor-pointer transition-all hover:scale-105 hover:shadow-2xl transform duration-300`}
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
-                  <IconoEntidad entidad={opcion.entidad} size={28} color="text-white" />
-                </div>
-                <div className="flex gap-1">
-                  <span className="text-xs bg-white/20 text-white px-2 py-1 rounded-full flex items-center gap-1">
-                    <FileSpreadsheet size={10} />
-                    Excel
-                  </span>
-                  <span className="text-xs bg-white/20 text-white px-2 py-1 rounded-full flex items-center gap-1">
-                    <FilePieChart size={10} />
-                    PDF
-                  </span>
-                </div>
-              </div>
-
-              <h2 className="text-xl font-bold text-white mb-1">{opcion.titulo}</h2>
-              <p className="text-xs text-white/80 mb-4">{opcion.descripcion}</p>
-
-              <div className="space-y-1.5 mb-5">
-                {opcion.stats.map((stat, idx) => (
-                  <div key={idx} className="text-xs text-white/70 flex items-center gap-2">
-                    <div className="w-1 h-1 bg-white/50 rounded-full"></div>
-                    {stat}
-                  </div>
-                ))}
-              </div>
-
-              <button className="w-full bg-white/20 backdrop-blur-sm text-white text-sm py-2.5 rounded-xl hover:bg-white/30 transition-all flex items-center justify-center gap-2 font-medium">
-                <Download size={14} />
-                Generar Reporte
-              </button>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Info adicional */}
-      <div className="mt-6 bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
-        <div className="flex items-start gap-3">
-          <div className="p-2 bg-blue-50 rounded-lg">
-            <PieChart size={18} className="text-blue-600" />
+      {/* ✅ Mensaje cuando no hay opciones disponibles */}
+      {opcionesFiltradas.length === 0 ? (
+        <div className="bg-white rounded-2xl shadow-lg p-12 text-center border border-gray-100">
+          <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertCircle size={32} className="text-gray-400" />
           </div>
-          <div className="text-xs text-gray-600">
-            <span className="font-medium text-gray-800">Formatos disponibles:</span> 
-            <span className="ml-2">Excel (editable) y PDF (profesional)</span>
-            <br />
-            <span className="text-gray-500">Los reportes incluyen filtros por fecha, tipo y estado. Puedes exportar con vista previa.</span>
-          </div>
+          <h3 className="text-xl font-semibold text-gray-800 mb-2">No hay reportes disponibles</h3>
+          <p className="text-sm text-gray-500">
+            Tu rol actual no tiene acceso a ningún reporte.
+            {tipoAlertaPermitido && ` (Tipo de alerta: ${tipoAlertaPermitido === 'panico' ? 'Pánico' : 'Médica'})`}
+            {rolPersonalPermitido && ` (Personal: ${rolPersonalPermitido === 'policia' ? 'Policía' : 'Ambulancia'})`}
+          </p>
+          <button
+            onClick={() => navigate('/admin/dashboard')}
+            className="mt-6 px-6 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors"
+          >
+            Volver al Dashboard
+          </button>
         </div>
-      </div>
+      ) : (
+        <>
+          {/* Grid de opciones */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {opcionesFiltradas.map((opcion) => {
+              // ✅ Mostrar indicador de filtro en la tarjeta si aplica
+              const tieneFiltro = (opcion.id === 'alertas' && tipoAlertaPermitido) ||
+                                  (opcion.id === 'personal' && rolPersonalPermitido);
+              
+              return (
+                <div
+                  key={opcion.id}
+                  onClick={() => navigate(`/admin/reportes/${opcion.id}`)}
+                  className={`bg-gradient-to-br ${opcion.gradient} rounded-2xl p-6 cursor-pointer transition-all hover:scale-105 hover:shadow-2xl transform duration-300`}
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
+                      <IconoEntidad entidad={opcion.entidad} size={28} color="text-white" />
+                    </div>
+                    <div className="flex gap-1">
+                      <span className="text-xs bg-white/20 text-white px-2 py-1 rounded-full flex items-center gap-1">
+                        <FileSpreadsheet size={10} />
+                        Excel
+                      </span>
+                      <span className="text-xs bg-white/20 text-white px-2 py-1 rounded-full flex items-center gap-1">
+                        <FilePieChart size={10} />
+                        PDF
+                      </span>
+                    </div>
+                  </div>
+
+                  <h2 className="text-xl font-bold text-white mb-1">{opcion.titulo}</h2>
+                  <p className="text-xs text-white/80 mb-4">{opcion.descripcion}</p>
+
+                  {/* ✅ Indicador de filtro aplicado */}
+                  {tieneFiltro && (
+                    <div className="mb-3">
+                      <span className="text-xs bg-white/30 text-white px-2 py-0.5 rounded-full">
+                        {opcion.id === 'alertas' 
+                          ? `Filtro: ${tipoAlertaPermitido === 'panico' ? 'Solo Pánico' : 'Solo Médicas'}`
+                          : `Filtro: ${rolPersonalPermitido === 'policia' ? 'Solo Policía' : 'Solo Ambulancia'}`
+                        }
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="space-y-1.5 mb-5">
+                    {opcion.stats.map((stat, idx) => (
+                      <div key={idx} className="text-xs text-white/70 flex items-center gap-2">
+                        <div className="w-1 h-1 bg-white/50 rounded-full"></div>
+                        {stat}
+                      </div>
+                    ))}
+                  </div>
+
+                  <button 
+                    className="w-full bg-white/20 backdrop-blur-sm text-white text-sm py-2.5 rounded-xl hover:bg-white/30 transition-all flex items-center justify-center gap-2 font-medium"
+                    aria-label={`Generar reporte de ${opcion.titulo}`}
+                  >
+                    <Download size={14} />
+                    Generar Reporte
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Info adicional */}
+          <div className="mt-6 bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-blue-50 rounded-lg">
+                <PieChart size={18} className="text-blue-600" />
+              </div>
+              <div className="text-xs text-gray-600">
+                <span className="font-medium text-gray-800">Formatos disponibles:</span> 
+                <span className="ml-2">Excel (editable) y PDF (profesional)</span>
+                <br />
+                <span className="text-gray-500">
+                  Los reportes incluyen filtros por fecha, tipo y estado. Puedes exportar con vista previa.
+                  {tipoAlertaPermitido && ' Los datos se filtrarán automáticamente según tu rol.'}
+                  {rolPersonalPermitido && ' Los datos de personal se filtrarán automáticamente según tu rol.'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };

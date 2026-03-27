@@ -1,10 +1,10 @@
 // src/pages/admin/unidades/UnidadesList.jsx
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Truck, Plus, Search, Filter, ChevronLeft, ChevronRight,
   Eye, Edit, Trash2, Power, Users, X, FileSpreadsheet, FilePieChart,
-  Clock, AlertCircle, CheckCircle
+  Clock, AlertCircle, CheckCircle, Loader
 } from 'lucide-react';
 import unidadService from '../../../services/admin/unidad.service';
 import toast from 'react-hot-toast';
@@ -52,7 +52,7 @@ const ModalAccionNoPermitida = ({ isOpen, onClose, mensaje }) => {
   );
 };
 
-const ModalConfirmacion = ({ isOpen, onClose, onConfirm, titulo, mensaje, itemNombre, tipoAccion = 'eliminar' }) => {
+const ModalConfirmacion = ({ isOpen, onClose, onConfirm, titulo, mensaje, itemNombre, tipoAccion = 'eliminar', loading }) => {
   if (!isOpen) return null;
 
   const config = {
@@ -108,7 +108,8 @@ const ModalConfirmacion = ({ isOpen, onClose, onConfirm, titulo, mensaje, itemNo
           <div className="flex justify-end gap-3">
             <button
               onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+              disabled={loading}
+              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium disabled:opacity-50"
             >
               Cancelar
             </button>
@@ -117,10 +118,11 @@ const ModalConfirmacion = ({ isOpen, onClose, onConfirm, titulo, mensaje, itemNo
                 onConfirm();
                 onClose();
               }}
-              className={`px-4 py-2 ${conf.buttonColor} text-white rounded-lg transition-colors text-sm font-medium flex items-center gap-2`}
+              disabled={loading}
+              className={`px-4 py-2 ${conf.buttonColor} text-white rounded-lg transition-colors text-sm font-medium flex items-center gap-2 disabled:opacity-50`}
             >
-              {conf.icon}
-              {conf.buttonText}
+              {loading ? <Loader size={16} className="animate-spin" /> : conf.icon}
+              {loading ? 'Procesando...' : conf.buttonText}
             </button>
           </div>
         </div>
@@ -135,23 +137,27 @@ const UnidadesList = () => {
   const [unidades, setUnidades] = useState([]);
   const [loading, setLoading] = useState(true);
   const [exportando, setExportando] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false); // ✅ Estado para acciones
+  
+  // ✅ REF para AbortController
+  const abortControllerRef = useRef(null);
   
   const tipoUnidadPermitido = authService.getRolPersonalPermitido();
   
-  // Funciones de permisos para unidades
-  const puedeCrearUnidades = () => {
+  // ✅ Funciones de permisos para unidades (memoizadas con useCallback)
+  const puedeCrearUnidades = useCallback(() => {
     const puedeCrearPolicia = authService.puedeCrearUnidad('policia');
     const puedeCrearAmbulancia = authService.puedeCrearUnidad('ambulancia');
     return puedeCrearPolicia || puedeCrearAmbulancia;
-  };
+  }, []);
   
-  const puedeGestionarUnidad = (unidad) => {
+  const puedeGestionarUnidad = useCallback((unidad) => {
     return authService.puedeEditarUnidad(unidad.tipo);
-  };
+  }, []);
   
-  const puedeEliminarUnidad = (unidad) => {
+  const puedeEliminarUnidad = useCallback((unidad) => {
     return authService.puedeEliminarUnidad(unidad.tipo);
-  };
+  }, []);
   
   const [modalInfo, setModalInfo] = useState({ show: false, mensaje: '' });
   const [modalConfirmacion, setModalConfirmacion] = useState({
@@ -185,10 +191,20 @@ const UnidadesList = () => {
   });
   const searchTerm = useDebounce(filtros.search, 500);
 
+  // ✅ Función para cargar unidades con AbortController
   const cargarUnidades = useCallback(async () => {
+    // Cancelar petición anterior si existe
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      console.log('🛑 Petición anterior cancelada en UnidadesList');
+    }
+    
+    // Crear nuevo AbortController
+    abortControllerRef.current = new AbortController();
+    
     setLoading(true);
     try {
-      const filtrosActivos = {};
+      const filtrosActivos = { signal: abortControllerRef.current.signal };
       if (filtros.tipo) filtrosActivos.tipo = filtros.tipo;
       if (filtros.estado) filtrosActivos.estado = filtros.estado;
       if (searchTerm) filtrosActivos.search = searchTerm;
@@ -204,30 +220,42 @@ const UnidadesList = () => {
         total_paginas: 1
       });
     } catch (error) {
-      console.error('Error:', error);
-      if (error.response?.status === 429) {
-        toast.error('Demasiadas peticiones. Espera unos segundos...', {
-          icon: <Clock size={18} className="text-yellow-500" />
-        });
-      } else {
-        toast.error('Error al cargar unidades');
+      // ✅ Ignorar errores de cancelación
+      if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
+        console.error('Error:', error);
+        if (error.response?.status === 429) {
+          toast.error('Demasiadas peticiones. Espera unos segundos...', {
+            icon: <Clock size={18} className="text-yellow-500" />
+          });
+        } else {
+          toast.error('Error al cargar unidades');
+        }
       }
     } finally {
       setLoading(false);
     }
   }, [filtros.tipo, filtros.estado, searchTerm, filtros.pagina, filtros.limite]);
 
+  // ✅ Efecto con limpieza
   useEffect(() => {
     cargarUnidades();
+    
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        console.log('🛑 Componente UnidadesList desmontado - peticiones canceladas');
+      }
+    };
   }, [cargarUnidades]);
 
   const isUnidadOcupada = (unidad) => {
     return unidad.estado === 'ocupada';
   };
 
+  // ✅ Exportar Excel con loading y sin AbortController (no es necesario cancelar)
   const exportarExcel = async () => {
+    setExportando(true);
     try {
-      setExportando(true);
       toast.loading('Generando reporte de Excel...', { id: 'export' });
       const params = {};
       if (tipoUnidadPermitido) params.tipo = tipoUnidadPermitido;
@@ -243,15 +271,16 @@ const UnidadesList = () => {
     }
   };
 
+  // ✅ Exportar PDF con loading
   const exportarPDF = async () => {
+    setExportando(true);
     try {
-      setExportando(true);
       toast.loading('Generando reporte PDF...', { id: 'export' });
       const params = {};
       if (tipoUnidadPermitido) params.tipo = tipoUnidadPermitido;
       const response = await unidadService.listarUnidades({ limite: 1000, ...params });
       const todasUnidades = response.data || [];
-      reportesService.generarPDFPersonalizado(todasUnidades, 'unidades', filtros, user);
+      await reportesService.generarPDFPersonalizado(todasUnidades, 'unidades', filtros, user);
       toast.success('Reporte PDF generado correctamente', { id: 'export' });
     } catch (error) {
       console.error('Error exportando PDF:', error);
@@ -288,12 +317,14 @@ const UnidadesList = () => {
     });
   };
 
+  // ✅ Ejecutar toggle con loading
   const ejecutarToggle = async () => {
     const { id, codigo, unidad, activar } = modalToggle;
     const accion = activar ? 'activar' : 'desactivar';
     const estadoAnterior = unidades.find(u => u.id === id);
     const activa = unidad.activa;
 
+    setActionLoading(true);
     setUnidades(prevUnidades =>
       prevUnidades.map(u =>
         u.id === id
@@ -331,6 +362,9 @@ const UnidadesList = () => {
       } else {
         toast.error(error.error || `Error al ${accion} unidad`);
       }
+    } finally {
+      setActionLoading(false);
+      setModalToggle({ show: false, id: null, codigo: '', unidad: null, activar: false, estadoActual: null });
     }
   };
 
@@ -360,12 +394,14 @@ const UnidadesList = () => {
     });
   };
 
+  // ✅ Ejecutar eliminar con loading
   const ejecutarEliminar = async () => {
     const { id, codigo } = modalConfirmacion;
+    setActionLoading(true);
     try {
       await unidadService.eliminarUnidad(id);
       toast.success('Unidad eliminada correctamente');
-      cargarUnidades();
+      await cargarUnidades();
     } catch (error) {
       if (error.response?.status === 429) {
         toast.error('Demasiadas peticiones. Espera unos segundos...', {
@@ -374,6 +410,9 @@ const UnidadesList = () => {
       } else {
         toast.error(error.error || 'Error al eliminar');
       }
+    } finally {
+      setActionLoading(false);
+      setModalConfirmacion({ show: false, id: null, codigo: '', unidad: null, tipoAccion: 'eliminar' });
     }
   };
 
@@ -429,6 +468,7 @@ const UnidadesList = () => {
         mensaje="¿Estás seguro de eliminar la unidad?"
         itemNombre={modalConfirmacion.codigo}
         tipoAccion="eliminar"
+        loading={actionLoading}
       />
 
       <ModalConfirmacion
@@ -441,6 +481,7 @@ const UnidadesList = () => {
           : "¿Estás seguro de desactivar la unidad?"}
         itemNombre={modalToggle.codigo}
         tipoAccion={modalToggle.activar ? "activar" : "desactivar"}
+        loading={actionLoading}
       />
 
       {/* Header */}
@@ -460,26 +501,27 @@ const UnidadesList = () => {
         <div className="flex gap-2 w-full sm:w-auto">
           <button
             onClick={exportarExcel}
-            disabled={exportando}
+            disabled={exportando || actionLoading}
             className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-green-600 text-white px-3 sm:px-4 py-2 text-sm sm:text-base rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
           >
-            <FileSpreadsheet size={16} />
+            {exportando ? <Loader size={16} className="animate-spin" /> : <FileSpreadsheet size={16} />}
             <span className="sm:hidden">Excel</span>
             <span className="hidden sm:inline">Excel</span>
           </button>
           <button
             onClick={exportarPDF}
-            disabled={exportando}
+            disabled={exportando || actionLoading}
             className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-red-600 text-white px-3 sm:px-4 py-2 text-sm sm:text-base rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
           >
-            <FilePieChart size={16} />
+            {exportando ? <Loader size={16} className="animate-spin" /> : <FilePieChart size={16} />}
             <span className="sm:hidden">PDF</span>
             <span className="hidden sm:inline">PDF</span>
           </button>
           {puedeCrearUnidades() && (
             <button
               onClick={() => navigate('/admin/unidades/crear')}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-blue-600 text-white px-3 sm:px-4 py-2 text-sm sm:text-base rounded-lg hover:bg-blue-700 transition-colors"
+              disabled={actionLoading}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-blue-600 text-white px-3 sm:px-4 py-2 text-sm sm:text-base rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
             >
               <Plus size={16} />
               <span className="sm:hidden">Nueva</span>
@@ -608,14 +650,14 @@ const UnidadesList = () => {
                             {unidad.codigo}
                           </span>
                         </div>
-                      </td>
+                       </td>
                       <td className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 lg:py-4">
                         <BadgeIcono 
                           entidad={tipoToEntidad[unidad.tipo] || 'PATRULLA'}
                           texto={unidad.tipo === 'policia' ? 'Policía' : 'Ambulancia'}
                           size={12}
                         />
-                      </td>
+                       </td>
                       <td className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 lg:py-4">
                         <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs whitespace-nowrap ${
                           unidad.estado === 'disponible' ? 'bg-green-100 text-green-700' :
@@ -624,7 +666,7 @@ const UnidadesList = () => {
                         }`}>
                           {capitalizar(unidad.estado)}
                         </span>
-                      </td>
+                       </td>
                       <td className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 lg:py-4">
                         <div className="flex items-center gap-1">
                           <Users size={12} className="text-gray-400" />
@@ -632,15 +674,16 @@ const UnidadesList = () => {
                             {unidad.personal_asignado?.length || 0}
                           </span>
                         </div>
-                      </td>
+                       </td>
                       <td className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 lg:py-4 text-right">
                         <div className="flex items-center justify-end gap-1 sm:gap-1.5 lg:gap-2">
                           {puedeGestionarUnidad(unidad) && (
                             <button
                               onClick={() => handleToggleActivo(unidad.id, unidad.codigo, unidad)}
+                              disabled={actionLoading}
                               className={`p-1 rounded-lg transition-colors ${
                                 unidad.activa ? 'hover:bg-yellow-50 text-yellow-600' : 'hover:bg-green-50 text-green-600'
-                              }`}
+                              } disabled:opacity-50`}
                               title={unidad.activa ? 'Desactivar' : 'Activar'}
                             >
                               <Power size={14} className="sm:w-4 sm:h-4" />
@@ -665,54 +708,55 @@ const UnidadesList = () => {
                           {puedeEliminarUnidad(unidad) && (
                             <button
                               onClick={() => handleEliminar(unidad.id, unidad.codigo, unidad)}
-                              className="p-1 hover:bg-red-50 rounded-lg"
+                              disabled={actionLoading}
+                              className="p-1 hover:bg-red-50 rounded-lg disabled:opacity-50"
                               title="Eliminar"
                             >
                               <Trash2 size={14} className="text-red-500" />
                             </button>
                           )}
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Paginación */}
-            <div className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 border-t flex flex-col xs:flex-row items-center justify-between gap-3">
-              <p className="text-xs sm:text-sm text-gray-500 text-center xs:text-left">
-                Mostrando <span className="font-medium">
-                  {paginacion.total > 0 ? ((paginacion.pagina - 1) * paginacion.limite) + 1 : 0}
-                </span> a{' '}
-                <span className="font-medium">{Math.min(paginacion.pagina * paginacion.limite, paginacion.total)}</span>{' '}
-                de <span className="font-medium">{paginacion.total}</span> registros
-              </p>
-              <div className="flex items-center gap-1 sm:gap-2">
-                <button
-                  onClick={() => setFiltros(prev => ({ ...prev, pagina: prev.pagina - 1 }))}
-                  disabled={paginacion.pagina === 1}
-                  className="px-2 sm:px-3 py-1 text-xs sm:text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
-                >
-                  Anterior
-                </button>
-                <span className="px-2 sm:px-3 py-1 text-xs sm:text-sm text-gray-600">
-                  {paginacion.pagina} / {paginacion.total_paginas}
-                </span>
-                <button
-                  onClick={() => setFiltros(prev => ({ ...prev, pagina: prev.pagina + 1 }))}
-                  disabled={paginacion.pagina === paginacion.total_paginas}
-                  className="px-2 sm:px-3 py-1 text-xs sm:text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
-                >
-                  Siguiente
-                </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-};
 
-export default UnidadesList;
+              {/* Paginación */}
+              <div className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 border-t flex flex-col xs:flex-row items-center justify-between gap-3">
+                <p className="text-xs sm:text-sm text-gray-500 text-center xs:text-left">
+                  Mostrando <span className="font-medium">
+                    {paginacion.total > 0 ? ((paginacion.pagina - 1) * paginacion.limite) + 1 : 0}
+                  </span> a{' '}
+                  <span className="font-medium">{Math.min(paginacion.pagina * paginacion.limite, paginacion.total)}</span>{' '}
+                  de <span className="font-medium">{paginacion.total}</span> registros
+                </p>
+                <div className="flex items-center gap-1 sm:gap-2">
+                  <button
+                    onClick={() => setFiltros(prev => ({ ...prev, pagina: prev.pagina - 1 }))}
+                    disabled={paginacion.pagina === 1 || actionLoading}
+                    className="px-2 sm:px-3 py-1 text-xs sm:text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                  >
+                    Anterior
+                  </button>
+                  <span className="px-2 sm:px-3 py-1 text-xs sm:text-sm text-gray-600">
+                    {paginacion.pagina} / {paginacion.total_paginas}
+                  </span>
+                  <button
+                    onClick={() => setFiltros(prev => ({ ...prev, pagina: prev.pagina + 1 }))}
+                    disabled={paginacion.pagina === paginacion.total_paginas || actionLoading}
+                    className="px-2 sm:px-3 py-1 text-xs sm:text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                  >
+                    Siguiente
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  };
+  
+  export default UnidadesList;

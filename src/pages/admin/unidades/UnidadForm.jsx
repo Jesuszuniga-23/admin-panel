@@ -1,5 +1,5 @@
 // src/pages/admin/unidades/UnidadForm.jsx
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
   Truck, Save, X, ChevronLeft,
@@ -20,7 +20,7 @@ const tipoToEntidad = {
   ambulancia: 'AMBULANCIA'
 };
 
-// Componente de barra de progreso
+// Componente de barra de progreso (sin cambios)
 const ProgressBar = ({ completed, total }) => {
   const percentage = Math.min(100, Math.round((completed / total) * 100));
   
@@ -53,7 +53,7 @@ const UnidadForm = () => {
   const isEditing = !!id;
   const storageKey = isEditing ? `unidad_form_edit_${id}` : 'unidad_form_new';
 
-  // ✅ Obtener permisos según rol
+  // Obtener permisos según rol
   const tipoUnidadPermitido = authService.getRolPersonalPermitido(); // 'policia' o 'ambulancia'
 
   const [loading, setLoading] = useState(false);
@@ -63,6 +63,10 @@ const UnidadForm = () => {
   const [codigoValido, setCodigoValido] = useState(true);
   const [codigoMensaje, setCodigoMensaje] = useState('');
   const [touched, setTouched] = useState({});
+  
+  // ✅ REF para AbortControllers
+  const abortControllerRef = useRef(null);
+  const codigoAbortControllerRef = useRef(null);
   
   // Estado para cambios sin guardar
   const [originalFormData, setOriginalFormData] = useState(null);
@@ -86,7 +90,7 @@ const UnidadForm = () => {
     };
   });
 
-  // ✅ Verificar permisos para crear/editar unidades
+  // Verificar permisos para crear/editar unidades
   const puedeCrearUnidad = authService.puedeCrearUnidad(formData.tipo);
   const puedeEditarUnidad = authService.puedeEditarUnidad(formData.tipo);
   const puedeGestionar = puedeCrearUnidad || puedeEditarUnidad;
@@ -117,7 +121,7 @@ const UnidadForm = () => {
     return false;
   };
 
-  // Emitir evento de cambios sin guardar
+  // Emitir evento de cambios sin guardar (sin cambios)
   useEffect(() => {
     const emitUnsavedStatus = () => {
       const hasChanges = hasUnsavedChanges() && !isEditing;
@@ -137,7 +141,7 @@ const UnidadForm = () => {
     return () => clearInterval(interval);
   }, [formData, originalFormData, isEditing]);
 
-  // Escuchar eventos del sidebar
+  // Escuchar eventos del sidebar (sin cambios)
   useEffect(() => {
     const handleSaveProgress = () => {
       if (!isEditing) {
@@ -168,7 +172,7 @@ const UnidadForm = () => {
     };
   }, [formData, isEditing, storageKey]);
 
-  // Interceptar navegación con beforeunload para recargar página
+  // Interceptar navegación con beforeunload (sin cambios)
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (hasUnsavedChanges() && !isEditing) {
@@ -182,7 +186,7 @@ const UnidadForm = () => {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [formData, originalFormData, isEditing]);
 
-  // Auto-guardado cada 30 segundos
+  // Auto-guardado cada 30 segundos (sin cambios)
   useEffect(() => {
     const autoSaveInterval = setInterval(() => {
       if (hasUnsavedChanges() && !isEditing) {
@@ -204,51 +208,29 @@ const UnidadForm = () => {
     sessionStorage.removeItem(storageKey);
   };
 
-  useEffect(() => {
-    if (isEditing) {
-      cargarUnidad();
-    }
-  }, [id]);
-
-  const cargarUnidad = async () => {
-    try {
-      setCargandoDatos(true);
-      console.log("Cargando unidad ID:", id);
-      const response = await unidadService.obtenerUnidad(id);
-      console.log("Datos recibidos:", response.data);
-
-      const loadedData = {
-        codigo: response.data.codigo || '',
-        tipo: response.data.tipo || 'policia',
-        descripcion: response.data.descripcion || '',
-        estado: response.data.estado || 'disponible',
-        activa: response.data.activa ?? true
-      };
-      
-      setFormData(loadedData);
-      setOriginalFormData(JSON.parse(JSON.stringify(loadedData)));
-    } catch (error) {
-      console.error('Error cargando unidad:', error);
-      toast.error('Error al cargar los datos');
-      navigate('/admin/unidades');
-    } finally {
-      setCargandoDatos(false);
-    }
-  };
-
-  const validarCodigoUnico = async (codigo) => {
+  // ✅ Función para validar código único con AbortController
+  const validarCodigoUnico = useCallback(async (codigo) => {
     if (!codigo || codigo.length < 3) {
       setCodigoValido(false);
       setCodigoMensaje('El código debe tener al menos 3 caracteres');
       return;
     }
 
+    // Cancelar petición anterior si existe
+    if (codigoAbortControllerRef.current) {
+      codigoAbortControllerRef.current.abort();
+      console.log('🛑 Petición de validación anterior cancelada');
+    }
+    
+    codigoAbortControllerRef.current = new AbortController();
+
     try {
       setVerificandoCodigo(true);
       
       const response = await unidadService.listarUnidades({ 
         search: codigo,
-        limite: 1000
+        limite: 1000,
+        signal: codigoAbortControllerRef.current.signal
       });
 
       console.log('Respuesta validación código:', response);
@@ -276,19 +258,87 @@ const UnidadForm = () => {
         );
       }
     } catch (error) {
-      console.error('Error verificando código:', error);
-      setCodigoValido(false);
-      setCodigoMensaje('Error al verificar código');
-      
-      if (error.response?.status === 500) {
-        toast.error('Error en el servidor al verificar código');
-      } else {
-        toast.error(error.error || 'Error al verificar código');
+      // ✅ Ignorar errores de cancelación
+      if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
+        console.error('Error verificando código:', error);
+        setCodigoValido(false);
+        setCodigoMensaje('Error al verificar código');
+        
+        if (error.response?.status === 500) {
+          toast.error('Error en el servidor al verificar código');
+        } else {
+          toast.error(error.error || 'Error al verificar código');
+        }
       }
     } finally {
       setVerificandoCodigo(false);
     }
-  };
+  }, [isEditing, id]);
+
+  // ✅ Función para cargar unidad con AbortController
+  const cargarUnidad = useCallback(async () => {
+    if (!id) return;
+    
+    // Cancelar petición anterior si existe
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      console.log('🛑 Petición anterior cancelada en UnidadForm');
+    }
+    
+    abortControllerRef.current = new AbortController();
+    
+    try {
+      setCargandoDatos(true);
+      console.log("Cargando unidad ID:", id);
+      const response = await unidadService.obtenerUnidad(id, {
+        signal: abortControllerRef.current.signal
+      });
+      console.log("Datos recibidos:", response.data);
+
+      const loadedData = {
+        codigo: response.data.codigo || '',
+        tipo: response.data.tipo || 'policia',
+        descripcion: response.data.descripcion || '',
+        estado: response.data.estado || 'disponible',
+        activa: response.data.activa ?? true
+      };
+      
+      setFormData(loadedData);
+      setOriginalFormData(JSON.parse(JSON.stringify(loadedData)));
+    } catch (error) {
+      // ✅ Ignorar errores de cancelación
+      if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
+        console.error('Error cargando unidad:', error);
+        toast.error('Error al cargar los datos');
+        navigate('/admin/unidades');
+      }
+    } finally {
+      setCargandoDatos(false);
+    }
+  }, [id, navigate]);
+
+  // ✅ Efecto con limpieza
+  useEffect(() => {
+    if (isEditing) {
+      cargarUnidad();
+    }
+    
+    return () => {
+      // Limpiar debounce timeout
+      if (debounceTimeout.current) {
+        clearTimeout(debounceTimeout.current);
+      }
+      // Cancelar peticiones pendientes
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        console.log('🛑 Petición de unidad cancelada al desmontar');
+      }
+      if (codigoAbortControllerRef.current) {
+        codigoAbortControllerRef.current.abort();
+        console.log('🛑 Petición de validación cancelada al desmontar');
+      }
+    };
+  }, [isEditing, cargarUnidad]);
 
   const handleBlur = (field) => {
     setTouched(prev => ({ ...prev, [field]: true }));
@@ -376,7 +426,7 @@ const UnidadForm = () => {
     e.preventDefault();
     setLoading(true);
     
-    // ✅ Verificar permisos según el tipo de unidad
+    // Verificar permisos según el tipo de unidad
     if (!isEditing && !authService.puedeCrearUnidad(formData.tipo)) {
       toast.error(`No tienes permisos para crear unidades de tipo ${formData.tipo === 'policia' ? 'Policía' : 'Ambulancia'}`);
       setLoading(false);
@@ -498,7 +548,7 @@ const UnidadForm = () => {
 
         {!isEditing && <ProgressBar completed={calcularProgreso()} total={3} />}
 
-        {/* Formulario */}
+        {/* Formulario - el resto del JSX se mantiene igual */}
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-200">
           <div className="h-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-600"></div>
           

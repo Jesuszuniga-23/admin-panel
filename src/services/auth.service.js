@@ -5,7 +5,7 @@ import { ENDPOINTS } from './api/endpoints';
 class AuthService {
   #currentUser = null;
 
-  async loginWithGoogle(token) {
+  async loginWithGoogle(token, options = {}) {
     try {
       if (!token) {
         throw new Error('No se recibió el token de Google');
@@ -13,59 +13,104 @@ class AuthService {
 
       console.log("📧 Enviando token al backend...");
       
+      const config = {};
+      if (options.signal) {
+        config.signal = options.signal;
+      }
+      
       const response = await axiosInstance.post(ENDPOINTS.AUTH.GOOGLE_ADMIN_LOGIN, {
         idToken: token
-      });
+      }, config);
       
       return response.data;
     } catch (error) {
+      // ✅ Propagar error de cancelación
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
+        throw error;
+      }
       console.error("Error:", error);
       throw error.response?.data || { error: 'Error de autenticación' };
     }
   }
 
-  async verificar2FA(codigo) {
+  async verificar2FA(codigo, options = {}) {
     try {
+      const config = {};
+      if (options.signal) {
+        config.signal = options.signal;
+      }
+      
       const response = await axiosInstance.post(ENDPOINTS.AUTH.VERIFY_2FA, {
         codigo
-      });
+      }, config);
       console.log('🔐 Respuesta de verificar2FA:', response.data);
       return response.data;
     } catch (error) {
+      // ✅ Propagar error de cancelación
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
+        throw error;
+      }
       console.error("Error verificando 2FA:", error);
       throw error.response?.data || { error: 'Error al verificar código' };
     }
   }
 
-  async reenviarCodigo2FA() {
+  async reenviarCodigo2FA(options = {}) {
     try {
-      const response = await axiosInstance.post(ENDPOINTS.AUTH.RESEND_2FA, {});
+      const config = {};
+      if (options.signal) {
+        config.signal = options.signal;
+      }
+      
+      const response = await axiosInstance.post(ENDPOINTS.AUTH.RESEND_2FA, {}, config);
       return response.data;
     } catch (error) {
+      // ✅ Propagar error de cancelación
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
+        throw error;
+      }
       console.error("Error reenviando código:", error);
       throw error.response?.data || { error: 'Error al reenviar código' };
     }
   }
 
-  async obtenerEstadoSesion() {
+  async obtenerEstadoSesion(options = {}) {
     try {
-      const response = await axiosInstance.get(ENDPOINTS.AUTH.SESSION_STATUS);
+      const config = {};
+      if (options.signal) {
+        config.signal = options.signal;
+      }
+      
+      const response = await axiosInstance.get(ENDPOINTS.AUTH.SESSION_STATUS, config);
       return response.data;
     } catch (error) {
+      // ✅ Propagar error de cancelación
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
+        throw error;
+      }
       console.error("Error obteniendo estado de sesión:", error);
       return { activa: false, motivo: 'Error de conexión' };
     }
   }
 
-  async registrarActividad() {
+  async registrarActividad(options = {}) {
     try {
-      await axiosInstance.post(ENDPOINTS.AUTH.ACTIVITY);
+      const config = {};
+      if (options.signal) {
+        config.signal = options.signal;
+      }
+      
+      await axiosInstance.post(ENDPOINTS.AUTH.ACTIVITY, {}, config);
     } catch (error) {
+      // ✅ Ignorar errores de cancelación silenciosamente
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
+        return;
+      }
       console.debug("Error registrando actividad:", error);
     }
   }
 
-  async logout() {
+  async logout(navigate = null) {
     try {
       await axiosInstance.post(ENDPOINTS.AUTH.LOGOUT);
     } catch (error) {
@@ -78,18 +123,28 @@ class AuthService {
       localStorage.removeItem('pending_2fa_token');
       sessionStorage.clear();
       
-      window.location.href = '/login';
+      // ✅ Usar navigate si está disponible, sino window.location
+      if (navigate && typeof navigate === 'function') {
+        navigate('/login', { replace: true });
+      } else {
+        window.location.href = '/login';
+      }
     }
   }
 
-  async checkSession() {
+  async checkSession(options = {}) {
     try {
       const userStr = localStorage.getItem('user');
       if (!userStr) {
         return false;
       }
 
-      const response = await axiosInstance.get(ENDPOINTS.AUTH.ME);
+      const config = {};
+      if (options.signal) {
+        config.signal = options.signal;
+      }
+
+      const response = await axiosInstance.get(ENDPOINTS.AUTH.ME, config);
       
       if (response.data?.user) {
         this.#currentUser = response.data.user;
@@ -98,6 +153,10 @@ class AuthService {
       
       return false;
     } catch (error) {
+      // ✅ Propagar error de cancelación
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
+        throw error;
+      }
       console.error("Error verificando sesión:", error);
       this.#currentUser = null;
       localStorage.removeItem('user');
@@ -159,15 +218,17 @@ class AuthService {
 
   getTipoAlertaPermitido() {
     const user = this.getCurrentUser();
-    if (user?.rol === 'operador_policial') return 'panico';
-    if (user?.rol === 'operador_medico') return 'medica';
+    if (!user) return null;
+    if (user.rol === 'operador_policial') return 'panico';
+    if (user.rol === 'operador_medico') return 'medica';
     return null;
   }
 
   getRolPersonalPermitido() {
     const user = this.getCurrentUser();
-    if (user?.rol === 'operador_policial') return 'policia';
-    if (user?.rol === 'operador_medico') return 'ambulancia';
+    if (!user) return null;
+    if (user.rol === 'operador_policial') return 'policia';
+    if (user.rol === 'operador_medico') return 'ambulancia';
     return null;
   }
 
@@ -177,7 +238,9 @@ class AuthService {
   
   puedeCrearPersonal(rolACrear) {
     const user = this.getCurrentUser();
-    const rolUsuario = user?.rol;
+    if (!user) return false;
+    
+    const rolUsuario = user.rol;
     
     const permisos = {
       superadmin: true,
@@ -194,7 +257,9 @@ class AuthService {
   
   puedeCrearUnidad(tipoUnidad) {
     const user = this.getCurrentUser();
-    const rolUsuario = user?.rol;
+    if (!user) return false;
+    
+    const rolUsuario = user.rol;
     
     const permisos = {
       superadmin: true,
@@ -212,7 +277,9 @@ class AuthService {
   
   puedeEditarPersonal(rolPersonal) {
     const user = this.getCurrentUser();
-    const rolUsuario = user?.rol;
+    if (!user) return false;
+    
+    const rolUsuario = user.rol;
     
     if (rolUsuario === 'superadmin') return true;
     if (rolUsuario === 'admin') {
@@ -231,7 +298,9 @@ class AuthService {
   
   puedeEditarUnidad(tipoUnidad) {
     const user = this.getCurrentUser();
-    const rolUsuario = user?.rol;
+    if (!user) return false;
+    
+    const rolUsuario = user.rol;
     
     if (rolUsuario === 'superadmin') return true;
     if (rolUsuario === 'admin') return false;
@@ -252,10 +321,12 @@ class AuthService {
 
   puedeGestionarAlerta(tipoAlerta) {
     const user = this.getCurrentUser();
-    if (user?.rol === 'admin' || user?.rol === 'superadmin') return true;
-    if (user?.rol === 'operador_tecnico') return true;
-    if (user?.rol === 'operador_policial') return tipoAlerta === 'panico';
-    if (user?.rol === 'operador_medico') return tipoAlerta === 'medica';
+    if (!user) return false;
+    
+    if (user.rol === 'admin' || user.rol === 'superadmin') return true;
+    if (user.rol === 'operador_tecnico') return true;
+    if (user.rol === 'operador_policial') return tipoAlerta === 'panico';
+    if (user.rol === 'operador_medico') return tipoAlerta === 'medica';
     return false;
   }
 }

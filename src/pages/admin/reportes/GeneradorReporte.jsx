@@ -1,5 +1,5 @@
 // src/pages/admin/reportes/GeneradorReporte.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ChevronLeft, Calendar, Filter, Download,
@@ -40,6 +40,7 @@ const GeneradorReporte = () => {
   const rolPersonalPermitido = authService.getRolPersonalPermitido();
   
   const [cargando, setCargando] = useState(true);
+  const [exportando, setExportando] = useState(false);
   const [datos, setDatos] = useState([]);
   const [datosFiltrados, setDatosFiltrados] = useState([]);
   const [estadisticas, setEstadisticas] = useState(null);
@@ -52,6 +53,9 @@ const GeneradorReporte = () => {
     busqueda: ''
   });
   const [vistaPrevia, setVistaPrevia] = useState(true);
+
+  // ✅ REF para AbortController
+  const abortControllerRef = useRef(null);
 
   // Configuración según el tipo de reporte
   const config = {
@@ -123,19 +127,22 @@ const GeneradorReporte = () => {
 
   const info = config[tipo] || config.personal;
 
-  useEffect(() => {
-    cargarDatos();
-  }, [tipo]);
-
-  useEffect(() => {
-    aplicarFiltrosYEstadisticas();
-  }, [datos, filtros]);
-
-  const cargarDatos = async () => {
+  // ✅ Función para cargar datos con AbortController
+  const cargarDatos = useCallback(async () => {
+    // Cancelar petición anterior si existe
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      console.log('🛑 Petición anterior cancelada en GeneradorReporte');
+    }
+    
+    // Crear nuevo AbortController
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
+    
     setCargando(true);
     try {
       let data = [];
-      let params = {};
+      let params = { signal };
       
       if (filtros.fechaInicio) params.desde = filtros.fechaInicio;
       if (filtros.fechaFin) params.hasta = filtros.fechaFin;
@@ -155,11 +162,26 @@ const GeneradorReporte = () => {
         const res = await unidadService.listarUnidades({ limite: 1000, ...params });
         data = res.data || [];
       } else if (tipo === 'alertas') {
+        // ✅ Manejo individual de cancelación para cada petición
+        const configWithSignal = { signal };
+        
         const [exp, cer, act, proc] = await Promise.all([
-          alertasService.obtenerExpiradas({ limite: 500, ...params }),
-          alertasService.obtenerCerradasManual({ limite: 500, ...params }),
-          alertasService.obtenerActivas?.({ limite: 500, ...params }) || Promise.resolve({ data: [] }),
-          alertasService.obtenerEnProceso?.({ limite: 500, ...params }) || Promise.resolve({ data: [] })
+          alertasService.obtenerExpiradas({ limite: 500, ...params }).catch(err => {
+            if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') throw err;
+            return { data: [] };
+          }),
+          alertasService.obtenerCerradasManual({ limite: 500, ...params }).catch(err => {
+            if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') throw err;
+            return { data: [] };
+          }),
+          alertasService.obtenerActivas?.({ limite: 500, ...params }).catch(err => {
+            if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') throw err;
+            return { data: [] };
+          }) || Promise.resolve({ data: [] }),
+          alertasService.obtenerEnProceso?.({ limite: 500, ...params }).catch(err => {
+            if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') throw err;
+            return { data: [] };
+          }) || Promise.resolve({ data: [] })
         ]);
         
         data = [
@@ -173,12 +195,31 @@ const GeneradorReporte = () => {
       setDatos(data);
       toast.success(`${data.length} registros cargados`);
     } catch (error) {
-      console.error('Error cargando datos:', error);
-      toast.error('Error al cargar datos');
+      // ✅ Ignorar errores de cancelación
+      if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
+        console.error('Error cargando datos:', error);
+        toast.error('Error al cargar datos');
+      }
     } finally {
       setCargando(false);
     }
-  };
+  }, [tipo, filtros.fechaInicio, filtros.fechaFin, rolPersonalPermitido, tipoAlertaPermitido]);
+
+  // ✅ Efecto con limpieza
+  useEffect(() => {
+    cargarDatos();
+    
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        console.log('🛑 Componente GeneradorReporte desmontado - peticiones canceladas');
+      }
+    };
+  }, [cargarDatos]);
+
+  useEffect(() => {
+    aplicarFiltrosYEstadisticas();
+  }, [datos, filtros]);
 
   const calcularZona = (lat, lng) => {
     if (!lat || !lng) return 'No especificada';
@@ -328,21 +369,29 @@ const GeneradorReporte = () => {
     setEstadisticas(stats);
   };
 
-  const exportarExcel = () => {
+  const exportarExcel = async () => {
+    setExportando(true);
     try {
-      reportesService.generarExcelPersonalizado(datosFiltrados, tipo, filtros, user, estadisticas);
+      await reportesService.generarExcelPersonalizado(datosFiltrados, tipo, filtros, user, estadisticas);
       toast.success('Reporte Excel generado');
     } catch (error) {
+      console.error('Error generando Excel:', error);
       toast.error('Error generando Excel');
+    } finally {
+      setExportando(false);
     }
   };
 
-  const exportarPDF = () => {
+  const exportarPDF = async () => {
+    setExportando(true);
     try {
-      reportesService.generarPDFPersonalizado(datosFiltrados, tipo, filtros, user, estadisticas);
+      await reportesService.generarPDFPersonalizado(datosFiltrados, tipo, filtros, user, estadisticas);
       toast.success('Reporte PDF generado');
     } catch (error) {
+      console.error('Error generando PDF:', error);
       toast.error('Error generando PDF');
+    } finally {
+      setExportando(false);
     }
   };
 
@@ -438,21 +487,24 @@ const GeneradorReporte = () => {
           </button>
           <button
             onClick={exportarExcel}
-            className="px-3 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 transition-colors flex items-center gap-2 text-sm shadow-md"
+            disabled={exportando}
+            className="px-3 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 transition-colors flex items-center gap-2 text-sm shadow-md disabled:opacity-50"
           >
-            <FileSpreadsheet size={16} />
+            {exportando ? <Loader size={16} className="animate-spin" /> : <FileSpreadsheet size={16} />}
             Excel
           </button>
           <button
             onClick={exportarPDF}
-            className="px-3 py-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg hover:from-red-700 hover:to-red-800 transition-colors flex items-center gap-2 text-sm shadow-md"
+            disabled={exportando}
+            className="px-3 py-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg hover:from-red-700 hover:to-red-800 transition-colors flex items-center gap-2 text-sm shadow-md disabled:opacity-50"
           >
-            <FilePieChart size={16} />
+            {exportando ? <Loader size={16} className="animate-spin" /> : <FilePieChart size={16} />}
             PDF
           </button>
           <button
             onClick={cargarDatos}
-            className="p-2 border border-gray-200 bg-white rounded-lg hover:bg-gray-50 transition-colors"
+            disabled={cargando}
+            className="p-2 border border-gray-200 bg-white rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
             title="Actualizar datos"
           >
             <RefreshCw size={16} className={`text-gray-500 ${cargando ? 'animate-spin' : ''}`} />
@@ -460,7 +512,7 @@ const GeneradorReporte = () => {
         </div>
       </div>
 
-      {/* Panel de filtros */}
+      {/* Panel de filtros - sin cambios estructurales */}
       <div className="bg-white rounded-xl shadow-lg p-5 mb-6 border border-gray-100">
         <div className="flex items-center gap-2 mb-4">
           <Filter size={16} className="text-blue-600" />
@@ -591,7 +643,7 @@ const GeneradorReporte = () => {
         </div>
       )}
 
-      {/* Vista previa de datos */}
+      {/* Vista previa de datos - sin cambios estructurales */}
       {vistaPrevia && datosFiltrados.length > 0 && (
         <div className="bg-white rounded-xl shadow-lg overflow-hidden mb-6">
           <div className="px-6 py-4 border-b bg-gray-50 flex items-center justify-between">
@@ -624,21 +676,21 @@ const GeneradorReporte = () => {
                         return (
                           <td key={campo.key} className="px-4 py-3">
                             {renderBadgeRol(item.rol)}
-                          </td>
+                           </td>
                         );
                       }
                       if (campo.key === 'tipo' && tipo === 'unidades') {
                         return (
                           <td key={campo.key} className="px-4 py-3">
                             {renderBadgeTipoUnidad(item.tipo)}
-                          </td>
+                           </td>
                         );
                       }
                       if (campo.key === 'tipo' && tipo === 'alertas') {
                         return (
                           <td key={campo.key} className="px-4 py-3">
                             {renderBadgeAlerta(item.tipo)}
-                          </td>
+                           </td>
                         );
                       }
                       
@@ -648,7 +700,7 @@ const GeneradorReporte = () => {
                         </td>
                       );
                     })}
-                  </tr>
+                   </tr>
                 ))}
               </tbody>
             </table>
@@ -673,16 +725,18 @@ const GeneradorReporte = () => {
           <div className="flex gap-2 w-full sm:w-auto">
             <button
               onClick={exportarExcel}
-              className="flex-1 sm:flex-none text-sm bg-white text-green-600 px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors font-medium"
+              disabled={exportando}
+              className="flex-1 sm:flex-none text-sm bg-white text-green-600 px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors font-medium disabled:opacity-50"
             >
-              <FileSpreadsheet size={16} className="inline mr-2" />
+              {exportando ? <Loader size={16} className="inline mr-2 animate-spin" /> : <FileSpreadsheet size={16} className="inline mr-2" />}
               Excel
             </button>
             <button
               onClick={exportarPDF}
-              className="flex-1 sm:flex-none text-sm bg-white text-red-600 px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors font-medium"
+              disabled={exportando}
+              className="flex-1 sm:flex-none text-sm bg-white text-red-600 px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors font-medium disabled:opacity-50"
             >
-              <FilePieChart size={16} className="inline mr-2" />
+              {exportando ? <Loader size={16} className="inline mr-2 animate-spin" /> : <FilePieChart size={16} className="inline mr-2" />}
               PDF
             </button>
           </div>
@@ -692,7 +746,7 @@ const GeneradorReporte = () => {
   );
 };
 
-// Componente de tarjeta de estadísticas
+// Componente de tarjeta de estadísticas (sin cambios)
 const StatCard = ({ label, value, icon: Icon, color }) => {
   const colors = {
     blue: 'bg-blue-50 text-blue-600 border-blue-100',

@@ -1,5 +1,5 @@
 // src/pages/admin/reasignaciones/ReasignacionesPendientes.jsx
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle, Clock, MapPin, User, Calendar,
@@ -17,7 +17,7 @@ import useAuthStore from '../../../store/authStore';
 
 const ReasignacionesPendientes = () => {
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  // ✅ Eliminada variable no usada 'user'
   const [alertas, setAlertas] = useState([]);
   const [alertasFiltradas, setAlertasFiltradas] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -30,6 +30,11 @@ const ReasignacionesPendientes = () => {
   const [mostrarModalCierre, setMostrarModalCierre] = useState(false);
   const [motivoCierre, setMotivoCierre] = useState('');
   const [ultimaActualizacion, setUltimaActualizacion] = useState(new Date());
+  
+  // ✅ REF para AbortControllers
+  const abortControllerRef = useRef(null);
+  const unidadesAbortControllerRef = useRef(null);
+  const intervalRef = useRef(null);
   
   // Obtener tipo de alerta permitido según rol
   const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
@@ -48,14 +53,106 @@ const ReasignacionesPendientes = () => {
     tipo: null
   });
 
+  // ✅ Función para cargar pendientes con AbortController
+  const cargarPendientes = useCallback(async (silencioso = false) => {
+    // Cancelar petición anterior si existe
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      console.log('🛑 Petición anterior cancelada en ReasignacionesPendientes');
+    }
+    
+    // Crear nuevo AbortController
+    abortControllerRef.current = new AbortController();
+    
+    if (!silencioso) setCargando(true);
+    try {
+      const params = { signal: abortControllerRef.current.signal };
+      if (tipoAlertaPermitido) {
+        params.tipo = tipoAlertaPermitido;
+      }
+      const response = await reasignacionService.obtenerPendientes(params);
+      const nuevosAlertas = response.data || [];
+      setAlertas(nuevosAlertas);
+      setAlertasFiltradas(nuevosAlertas);
+      setUltimaActualizacion(new Date());
+
+      if (mostrarModal && nuevosAlertas.length !== alertas.length) {
+        toast('Nuevas alertas disponibles', {
+          icon: <BellRing size={18} className="text-blue-500 animate-pulse" />,
+          duration: 3000
+        });
+      }
+    } catch (error) {
+      // ✅ Ignorar errores de cancelación
+      if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
+        console.error("Error:", error);
+        if (!silencioso) toast.error('Error al cargar alertas pendientes');
+      }
+    } finally {
+      if (!silencioso) setCargando(false);
+    }
+  }, [tipoAlertaPermitido, mostrarModal, alertas.length]);
+
+  // ✅ Función para cargar unidades disponibles con AbortController
+  const handleVerUnidades = useCallback(async (alerta) => {
+    if (!puedeReasignar) {
+      toast.error('No tienes permisos para reasignar alertas');
+      return;
+    }
+    
+    // Cancelar petición de unidades anterior si existe
+    if (unidadesAbortControllerRef.current) {
+      unidadesAbortControllerRef.current.abort();
+      console.log('🛑 Petición de unidades anterior cancelada');
+    }
+    
+    unidadesAbortControllerRef.current = new AbortController();
+    
+    try {
+      setAlertaSeleccionada(alerta);
+      const response = await reasignacionService.obtenerUnidadesDisponibles(alerta.id, {
+        signal: unidadesAbortControllerRef.current.signal
+      });
+      setUnidadesDisponibles(response.data || []);
+      setMostrarModal(true);
+      setUnidadSeleccionada('');
+      setMotivoReasignacion('');
+    } catch (error) {
+      // ✅ Ignorar errores de cancelación
+      if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
+        console.error("Error cargando unidades:", error);
+        toast.error('Error al cargar unidades disponibles');
+      }
+    }
+  }, [puedeReasignar]);
+
+  // ✅ Efecto con limpieza para el intervalo y peticiones
   useEffect(() => {
     cargarPendientes();
-    const intervalo = setInterval(() => {
+    
+    // Configurar intervalo
+    intervalRef.current = setInterval(() => {
       console.log('Recargando alertas pendientes');
       cargarPendientes(true);
     }, 30000);
-    return () => clearInterval(intervalo);
-  }, []);
+    
+    return () => {
+      // Limpiar intervalo
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      // Cancelar peticiones pendientes
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        console.log('🛑 Componente ReasignacionesPendientes desmontado - peticiones canceladas');
+      }
+      if (unidadesAbortControllerRef.current) {
+        unidadesAbortControllerRef.current.abort();
+        console.log('🛑 Petición de unidades cancelada al desmontar');
+      }
+    };
+  }, [cargarPendientes]);
 
   // Aplicar filtro cuando cambia
   useEffect(() => {
@@ -67,51 +164,6 @@ const ReasignacionesPendientes = () => {
       setAlertasFiltradas(alertas);
     } else {
       setAlertasFiltradas(alertas.filter(alerta => alerta.tipo === filtroTipo));
-    }
-  };
-
-  const cargarPendientes = async (silencioso = false) => {
-    if (!silencioso) setCargando(true);
-    try {
-      const params = {};
-      if (tipoAlertaPermitido) {
-        params.tipo = tipoAlertaPermitido;
-      }
-      const response = await reasignacionService.obtenerPendientes(params);
-      setAlertas(response.data || []);
-      setAlertasFiltradas(response.data || []);
-      setUltimaActualizacion(new Date());
-
-      if (mostrarModal && response.data?.length !== alertas.length) {
-        toast('Nuevas alertas disponibles', {
-          icon: <BellRing size={18} className="text-blue-500 animate-pulse" />,
-          duration: 3000
-        });
-      }
-    } catch (error) {
-      console.error("Error:", error);
-      if (!silencioso) toast.error('Error al cargar alertas pendientes');
-    } finally {
-      if (!silencioso) setCargando(false);
-    }
-  };
-
-  const handleVerUnidades = async (alerta) => {
-    if (!puedeReasignar) {
-      toast.error('No tienes permisos para reasignar alertas');
-      return;
-    }
-    
-    try {
-      setAlertaSeleccionada(alerta);
-      const response = await reasignacionService.obtenerUnidadesDisponibles(alerta.id);
-      setUnidadesDisponibles(response.data || []);
-      setMostrarModal(true);
-      setUnidadSeleccionada('');
-      setMotivoReasignacion('');
-    } catch (error) {
-      console.error("Error cargando unidades:", error);
-      toast.error('Error al cargar unidades disponibles');
     }
   };
 
@@ -348,232 +400,232 @@ const ReasignacionesPendientes = () => {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">FECHA</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">ACCIONES</th>
                    </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {alertasFiltradas.map((alerta) => (
-                    <tr 
-                      key={alerta.id}
-                      onClick={() => handleRowClick(alerta.id)}
-                      className="hover:bg-gray-50 cursor-pointer transition-colors"
-                    >
-                      <td className="px-4 py-3">
-                        <BadgeTipoAlerta tipo={alerta.tipo} size={12} />
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-col">
-                          <span className="text-sm font-medium text-gray-800">
-                            {alerta.ciudadano?.nombre || 'Desconocido'}
-                          </span>
-                          {alerta.ciudadano?.telefono && (
-                            <span className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
-                              <Phone size={10} />
-                              {alerta.ciudadano.telefono}
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {alertasFiltradas.map((alerta) => (
+                      <tr 
+                        key={alerta.id}
+                        onClick={() => handleRowClick(alerta.id)}
+                        className="hover:bg-gray-50 cursor-pointer transition-colors"
+                      >
+                        <td className="px-4 py-3">
+                          <BadgeTipoAlerta tipo={alerta.tipo} size={12} />
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium text-gray-800">
+                              {alerta.ciudadano?.nombre || 'Desconocido'}
                             </span>
+                            {alerta.ciudadano?.telefono && (
+                              <span className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                                <Phone size={10} />
+                                {alerta.ciudadano.telefono}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1.5">
+                            <Clock size={14} className="text-amber-500" />
+                            <span className="text-sm font-semibold text-amber-600">
+                              {alerta.minutos_espera} min
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          {alerta.lat && alerta.lng ? (
+                            <BotonMapa
+                              onClick={(e) => abrirMapaModal(e, alerta)}
+                              texto="Ver mapa"
+                              size={14}
+                            />
+                          ) : (
+                            <span className="text-xs text-gray-400">—</span>
                           )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5">
-                          <Clock size={14} className="text-amber-500" />
-                          <span className="text-sm font-semibold text-amber-600">
-                            {alerta.minutos_espera} min
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        {alerta.lat && alerta.lng ? (
-                          <BotonMapa
-                            onClick={(e) => abrirMapaModal(e, alerta)}
-                            texto="Ver mapa"
-                            size={14}
-                          />
-                        ) : (
-                          <span className="text-xs text-gray-400">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-500">
-                        {formatearFechaCorta(alerta.fecha_creacion)}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          {puedeReasignar && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleVerUnidades(alerta);
-                              }}
-                              className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all text-xs font-medium shadow-md"
-                              title="Reasignar alerta"
-                            >
-                              <Truck size={14} />
-                              <span>Reasignar</span>
-                            </button>
-                          )}
-                          {puedeReasignar && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setAlertaSeleccionada(alerta);
-                                setMostrarModalCierre(true);
-                              }}
-                              className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-red-200 text-red-600 rounded-lg hover:bg-red-50 hover:border-red-300 transition-all text-xs font-medium"
-                              title="Cerrar manualmente"
-                            >
-                              <XCircle size={14} />
-                              <span>Cerrar</span>
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* Modal de Reasignación */}
-        {mostrarModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fadeIn">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full mx-4 p-6 max-h-[80vh] overflow-y-auto">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-bold text-gray-800">Reasignar Alerta #{alertaSeleccionada?.id}</h3>
-                <button
-                  onClick={() => setMostrarModal(false)}
-                  className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <X size={20} className="text-gray-500" />
-                </button>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-500">
+                          {formatearFechaCorta(alerta.fecha_creacion)}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            {puedeReasignar && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleVerUnidades(alerta);
+                                }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all text-xs font-medium shadow-md"
+                                title="Reasignar alerta"
+                              >
+                                <Truck size={14} />
+                                <span>Reasignar</span>
+                              </button>
+                            )}
+                            {puedeReasignar && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setAlertaSeleccionada(alerta);
+                                  setMostrarModalCierre(true);
+                                }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-red-200 text-red-600 rounded-lg hover:bg-red-50 hover:border-red-300 transition-all text-xs font-medium"
+                                title="Cerrar manualmente"
+                              >
+                                <XCircle size={14} />
+                                <span>Cerrar</span>
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-
-              {unidadesDisponibles.length === 0 ? (
-                <div className="text-center py-8">
-                  <Truck size={48} className="text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-500">No hay unidades disponibles para reasignar</p>
+            </div>
+          )}
+          
+          {/* Modal de Reasignación */}
+          {mostrarModal && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fadeIn">
+              <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full mx-4 p-6 max-h-[80vh] overflow-y-auto">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xl font-bold text-gray-800">Reasignar Alerta #{alertaSeleccionada?.id}</h3>
+                  <button
+                    onClick={() => setMostrarModal(false)}
+                    className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <X size={20} className="text-gray-500" />
+                  </button>
                 </div>
-              ) : (
-                <>
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Seleccionar unidad
-                    </label>
-                    <select
-                      value={unidadSeleccionada}
-                      onChange={(e) => setUnidadSeleccionada(e.target.value)}
-                      className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">-- Selecciona una unidad --</option>
-                      {unidadesDisponibles.map((u) => (
-                        <option key={u.id} value={u.id}>
-                          {u.codigo} - {u.tipo} ({u.personal?.map(p => p.nombre).join(', ') || 'Sin personal'})
-                        </option>
-                      ))}
-                    </select>
+
+                {unidadesDisponibles.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Truck size={48} className="text-gray-300 mx-auto mb-4" />
+                    <p className="text-gray-500">No hay unidades disponibles para reasignar</p>
                   </div>
+                ) : (
+                  <>
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Seleccionar unidad
+                      </label>
+                      <select
+                        value={unidadSeleccionada}
+                        onChange={(e) => setUnidadSeleccionada(e.target.value)}
+                        className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">-- Selecciona una unidad --</option>
+                        {unidadesDisponibles.map((u) => (
+                          <option key={u.id} value={u.id}>
+                            {u.codigo} - {u.tipo} ({u.personal?.map(p => p.nombre).join(', ') || 'Sin personal'})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
 
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Motivo de reasignación (opcional)
-                    </label>
-                    <textarea
-                      value={motivoReasignacion}
-                      onChange={(e) => setMotivoReasignacion(e.target.value)}
-                      placeholder="Ej: Unidad anterior no disponible, cambio de prioridad..."
-                      className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px]"
-                    />
-                  </div>
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Motivo de reasignación (opcional)
+                      </label>
+                      <textarea
+                        value={motivoReasignacion}
+                        onChange={(e) => setMotivoReasignacion(e.target.value)}
+                        placeholder="Ej: Unidad anterior no disponible, cambio de prioridad..."
+                        className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px]"
+                      />
+                    </div>
 
-                  <div className="flex gap-3 mt-6">
-                    <button
-                      onClick={handleReasignar}
-                      disabled={procesando || !unidadSeleccionada}
-                      className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                    >
-                      {procesando ? (
-                        <Loader size={18} className="animate-spin" />
-                      ) : (
-                        <Truck size={18} />
-                      )}
-                      {procesando ? 'Reasignando...' : 'Confirmar Reasignación'}
-                    </button>
-                    <button
-                      onClick={() => setMostrarModal(false)}
-                      disabled={procesando}
-                      className="px-4 py-2 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
-                    >
-                      Cancelar
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Modal de Cierre Manual */}
-        {mostrarModalCierre && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fadeIn">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-bold text-gray-800">Cerrar Alerta #{alertaSeleccionada?.id}</h3>
-                <button
-                  onClick={() => setMostrarModalCierre(false)}
-                  className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <X size={20} className="text-gray-500" />
-                </button>
-              </div>
-
-              <p className="text-sm text-gray-600 mb-4">
-                ¿Estás seguro de cerrar esta alerta manualmente?
-              </p>
-
-              <textarea
-                value={motivoCierre}
-                onChange={(e) => setMotivoCierre(e.target.value)}
-                placeholder="Motivo del cierre..."
-                className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[100px] mb-4"
-              />
-
-              <div className="flex gap-3">
-                <button
-                  onClick={handleCerrarManual}
-                  disabled={procesando || !motivoCierre.trim()}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {procesando ? (
-                    <Loader size={18} className="animate-spin" />
-                  ) : (
-                    <XCircle size={18} />
-                  )}
-                  {procesando ? 'Cerrando...' : 'Confirmar Cierre'}
-                </button>
-                <button
-                  onClick={() => setMostrarModalCierre(false)}
-                  disabled={procesando}
-                  className="px-4 py-2 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
-                >
-                  Cancelar
-                </button>
+                    <div className="flex gap-3 mt-6">
+                      <button
+                        onClick={handleReasignar}
+                        disabled={procesando || !unidadSeleccionada}
+                        className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        {procesando ? (
+                          <Loader size={18} className="animate-spin" />
+                        ) : (
+                          <Truck size={18} />
+                        )}
+                        {procesando ? 'Reasignando...' : 'Confirmar Reasignación'}
+                      </button>
+                      <button
+                        onClick={() => setMostrarModal(false)}
+                        disabled={procesando}
+                        className="px-4 py-2 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Modal del Mapa */}
-        <ModalMapa
-          isOpen={mapaModal.abierto}
-          onClose={cerrarMapaModal}
-          lat={mapaModal.lat}
-          lng={mapaModal.lng}
-          titulo={mapaModal.titulo}
-          alertaId={mapaModal.alertaId}
-          tipo={mapaModal.tipo}
-        />
+          {/* Modal de Cierre Manual */}
+          {mostrarModalCierre && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fadeIn">
+              <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xl font-bold text-gray-800">Cerrar Alerta #{alertaSeleccionada?.id}</h3>
+                  <button
+                    onClick={() => setMostrarModalCierre(false)}
+                    className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <X size={20} className="text-gray-500" />
+                  </button>
+                </div>
+
+                <p className="text-sm text-gray-600 mb-4">
+                  ¿Estás seguro de cerrar esta alerta manualmente?
+                </p>
+
+                <textarea
+                  value={motivoCierre}
+                  onChange={(e) => setMotivoCierre(e.target.value)}
+                  placeholder="Motivo del cierre..."
+                  className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[100px] mb-4"
+                />
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleCerrarManual}
+                    disabled={procesando || !motivoCierre.trim()}
+                    className="flex-1 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {procesando ? (
+                      <Loader size={18} className="animate-spin" />
+                    ) : (
+                      <XCircle size={18} />
+                    )}
+                    {procesando ? 'Cerrando...' : 'Confirmar Cierre'}
+                  </button>
+                  <button
+                    onClick={() => setMostrarModalCierre(false)}
+                    disabled={procesando}
+                    className="px-4 py-2 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Modal del Mapa */}
+          <ModalMapa
+            isOpen={mapaModal.abierto}
+            onClose={cerrarMapaModal}
+            lat={mapaModal.lat}
+            lng={mapaModal.lng}
+            titulo={mapaModal.titulo}
+            alertaId={mapaModal.alertaId}
+            tipo={mapaModal.tipo}
+          />
+        </div>
       </div>
-    </div>
-  );
-};
-
-export default ReasignacionesPendientes;
+    );
+  };
+  
+  export default ReasignacionesPendientes;

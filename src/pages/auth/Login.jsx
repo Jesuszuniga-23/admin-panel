@@ -3,13 +3,16 @@ import { Shield, LogIn } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import useAuthStore from '../../store/authStore';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { ArrowLeft } from 'lucide-react';
 
 const Login = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
+  
+  // ✅ Ref para timeout de redirección
+  const redirectTimeoutRef = useRef(null);
 
   useEffect(() => {
     if (user) {
@@ -23,11 +26,44 @@ const Login = () => {
       }
     }
   }, [user, navigate]);
+  
+  // ✅ Limpiar timeout al desmontar
+  useEffect(() => {
+    return () => {
+      if (redirectTimeoutRef.current) {
+        clearTimeout(redirectTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleLoginClick = () => {
     setIsLoading(true);
-    // ✅ Redirigir al backend correctamente
-    window.location.href = `${import.meta.env.VITE_API_URL}/auth/login/google`;
+    
+    // ✅ Validar que la URL esté configurada
+    const apiUrl = import.meta.env.VITE_API_URL;
+    if (!apiUrl) {
+      toast.error('Error de configuración: URL de API no definida');
+      setIsLoading(false);
+      return;
+    }
+    
+    // ✅ Timeout para resetear el estado de carga si la redirección falla
+    redirectTimeoutRef.current = setTimeout(() => {
+      setIsLoading(false);
+      toast.error('La redirección está tomando más tiempo de lo esperado. Intenta nuevamente.');
+    }, 10000);
+    
+    // ✅ Redirigir al backend
+    try {
+      window.location.href = `${apiUrl}/auth/login/google`;
+    } catch (error) {
+      console.error('Error en redirección:', error);
+      setIsLoading(false);
+      toast.error('Error al redirigir. Intenta nuevamente.');
+      if (redirectTimeoutRef.current) {
+        clearTimeout(redirectTimeoutRef.current);
+      }
+    }
   };
 
   return (

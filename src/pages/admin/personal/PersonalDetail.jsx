@@ -1,5 +1,5 @@
 // src/pages/admin/personal/PersonalDetail.jsx
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   User, Mail, Phone, Shield, Hash, Calendar, Clock,
@@ -49,36 +49,67 @@ const PersonalDetail = () => {
   const [personal, setPersonal] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
+  const [actionLoading, setActionLoading] = useState(false); // ✅ Estado para acciones
+  
+  // ✅ REF para AbortController
+  const abortControllerRef = useRef(null);
+  
   // ✅ CORRECTO: Usar los nuevos métodos de permisos
   const rolPersonal = personal?.rol;
   const puedeEditar = authService.puedeEditarPersonal(rolPersonal);
   const puedeEliminar = authService.puedeEliminarPersonal(rolPersonal);
-  const puedeCambiarEstado = authService.puedeEditarPersonal(rolPersonal);
+  // ✅ Eliminada variable redundante 'puedeCambiarEstado' (usa puedeEditar)
   
   // Verificar si es el propio usuario (no puede eliminarse a sí mismo)
   const esPropioUsuario = currentUser?.id === parseInt(id);
 
-  useEffect(() => {
-    cargarPersonal();
-  }, [id]);
-
-  const cargarPersonal = async () => {
+  // ✅ Función para cargar personal con AbortController
+  const cargarPersonal = useCallback(async () => {
+    if (!id) return;
+    
+    // Cancelar petición anterior si existe
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      console.log('🛑 Petición anterior cancelada en PersonalDetail');
+    }
+    
+    // Crear nuevo AbortController
+    abortControllerRef.current = new AbortController();
+    
+    setLoading(true);
+    setError(null);
+    
     try {
-      setLoading(true);
-      const response = await personalService.obtenerPersonal(id);
+      const response = await personalService.obtenerPersonal(id, {
+        signal: abortControllerRef.current.signal
+      });
       setPersonal(response.data);
     } catch (error) {
-      console.error("Error cargando personal:", error);
-      setError(error.error || 'Error al cargar los datos');
-      toast.error('No se pudo cargar la información');
+      // ✅ Ignorar errores de cancelación
+      if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
+        console.error("Error cargando personal:", error);
+        setError(error.error || 'Error al cargar los datos');
+        toast.error('No se pudo cargar la información');
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  // ✅ Efecto con limpieza
+  useEffect(() => {
+    cargarPersonal();
+    
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        console.log('🛑 Componente PersonalDetail desmontado - peticiones canceladas');
+      }
+    };
+  }, [cargarPersonal]);
 
   const handleToggleActivo = async () => {
-    if (!puedeCambiarEstado) {
+    if (!puedeEditar) {
       toast.error('No tienes permisos para modificar este personal');
       return;
     }
@@ -90,13 +121,16 @@ const PersonalDetail = () => {
       return;
     }
 
+    setActionLoading(true);
     try {
       await personalService.toggleActivo(id, nuevoEstado);
       toast.success(`Personal ${accion}do correctamente`);
-      cargarPersonal();
+      await cargarPersonal(); // Recargar datos
     } catch (error) {
       console.error(`Error al ${accion}:`, error);
       toast.error(error.error || `Error al ${accion} personal`);
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -115,6 +149,7 @@ const PersonalDetail = () => {
       return;
     }
 
+    setActionLoading(true);
     try {
       await personalService.eliminarPersonal(id);
       toast.success('Personal eliminado correctamente');
@@ -122,6 +157,8 @@ const PersonalDetail = () => {
     } catch (error) {
       console.error("Error eliminando:", error);
       toast.error(error.error || 'Error al eliminar personal');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -358,16 +395,21 @@ const PersonalDetail = () => {
 
         {/* Botones de acción */}
         <div className="border-t px-6 py-4 bg-gray-50 flex justify-end gap-3">
-          {puedeCambiarEstado && (
+          {puedeEditar && (
             <button
               onClick={handleToggleActivo}
+              disabled={actionLoading}
               className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${
                 personal.activo 
                   ? 'bg-yellow-600 text-white hover:bg-yellow-700' 
                   : 'bg-green-600 text-white hover:bg-green-700'
-              }`}
+              } disabled:opacity-50`}
             >
-              <Power size={18} />
+              {actionLoading ? (
+                <Loader size={18} className="animate-spin" />
+              ) : (
+                <Power size={18} />
+              )}
               {personal.activo ? 'Desactivar' : 'Activar'}
             </button>
           )}
@@ -375,7 +417,8 @@ const PersonalDetail = () => {
           {puedeEditar && (
             <button
               onClick={handleEditar}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+              disabled={actionLoading}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50"
             >
               <Edit size={18} />
               Editar
@@ -385,9 +428,14 @@ const PersonalDetail = () => {
           {puedeEliminar && !esPropioUsuario && (
             <button
               onClick={handleEliminar}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"
+              disabled={actionLoading}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2 disabled:opacity-50"
             >
-              <Trash2 size={18} />
+              {actionLoading ? (
+                <Loader size={18} className="animate-spin" />
+              ) : (
+                <Trash2 size={18} />
+              )}
               Eliminar
             </button>
           )}

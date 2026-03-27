@@ -26,7 +26,8 @@ class UnidadService {
       const response = await axiosInstance.get(url, config);
       return response.data;
     } catch (error) {
-      if (error.name === 'AbortError') {
+      // ✅ Propagar error de cancelación (tanto AbortError como ERR_CANCELED)
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
       console.error('Error listando unidades:', error);
@@ -48,7 +49,8 @@ class UnidadService {
       const response = await axiosInstance.get(url, config);
       return response.data;
     } catch (error) {
-      if (error.name === 'AbortError') {
+      // ✅ Propagar error de cancelación
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
       console.error('Error obteniendo unidad:', error);
@@ -69,7 +71,8 @@ class UnidadService {
       const response = await axiosInstance.post(ENDPOINTS.UNIDADES.CREATE, datos, config);
       return response.data;
     } catch (error) {
-      if (error.name === 'AbortError') {
+      // ✅ Propagar error de cancelación
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
       console.error('Error creando unidad:', error);
@@ -90,7 +93,8 @@ class UnidadService {
       const response = await axiosInstance.put(ENDPOINTS.UNIDADES.UPDATE(id), datos, config);
       return response.data;
     } catch (error) {
-      if (error.name === 'AbortError') {
+      // ✅ Propagar error de cancelación
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
       console.error('Error actualizando unidad:', error);
@@ -111,7 +115,8 @@ class UnidadService {
       const response = await axiosInstance.delete(ENDPOINTS.UNIDADES.DELETE(id), config);
       return response.data;
     } catch (error) {
-      if (error.name === 'AbortError') {
+      // ✅ Propagar error de cancelación
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
       console.error('Error eliminando unidad:', error);
@@ -130,7 +135,8 @@ class UnidadService {
       const response = await axiosInstance.patch(ENDPOINTS.UNIDADES.TOGGLE_ACTIVA(id), { activa }, config);
       return response.data;
     } catch (error) {
-      if (error.name === 'AbortError') {
+      // ✅ Propagar error de cancelación
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
       console.error('Error cambiando estado:', error);
@@ -149,7 +155,8 @@ class UnidadService {
       const response = await axiosInstance.post(ENDPOINTS.UNIDADES.RESTAURAR(id), {}, config);
       return response.data;
     } catch (error) {
-      if (error.name === 'AbortError') {
+      // ✅ Propagar error de cancelación
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
       console.error('Error restaurando unidad:', error);
@@ -168,7 +175,8 @@ class UnidadService {
       const response = await axiosInstance.post(ENDPOINTS.UNIDADES.ASIGNAR(unidadId), { personal_id: personalId }, config);
       return response.data;
     } catch (error) {
-      if (error.name === 'AbortError') {
+      // ✅ Propagar error de cancelación
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
       console.error('Error asignando personal:', error);
@@ -187,7 +195,8 @@ class UnidadService {
       const response = await axiosInstance.post(ENDPOINTS.UNIDADES.REMOVER(unidadId), { personal_id: personalId }, config);
       return response.data;
     } catch (error) {
-      if (error.name === 'AbortError') {
+      // ✅ Propagar error de cancelación
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
       console.error('Error removiendo personal:', error);
@@ -210,7 +219,8 @@ class UnidadService {
       const response = await axiosInstance.get(url, config);
       return response.data;
     } catch (error) {
-      if (error.name === 'AbortError') {
+      // ✅ Propagar error de cancelación
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
       console.error('Error obteniendo personal disponible:', error);

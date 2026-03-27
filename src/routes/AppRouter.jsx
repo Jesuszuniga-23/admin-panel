@@ -26,55 +26,94 @@ import AlertasCerradas from '../pages/admin/alertas/AlertasCerradas';
 import AlertaPanelDetail from '../pages/admin/alertas/AlertaPanelDetail';
 import AnalisisGeografico from '../pages/admin/analisis/AnalisisGeografico';
 import AlertaExpiradaDetail from '../pages/admin/alertas/AlertaExpiradaDetail';
-console.log("🔥 AppRouter cargado");
+import NotFound from '../pages/NotFound';
+
+// ✅ Logs condicionales solo en desarrollo
+if (import.meta.env.DEV) {
+  console.log("🔥 AppRouter cargado");
+}
+
 const AppRouter = () => {
-   console.log("🔥 AppRouter renderizando - ruta:", window.location.pathname);
+  if (import.meta.env.DEV) {
+    console.log("🔥 AppRouter renderizando - ruta:", window.location.pathname);
+  }
+  
   return (
     <Routes>
+      {/* Rutas públicas */}
       <Route path="/" element={<Home />} />
       <Route path="/login" element={<Login />} />
       <Route path="/verificar-2fa" element={<Verificar2FA />} />
 
-      <Route path="/admin" element={
-        <PrivateRoute allowedRoles={['admin', 'superadmin', 'operador_tecnico', 'operador_policial', 'operador_medico', 'operador_general']}>
-          <AdminLayout />
-        </PrivateRoute>
-      }>
+      {/* ✅ Rutas admin - orden correcto: específicas primero, genéricas después */}
+      <Route 
+        path="/admin" 
+        element={
+          <PrivateRoute allowedRoles={['admin', 'superadmin', 'operador_tecnico', 'operador_policial', 'operador_medico', 'operador_general']}>
+            <AdminLayout />
+          </PrivateRoute>
+        }
+      >
+        {/* Rutas principales */}
+        <Route index element={<Navigate to="/admin/dashboard" />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="perfil" element={<Perfil />} />
+        
+        {/* Personal */}
         <Route path="personal" element={<PersonalList />} />
         <Route path="personal/crear" element={<PersonalForm />} />
         <Route path="personal/editar/:id" element={<PersonalForm />} />
         <Route path="personal/:id" element={<PersonalDetail />} />
+        
+        {/* Alertas - ORDEN CORRECTO: rutas específicas primero */}
         <Route path="alertas/activas" element={<AlertasActivas />} />
         <Route path="alertas/en-proceso" element={<AlertasEnProceso />} />
         <Route path="alertas/cerradas" element={<AlertasCerradas />} />
-        <Route path="alertas/:id" element={<AlertaPanelDetail />} />
-        <Route path="alertas/expiradas" element={<AlertasExpiradas />} />
-        <Route path="alertas/expiradas/:id" element={<AlertaExpiradaDetail />} />
         <Route path="alertas/cerradas-manual" element={<AlertasCerradasManual />} />
+        <Route path="alertas/expiradas" element={<AlertasExpiradas />} />
+        {/* ✅ Ruta específica para detalle de alerta expirada - DEBE ir antes de la genérica */}
+        <Route path="alertas/expiradas/:id" element={<AlertaExpiradaDetail />} />
+        {/* ✅ Ruta genérica para detalle de alerta - VA DESPUÉS de las específicas */}
+        <Route path="alertas/:id" element={<AlertaPanelDetail />} />
+        
+        {/* Recuperaciones */}
         <Route path="recuperaciones/pendientes" element={<RecuperacionesPendientes />} />
+        
+        {/* Unidades */}
         <Route path="unidades" element={<UnidadesList />} />
         <Route path="unidades/crear" element={<UnidadForm />} />
         <Route path="unidades/editar/:id" element={<UnidadForm />} />
         <Route path="unidades/:id" element={<UnidadDetail />} />
+        
+        {/* Reasignaciones */}
         <Route path="reasignaciones/pendientes" element={<ReasignacionesPendientes />} />
+        
+        {/* Reportes */}
         <Route path="reportes" element={<ReportesMenu />} />
         <Route path="reportes/:tipo" element={<GeneradorReporte />} />
+        
+        {/* Análisis */}
         <Route path="analisis/geografico" element={<AnalisisGeografico />} />
-        <Route index element={<Navigate to="/admin/dashboard" />} />
       </Route>
 
-      <Route path="/superadmin" element={
-        <PrivateRoute allowedRoles={['superadmin']}>
-          <AdminLayout />
-        </PrivateRoute>
-      }>
-        <Route path="dashboard" element={<Dashboard />} />
+      {/* ✅ Ruta para superadmin (opcional, puede redirigir a admin) */}
+      <Route 
+        path="/superadmin" 
+        element={
+          <PrivateRoute allowedRoles={['superadmin']}>
+            <AdminLayout />
+          </PrivateRoute>
+        }
+      >
         <Route index element={<Navigate to="/superadmin/dashboard" />} />
+        <Route path="dashboard" element={<Dashboard />} />
+        {/* ✅ Redirigir otras rutas de superadmin a admin para evitar duplicación */}
+        <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
       </Route>
 
-      <Route path="*" element={<Navigate to="/" replace />} />
+      {/* ✅ Ruta 404 - No encontrada */}
+      <Route path="/404" element={<NotFound />} />
+      <Route path="*" element={<Navigate to="/404" replace />} />
     </Routes>
   );
 };

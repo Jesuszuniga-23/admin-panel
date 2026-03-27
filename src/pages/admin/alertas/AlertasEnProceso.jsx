@@ -47,9 +47,11 @@ const AlertasEnProceso = () => {
   const [alertas, setAlertas] = useState([]);
   const [alertasOriginal, setAlertasOriginal] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [detalleLoading, setDetalleLoading] = useState(false); // ✅ Estado separado para detalle
   
-  // REF para AbortController
+  // ✅ REF para AbortControllers
   const abortControllerRef = useRef(null);
+  const detalleAbortControllerRef = useRef(null);
   
   // Obtener tipo de alerta permitido según rol
   const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
@@ -99,7 +101,7 @@ const AlertasEnProceso = () => {
   const [unidadesDisponibles, setUnidadesDisponibles] = useState([]);
   const [filtrosActivos, setFiltrosActivos] = useState(false);
 
-  // Función para cargar alertas con AbortController
+  // ✅ Función para cargar alertas con AbortController
   const cargarAlertas = useCallback(async () => {
     // Cancelar petición anterior si existe
     if (abortControllerRef.current) {
@@ -142,8 +144,8 @@ const AlertasEnProceso = () => {
         aplicarFiltrosLocal(alertasFormateadas);
       }
     } catch (error) {
-      // Ignorar errores de cancelación
-      if (error.name !== 'AbortError') {
+      // ✅ Ignorar errores de cancelación
+      if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
         console.error('Error:', error);
         toast.error('Error al cargar alertas');
       }
@@ -231,24 +233,38 @@ const AlertasEnProceso = () => {
     }
   }, [filtros.tipo, filtros.unidad, filtros.desde, filtros.hasta, filtros.pagina, alertasOriginal]);
 
-  // Cargar datos al montar y limpiar al desmontar
+  // ✅ Efecto con limpieza
   useEffect(() => {
     cargarAlertas();
     
-    // LIMPIAR al desmontar el componente
     return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
         console.log('🛑 Componente AlertasEnProceso desmontado - peticiones canceladas');
       }
+      if (detalleAbortControllerRef.current) {
+        detalleAbortControllerRef.current.abort();
+        console.log('🛑 Petición de detalle cancelada');
+      }
     };
   }, [cargarAlertas]);
 
-  // Manejar clic en alerta
-  const handleRowClick = async (alerta) => {
+  // ✅ Manejar clic en alerta con AbortController
+  const handleRowClick = useCallback(async (alerta) => {
+    // Cancelar petición de detalle anterior si existe
+    if (detalleAbortControllerRef.current) {
+      detalleAbortControllerRef.current.abort();
+      console.log('🛑 Petición de detalle anterior cancelada');
+    }
+    
+    // Crear nuevo AbortController para detalle
+    detalleAbortControllerRef.current = new AbortController();
+    
+    setDetalleLoading(true);
     try {
-      setLoading(true);
-      const response = await alertasPanelService.obtenerDetalle(alerta.id);
+      const response = await alertasPanelService.obtenerDetalle(alerta.id, {
+        signal: detalleAbortControllerRef.current.signal
+      });
       
       if (response.success) {
         setDatosCompletosAlerta(response.data);
@@ -263,12 +279,15 @@ const AlertasEnProceso = () => {
         toast.error('Error al cargar la alerta');
       }
     } catch (error) {
-      console.error('Error:', error);
-      toast.error('Error al cargar la alerta');
+      // ✅ Ignorar errores de cancelación
+      if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
+        console.error('Error al cargar detalle:', error);
+        toast.error('Error al cargar la alerta');
+      }
     } finally {
-      setLoading(false);
+      setDetalleLoading(false);
     }
-  };
+  }, [navigate]);
 
   const handleSolicitarOtp = async () => {
     if (!alertaSeleccionada) return;
@@ -457,9 +476,10 @@ const AlertasEnProceso = () => {
 
         {/* Tabla de Alertas */}
         <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-          {loading ? (
+          {detalleLoading ? (
             <div className="p-12 text-center">
-              <Loader />
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-yellow-200 border-t-yellow-600"></div>
+              <p className="mt-3 text-sm text-gray-500">Cargando detalles...</p>
             </div>
           ) : alertas.length === 0 ? (
             <div className="p-16 text-center">
@@ -487,7 +507,7 @@ const AlertasEnProceso = () => {
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">TIEMPO EN PROCESO</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">FECHA ASIGNACIÓN</th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">ACCIONES</th>
-                     </tr>
+                      </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {alertas.map((alerta) => (

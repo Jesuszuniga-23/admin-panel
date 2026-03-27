@@ -1,5 +1,5 @@
 // src/pages/admin/alertas/AlertasExpiradas.jsx
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ChevronLeft, ChevronRight, Filter, Search, Calendar, User, Clock, X, AlertTriangle,
@@ -53,6 +53,11 @@ const AlertasExpiradas = () => {
   const [alertas, setAlertas] = useState([]);
   const [alertasOriginal, setAlertasOriginal] = useState([]);
   const [cargando, setCargando] = useState(true);
+  const [detalleLoading, setDetalleLoading] = useState(false); // ✅ Estado separado
+  
+  // ✅ REF para AbortControllers
+  const abortControllerRef = useRef(null);
+  const detalleAbortControllerRef = useRef(null);
   
   // Estados para el modal OTP
   const [alertaSeleccionada, setAlertaSeleccionada] = useState(null);
@@ -97,12 +102,53 @@ const AlertasExpiradas = () => {
     total_paginas: 0
   });
 
-  useEffect(() => {
-    cargarAlertas();
-  }, []);
+  // ✅ Función para cargar alertas con AbortController
+  const cargarAlertas = useCallback(async () => {
+    // Cancelar petición anterior si existe
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      console.log('🛑 Petición anterior cancelada en AlertasExpiradas');
+    }
+    
+    // Crear nuevo AbortController
+    abortControllerRef.current = new AbortController();
+    
+    setCargando(true);
+    try {
+      const params = {};
+      if (tipoAlertaPermitido) {
+        params.tipo = tipoAlertaPermitido;
+      }
+      
+      const resultado = await alertasService.obtenerExpiradas({ 
+        limite: 1000, 
+        ...params,
+        signal: abortControllerRef.current.signal 
+      });
+      
+      const alertasFormateadas = (resultado.data || []).map(alerta => ({
+        ...alerta,
+        ciudadano: alerta.ciudadano ? {
+          ...alerta.ciudadano,
+          nombre: formatearNombre(alerta.ciudadano.nombre)
+        } : null
+      }));
+      setAlertasOriginal(alertasFormateadas);
+      aplicarFiltrosLocal(alertasFormateadas);
+    } catch (error) {
+      // ✅ Ignorar errores de cancelación
+      if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
+        console.error("Error:", error);
+      }
+    } finally {
+      setCargando(false);
+    }
+  }, [tipoAlertaPermitido]);
 
-  const filtrarDatos = (datos) => {
+  // ✅ Función de filtrado simplificada
+  const filtrarDatos = useCallback((datos) => {
     return datos.filter(item => {
+      // Filtro por búsqueda
       if (filtros.search) {
         const termino = filtros.search.toLowerCase().trim();
         const idMatch = item.id?.toString().includes(termino);
@@ -115,56 +161,26 @@ const AlertasExpiradas = () => {
         if (!idMatch && !tipoMatch && !ciudadanoMatch) return false;
       }
       
-      if (filtros.desde && filtros.hasta) {
-        const fechaCreacion = new Date(item.fecha_creacion);
+      // Filtro por fechas
+      if (filtros.desde) {
         const desdeParts = filtros.desde.split('-');
-        const hastaParts = filtros.hasta.split('-');
         const desde = new Date(parseInt(desdeParts[0]), parseInt(desdeParts[1]) - 1, parseInt(desdeParts[2]), 0, 0, 0, 0);
-        const hasta = new Date(parseInt(hastaParts[0]), parseInt(hastaParts[1]) - 1, parseInt(hastaParts[2]), 23, 59, 59, 999);
-        if (fechaCreacion < desde || fechaCreacion > hasta) return false;
-      } else {
-        if (filtros.desde) {
-          const desdeParts = filtros.desde.split('-');
-          const desde = new Date(parseInt(desdeParts[0]), parseInt(desdeParts[1]) - 1, parseInt(desdeParts[2]), 0, 0, 0, 0);
-          const fechaCreacion = new Date(item.fecha_creacion);
-          if (fechaCreacion < desde) return false;
-        }
-        if (filtros.hasta) {
-          const hastaParts = filtros.hasta.split('-');
-          const hasta = new Date(parseInt(hastaParts[0]), parseInt(hastaParts[1]) - 1, parseInt(hastaParts[2]), 23, 59, 59, 999);
-          const fechaCreacion = new Date(item.fecha_creacion);
-          if (fechaCreacion > hasta) return false;
-        }
+        const fechaCreacion = new Date(item.fecha_creacion);
+        if (fechaCreacion < desde) return false;
       }
+      
+      if (filtros.hasta) {
+        const hastaParts = filtros.hasta.split('-');
+        const hasta = new Date(parseInt(hastaParts[0]), parseInt(hastaParts[1]) - 1, parseInt(hastaParts[2]), 23, 59, 59, 999);
+        const fechaCreacion = new Date(item.fecha_creacion);
+        if (fechaCreacion > hasta) return false;
+      }
+      
       return true;
     });
-  };
+  }, [filtros.search, filtros.desde, filtros.hasta]);
 
-  const cargarAlertas = async () => {
-    setCargando(true);
-    try {
-      const params = {};
-      if (tipoAlertaPermitido) {
-        params.tipo = tipoAlertaPermitido;
-      }
-      const resultado = await alertasService.obtenerExpiradas({ limite: 1000, ...params });
-      const alertasFormateadas = (resultado.data || []).map(alerta => ({
-        ...alerta,
-        ciudadano: alerta.ciudadano ? {
-          ...alerta.ciudadano,
-          nombre: formatearNombre(alerta.ciudadano.nombre)
-        } : null
-      }));
-      setAlertasOriginal(alertasFormateadas);
-      aplicarFiltrosLocal(alertasFormateadas);
-    } catch (error) {
-      console.error("Error:", error);
-    } finally {
-      setCargando(false);
-    }
-  };
-
-  const aplicarFiltrosLocal = (datos = alertasOriginal) => {
+  const aplicarFiltrosLocal = useCallback((datos = alertasOriginal) => {
     const datosFiltrados = filtrarDatos(datos);
     const total = datosFiltrados.length;
     const totalPaginas = Math.ceil(total / filtros.limite);
@@ -178,7 +194,7 @@ const AlertasExpiradas = () => {
       limite: filtros.limite,
       total_paginas: totalPaginas
     });
-  };
+  }, [filtrarDatos, filtros.limite, filtros.pagina]);
 
   const handleSearchChange = (e) => {
     const value = e.target.value;
@@ -193,7 +209,9 @@ const AlertasExpiradas = () => {
 
   const aplicarFiltros = () => {
     setFiltros(prev => ({ ...prev, pagina: 1 }));
-    aplicarFiltrosLocal();
+    if (alertasOriginal.length) {
+      aplicarFiltrosLocal();
+    }
   };
 
   const limpiarFiltros = () => {
@@ -207,11 +225,22 @@ const AlertasExpiradas = () => {
     });
   };
 
-  // ✅ Manejar clic en alerta
-  const handleRowClick = async (alerta) => {
+  // ✅ Manejar clic en alerta con AbortController
+  const handleRowClick = useCallback(async (alerta) => {
+    // Cancelar petición de detalle anterior si existe
+    if (detalleAbortControllerRef.current) {
+      detalleAbortControllerRef.current.abort();
+      console.log('🛑 Petición de detalle anterior cancelada');
+    }
+    
+    // Crear nuevo AbortController para detalle
+    detalleAbortControllerRef.current = new AbortController();
+    
+    setDetalleLoading(true);
     try {
-      setCargando(true);
-      const response = await alertasPanelService.obtenerDetalle(alerta.id);
+      const response = await alertasPanelService.obtenerDetalle(alerta.id, {
+        signal: detalleAbortControllerRef.current.signal
+      });
       
       if (response.success) {
         setDatosCompletosAlerta(response.data);
@@ -226,12 +255,15 @@ const AlertasExpiradas = () => {
         toast.error('Error al cargar la alerta');
       }
     } catch (error) {
-      console.error('Error:', error);
-      toast.error('Error al cargar la alerta');
+      // ✅ Ignorar errores de cancelación
+      if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
+        console.error('Error al cargar detalle:', error);
+        toast.error('Error al cargar la alerta');
+      }
     } finally {
-      setCargando(false);
+      setDetalleLoading(false);
     }
-  };
+  }, [navigate]);
 
   const handleSolicitarOtp = async () => {
     if (!alertaSeleccionada) return;
@@ -274,11 +306,27 @@ const AlertasExpiradas = () => {
     });
   };
 
+  // ✅ Efecto con limpieza
+  useEffect(() => {
+    cargarAlertas();
+    
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        console.log('🛑 Componente AlertasExpiradas desmontado - peticiones canceladas');
+      }
+      if (detalleAbortControllerRef.current) {
+        detalleAbortControllerRef.current.abort();
+        console.log('🛑 Petición de detalle cancelada');
+      }
+    };
+  }, [cargarAlertas]);
+
   useEffect(() => {
     if (alertasOriginal.length) {
       aplicarFiltrosLocal();
     }
-  }, [filtros.search, filtros.desde, filtros.hasta, filtros.pagina]);
+  }, [filtros.search, filtros.desde, filtros.hasta, filtros.pagina, alertasOriginal, aplicarFiltrosLocal]);
 
   const formatearFecha = (fecha) => {
     return new Date(fecha).toLocaleString('es-MX', {
@@ -418,10 +466,10 @@ const AlertasExpiradas = () => {
 
         {/* Tabla */}
         <div className="bg-white rounded-xl md:rounded-2xl shadow-lg shadow-slate-200/50 overflow-hidden">
-          {cargando ? (
+          {detalleLoading ? (
             <div className="p-8 md:p-12 text-center">
               <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-gray-600"></div>
-              <p className="mt-3 text-xs sm:text-sm text-slate-500">Cargando alertas...</p>
+              <p className="mt-3 text-xs sm:text-sm text-slate-500">Cargando detalles...</p>
             </div>
           ) : alertas.length === 0 ? (
             <div className="p-8 md:p-16 text-center">
@@ -445,7 +493,7 @@ const AlertasExpiradas = () => {
                       <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-slate-500 uppercase">UBICACIÓN</th>
                       <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-slate-500 uppercase">FECHA</th>
                       <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-slate-500 uppercase">ESTADO</th>
-                     </tr>
+                      </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {alertas.map((alerta) => (

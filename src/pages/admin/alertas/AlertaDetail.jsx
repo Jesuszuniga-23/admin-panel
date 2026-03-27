@@ -1,5 +1,5 @@
 // src/pages/admin/alertas/AlertaDetail.jsx
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   AlertTriangle, Clock, MapPin, User, Calendar, ChevronLeft,
@@ -7,14 +7,13 @@ import {
   Shield, Phone, Mail, MessageSquare, X, MapPinned,
   PhoneCall, Mail as MailIcon, UserCircle, Activity
 } from 'lucide-react';
-// ✅ IMPORTACIÓN CORREGIDA - Usar alertasPanelService
 import alertasPanelService from '../../../services/admin/alertasPanel.service';
 import toast from 'react-hot-toast';
 import IconoEntidad, { BadgeTipoAlerta, ModalMapa } from '../../../components/ui/IconoEntidad';
 import BotonUbicacion from '../../../components/ui/BotonUbicacion';
 import authService from '../../../services/auth.service';
 
-// Función para normalizar texto
+// Función para normalizar texto (mantener igual)
 const normalizarTexto = (texto) => {
   if (!texto) return '';
   
@@ -108,6 +107,9 @@ const AlertaDetail = () => {
   const [motivoCierre, setMotivoCierre] = useState('');
   const [cerrando, setCerrando] = useState(false);
   
+  // ✅ REF para AbortController
+  const abortControllerRef = useRef(null);
+  
   const puedeCerrarAlerta = authService.puedeGestionarAlerta(alerta?.tipo);
   
   const [mapaModal, setMapaModal] = useState({
@@ -119,17 +121,28 @@ const AlertaDetail = () => {
     tipo: null
   });
 
-  useEffect(() => {
-    cargarAlerta();
-  }, [id]);
-
-  // ✅ CORRECCIÓN: Usar alertasPanelService.obtenerDetalle()
-  const cargarAlerta = async () => {
+  // ✅ Función para cargar alerta con AbortController
+  const cargarAlerta = useCallback(async () => {
+    if (!id) return;
+    
+    // Cancelar petición anterior si existe
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      console.log('🛑 Petición anterior cancelada en AlertaDetail');
+    }
+    
+    // Crear nuevo AbortController
+    abortControllerRef.current = new AbortController();
+    
+    setLoading(true);
+    setError(null);
+    
     try {
-      setLoading(true);
       console.log("Cargando alerta ID:", id);
       
-      const response = await alertasPanelService.obtenerDetalle(id);
+      const response = await alertasPanelService.obtenerDetalle(id, {
+        signal: abortControllerRef.current.signal
+      });
       console.log("Respuesta del backend:", response);
       
       if (response.success && response.data) {
@@ -146,14 +159,30 @@ const AlertaDetail = () => {
         toast.error('Alerta no encontrada');
       }
     } catch (error) {
-      console.error('Error cargando alerta:', error);
-      const errorMsg = error.response?.data?.error || error.message || 'Error al cargar los detalles de la alerta';
-      setError(errorMsg);
-      toast.error(errorMsg);
+      // ✅ Ignorar errores de cancelación
+      if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
+        console.error('Error cargando alerta:', error);
+        const errorMsg = error.response?.data?.error || error.message || 'Error al cargar los detalles de la alerta';
+        setError(errorMsg);
+        toast.error(errorMsg);
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  // ✅ Efecto con limpieza
+  useEffect(() => {
+    cargarAlerta();
+    
+    // ✅ LIMPIAR al desmontar el componente
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        console.log('🛑 Componente AlertaDetail desmontado - petición cancelada');
+      }
+    };
+  }, [cargarAlerta]);
 
   const handleCerrarManual = async () => {
     if (!puedeCerrarAlerta) {
@@ -311,6 +340,9 @@ const AlertaDetail = () => {
           </div>
         </div>
 
+        {/* El resto del JSX se mantiene IGUAL */}
+        {/* ... (todo el contenido desde aquí permanece sin cambios) ... */}
+        
         {/* Contenido principal */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">

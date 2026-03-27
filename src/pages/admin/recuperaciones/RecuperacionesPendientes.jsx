@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+// src/pages/admin/recuperaciones/RecuperacionesPendientes.jsx
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ChevronLeft, ChevronRight, Filter, Search,
@@ -29,6 +30,11 @@ const RecuperacionesPendientes = () => {
   const [solicitudes, setSolicitudes] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [ultimaActualizacion, setUltimaActualizacion] = useState(new Date());
+  const [accionLoading, setAccionLoading] = useState(false); // ✅ Estado para acciones
+
+  // ✅ REF para AbortControllers
+  const abortControllerRef = useRef(null);
+  const intervalRef = useRef(null);
 
   const [filtros, setFiltros] = useState({
     limite: 10,
@@ -46,18 +52,17 @@ const RecuperacionesPendientes = () => {
 
   const searchTerm = useDebounce(filtros.search, 500);
 
-  useEffect(() => {
-    cargarSolicitudes();
-
-    const intervalo = setInterval(() => {
-      console.log('Recargando solicitudes (tiempo real)');
-      cargarSolicitudes(true);
-    }, 30000);
-
-    return () => clearInterval(intervalo);
-  }, [filtros.pagina, filtros.estado, searchTerm]);
-
-  const cargarSolicitudes = async (silencioso = false) => {
+  // ✅ Función para cargar solicitudes con AbortController
+  const cargarSolicitudes = useCallback(async (silencioso = false) => {
+    // Cancelar petición anterior si existe
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      console.log('🛑 Petición anterior cancelada en RecuperacionesPendientes');
+    }
+    
+    // Crear nuevo AbortController
+    abortControllerRef.current = new AbortController();
+    
     if (!silencioso) setCargando(true);
     try {
       const filtrosActivos = {};
@@ -71,6 +76,7 @@ const RecuperacionesPendientes = () => {
 
       filtrosActivos.pagina = filtros.pagina;
       filtrosActivos.limite = filtros.limite;
+      filtrosActivos.signal = abortControllerRef.current.signal;
 
       console.log("Cargando recuperaciones con filtros:", filtrosActivos);
       const resultado = await recuperacionService.obtenerPendientes(filtrosActivos);
@@ -91,50 +97,87 @@ const RecuperacionesPendientes = () => {
         });
       }
     } catch (error) {
-      console.error("Error cargando recuperaciones:", error);
-      if (!silencioso) toast.error('Error al cargar solicitudes');
-      setSolicitudes([]);
+      // ✅ Ignorar errores de cancelación
+      if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
+        console.error("Error cargando recuperaciones:", error);
+        if (!silencioso) toast.error('Error al cargar solicitudes');
+        setSolicitudes([]);
+      }
     } finally {
       if (!silencioso) setCargando(false);
     }
-  };
+  }, [filtros.search, filtros.estado, filtros.pagina, filtros.limite, solicitudes.length]);
+
+  // ✅ Efecto con limpieza
+  useEffect(() => {
+    cargarSolicitudes();
+
+    // Configurar intervalo
+    intervalRef.current = setInterval(() => {
+      console.log('Recargando solicitudes (tiempo real)');
+      cargarSolicitudes(true);
+    }, 30000);
+
+    return () => {
+      // Limpiar intervalo
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      // Cancelar petición pendiente
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        console.log('🛑 Componente RecuperacionesPendientes desmontado - peticiones canceladas');
+      }
+    };
+  }, [cargarSolicitudes]);
 
   const handleSearchChange = (e) => {
     setFiltros(prev => ({ ...prev, search: e.target.value, pagina: 1 }));
   };
 
-  const handleAprobar = async (id) => {
+  // ✅ Manejar aprobar con loading y cancelación
+  const handleAprobar = useCallback(async (id) => {
     if (!window.confirm('¿Estás seguro de aprobar esta solicitud?')) return;
 
+    setAccionLoading(true);
     try {
       await recuperacionService.aprobarSolicitud(id);
       toast.success('Solicitud aprobada correctamente', {
         icon: <CheckCircle size={18} className="text-green-500" />
       });
-      cargarSolicitudes();
+      await cargarSolicitudes(); // Recargar después de aprobar
     } catch (error) {
+      console.error('Error al aprobar:', error);
       toast.error('Error al aprobar la solicitud', {
         icon: <XCircle size={18} className="text-red-500" />
       });
+    } finally {
+      setAccionLoading(false);
     }
-  };
+  }, [cargarSolicitudes]);
 
-  const handleRechazar = async (id) => {
+  // ✅ Manejar rechazar con loading y cancelación
+  const handleRechazar = useCallback(async (id) => {
     const motivo = window.prompt('Motivo del rechazo:');
     if (!motivo) return;
 
+    setAccionLoading(true);
     try {
       await recuperacionService.rechazarSolicitud(id, motivo);
       toast.success('Solicitud rechazada', {
         icon: <XCircle size={18} className="text-red-500" />
       });
-      cargarSolicitudes();
+      await cargarSolicitudes(); // Recargar después de rechazar
     } catch (error) {
+      console.error('Error al rechazar:', error);
       toast.error('Error al rechazar la solicitud', {
         icon: <XCircle size={18} className="text-red-500" />
       });
+    } finally {
+      setAccionLoading(false);
     }
-  };
+  }, [cargarSolicitudes]);
 
   const limpiarFiltros = () => {
     setFiltros({
@@ -175,7 +218,8 @@ const RecuperacionesPendientes = () => {
         <div className="flex gap-3">
           <button
             onClick={() => cargarSolicitudes()}
-            className="flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-white border border-slate-200 rounded-xl shadow-sm hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-600 transition-all text-slate-600 text-xs sm:text-sm font-medium whitespace-nowrap"
+            disabled={cargando}
+            className="flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-white border border-slate-200 rounded-xl shadow-sm hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-600 transition-all text-slate-600 text-xs sm:text-sm font-medium whitespace-nowrap disabled:opacity-50"
           >
             <RefreshCw size={14} className={`sm:w-4 sm:h-4 ${cargando ? 'animate-spin' : ''}`} />
             <span className="hidden xs:inline">Actualizar</span>
@@ -332,16 +376,26 @@ const RecuperacionesPendientes = () => {
                       <div className="flex justify-end gap-3 mt-4 pt-4 border-t">
                         <button
                           onClick={() => handleAprobar(sol.id)}
-                          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                          disabled={accionLoading}
+                          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
                         >
-                          <CheckCircle size={16} />
+                          {accionLoading ? (
+                            <RefreshCw size={16} className="animate-spin" />
+                          ) : (
+                            <CheckCircle size={16} />
+                          )}
                           Aprobar
                         </button>
                         <button
                           onClick={() => handleRechazar(sol.id)}
-                          className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                          disabled={accionLoading}
+                          className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
                         >
-                          <XCircle size={16} />
+                          {accionLoading ? (
+                            <RefreshCw size={16} className="animate-spin" />
+                          ) : (
+                            <XCircle size={16} />
+                          )}
                           Rechazar
                         </button>
                       </div>

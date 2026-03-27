@@ -16,8 +16,9 @@ class DashboardService {
       });
       return response.data;
     } catch (error) {
-      if (error.name === 'AbortError') {
-        console.log('📡 Petición cancelada');
+      // ✅ Manejar cancelación
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
+        console.log('📡 Petición cancelada en obtenerDashboardCompleto');
         return { success: false, aborted: true };
       }
       console.error('Error obteniendo dashboard completo:', error);
@@ -26,10 +27,10 @@ class DashboardService {
   }
 
   // =====================================================
-  // MÉTODOS EXISTENTES (se mantienen para compatibilidad)
+  // MÉTODOS EXISTENTES (con soporte para signal)
   // =====================================================
   
-  async obtenerEstadisticas(filtros = {}) {
+  async obtenerEstadisticas(filtros = {}, options = {}) {
     try {
       console.log("Cargando estadísticas del dashboard...");
       
@@ -41,6 +42,9 @@ class DashboardService {
       const alertasParams = tipoAlertaPermitido ? { tipo: tipoAlertaPermitido } : {};
       const unidadParams = tipoUnidadPermitido ? { tipo: tipoUnidadPermitido } : {};
       
+      // ✅ Agregar signal a los parámetros
+      const signal = options.signal;
+      
       const [
         personalRes,
         unidadesRes,
@@ -50,13 +54,13 @@ class DashboardService {
         alertasEnProcesoRes,
         alertasCerradasRes
       ] = await Promise.allSettled([
-        personalService.listarPersonal({ limite: 1000, ...personalParams }),
-        unidadService.listarUnidades({ limite: 1000, ...unidadParams }),
-        alertasService.obtenerExpiradas({ limite: 1000, ...alertasParams }),
-        alertasService.obtenerCerradasManual({ limite: 1000, ...alertasParams }),
-        alertasPanelService.obtenerActivas({ limite: 1000, ...alertasParams }),
-        alertasPanelService.obtenerEnProceso({ limite: 1000, ...alertasParams }),
-        alertasPanelService.obtenerCerradas({ limite: 1000, ...alertasParams })
+        personalService.listarPersonal({ limite: 1000, ...personalParams, ...filtros, signal }),
+        unidadService.listarUnidades({ limite: 1000, ...unidadParams, ...filtros, signal }),
+        alertasService.obtenerExpiradas({ limite: 1000, ...alertasParams, ...filtros, signal }),
+        alertasService.obtenerCerradasManual({ limite: 1000, ...alertasParams, ...filtros, signal }),
+        alertasPanelService.obtenerActivas({ limite: 1000, ...alertasParams, ...filtros, signal }),
+        alertasPanelService.obtenerEnProceso({ limite: 1000, ...alertasParams, ...filtros, signal }),
+        alertasPanelService.obtenerCerradas({ limite: 1000, ...alertasParams, ...filtros, signal })
       ]);
 
       const personalData = personalRes.status === 'fulfilled' ? personalRes.value.data || [] : [];
@@ -167,6 +171,11 @@ class DashboardService {
       };
 
     } catch (error) {
+      // ✅ Manejar cancelación
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
+        console.log('📡 Petición cancelada en obtenerEstadisticas');
+        return { success: false, aborted: true };
+      }
       console.error('Error obteniendo estadísticas:', error);
       return {
         success: false,
@@ -175,14 +184,17 @@ class DashboardService {
     }
   }
 
-  async obtenerAlertasPorHora(filtros = {}) {
+  async obtenerAlertasPorHora(filtros = {}, options = {}) {
     try {
       const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
       const alertasParams = tipoAlertaPermitido ? { tipo: tipoAlertaPermitido } : {};
       
+      // ✅ Agregar signal a los parámetros
+      const signal = options.signal;
+      
       const [expiradasRes, cerradasRes] = await Promise.allSettled([
-        alertasService.obtenerExpiradas({ limite: 500, ...alertasParams, ...filtros }),
-        alertasService.obtenerCerradasManual({ limite: 500, ...alertasParams, ...filtros })
+        alertasService.obtenerExpiradas({ limite: 500, ...alertasParams, ...filtros, signal }),
+        alertasService.obtenerCerradasManual({ limite: 500, ...alertasParams, ...filtros, signal })
       ]);
 
       const expiradas = expiradasRes.status === 'fulfilled' ? expiradasRes.value.data || [] : [];
@@ -212,12 +224,17 @@ class DashboardService {
       return horas;
 
     } catch (error) {
+      // ✅ Manejar cancelación
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
+        console.log('📡 Petición cancelada en obtenerAlertasPorHora');
+        return [];
+      }
       console.error('Error obteniendo alertas por hora:', error);
       return [];
     }
   }
 
-  async obtenerActividadReciente(filtros = {}) {
+  async obtenerActividadReciente(filtros = {}, options = {}) {
     try {
       const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
       const rolPersonalPermitido = authService.getRolPersonalPermitido();
@@ -227,11 +244,14 @@ class DashboardService {
       const alertasParams = tipoAlertaPermitido ? { tipo: tipoAlertaPermitido } : {};
       const unidadParams = tipoUnidadPermitido ? { tipo: tipoUnidadPermitido } : {};
       
+      // ✅ Agregar signal a los parámetros
+      const signal = options.signal;
+      
       const [personalRes, unidadesRes, alertasActivasRes, alertasProcesoRes] = await Promise.allSettled([
-        personalService.listarPersonal({ limite: 5, orden: 'DESC', ordenarPor: 'creado_en', ...personalParams }),
-        unidadService.listarUnidades({ limite: 5, orden: 'DESC', ordenarPor: 'creado_en', ...unidadParams }),
-        alertasPanelService.obtenerActivas({ limite: 3, ...alertasParams }),
-        alertasPanelService.obtenerEnProceso({ limite: 3, ...alertasParams })
+        personalService.listarPersonal({ limite: 5, orden: 'DESC', ordenarPor: 'creado_en', ...personalParams, ...filtros, signal }),
+        unidadService.listarUnidades({ limite: 5, orden: 'DESC', ordenarPor: 'creado_en', ...unidadParams, ...filtros, signal }),
+        alertasPanelService.obtenerActivas({ limite: 3, ...alertasParams, ...filtros, signal }),
+        alertasPanelService.obtenerEnProceso({ limite: 3, ...alertasParams, ...filtros, signal })
       ]);
 
       const personalReciente = personalRes.status === 'fulfilled' ? personalRes.value.data || [] : [];
@@ -246,6 +266,11 @@ class DashboardService {
       };
 
     } catch (error) {
+      // ✅ Manejar cancelación
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
+        console.log('📡 Petición cancelada en obtenerActividadReciente');
+        return { personal: [], unidades: [], alertas: [] };
+      }
       console.error('Error obteniendo actividad reciente:', error);
       return { personal: [], unidades: [], alertas: [] };
     }

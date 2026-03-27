@@ -49,13 +49,17 @@ const AlertasActivas = () => {
   const [alertas, setAlertas] = useState([]);
   const [alertasOriginal, setAlertasOriginal] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [detalleLoading, setDetalleLoading] = useState(false); // ✅ Estado separado para detalle
   
-  // ✅ REF para AbortController
+  // ✅ REF para AbortController (principal)
   const abortControllerRef = useRef(null);
+  
+  // ✅ REF para AbortController de detalle
+  const detalleAbortControllerRef = useRef(null);
   
   // Obtener tipo de alerta permitido según rol
   const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
-  const puedeGestionar = authService.puedeGestionarAlerta(tipoAlertaPermitido || '');
+  // ✅ Eliminada variable no usada 'puedeGestionar'
   
   // Estados para el modal OTP
   const [alertaSeleccionada, setAlertaSeleccionada] = useState(null);
@@ -136,7 +140,7 @@ const AlertasActivas = () => {
       }
     } catch (error) {
       // ✅ Ignorar errores de cancelación
-      if (error.name !== 'AbortError') {
+      if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
         console.error('Error:', error);
         toast.error('Error al cargar alertas');
       }
@@ -220,14 +224,29 @@ const AlertasActivas = () => {
         abortControllerRef.current.abort();
         console.log('🛑 Componente AlertasActivas desmontado - peticiones canceladas');
       }
+      if (detalleAbortControllerRef.current) {
+        detalleAbortControllerRef.current.abort();
+        console.log('🛑 Petición de detalle cancelada');
+      }
     };
   }, [cargarAlertas]);
 
-  // ✅ Manejar clic en alerta
-  const handleRowClick = async (alerta) => {
+  // ✅ Manejar clic en alerta con AbortController
+  const handleRowClick = useCallback(async (alerta) => {
+    // Cancelar petición de detalle anterior si existe
+    if (detalleAbortControllerRef.current) {
+      detalleAbortControllerRef.current.abort();
+      console.log('🛑 Petición de detalle anterior cancelada');
+    }
+    
+    // Crear nuevo AbortController para detalle
+    detalleAbortControllerRef.current = new AbortController();
+    
+    setDetalleLoading(true);
     try {
-      setLoading(true);
-      const response = await alertasPanelService.obtenerDetalle(alerta.id);
+      const response = await alertasPanelService.obtenerDetalle(alerta.id, {
+        signal: detalleAbortControllerRef.current.signal
+      });
       
       if (response.success) {
         setDatosCompletosAlerta(response.data);
@@ -242,12 +261,15 @@ const AlertasActivas = () => {
         toast.error('Error al cargar la alerta');
       }
     } catch (error) {
-      console.error('Error:', error);
-      toast.error('Error al cargar la alerta');
+      // ✅ Ignorar errores de cancelación
+      if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
+        console.error('Error al cargar detalle:', error);
+        toast.error('Error al cargar la alerta');
+      }
     } finally {
-      setLoading(false);
+      setDetalleLoading(false);
     }
-  };
+  }, [navigate]);
 
   const handleSolicitarOtp = async () => {
     if (!alertaSeleccionada) return;
@@ -394,11 +416,12 @@ const AlertasActivas = () => {
           </div>
         </div>
 
-        {/* Tabla de Alertas - mantener igual */}
+        {/* Tabla de Alertas */}
         <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-          {loading ? (
+          {detalleLoading ? (
             <div className="p-12 text-center">
-              <Loader />
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-red-200 border-t-red-600"></div>
+              <p className="mt-3 text-sm text-gray-500">Cargando detalles...</p>
             </div>
           ) : alertas.length === 0 ? (
             <div className="p-16 text-center">
