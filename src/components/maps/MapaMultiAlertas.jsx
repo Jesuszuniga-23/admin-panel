@@ -12,7 +12,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
-// ✅ Memoizar iconos por tipo para no recrearlos en cada render
+// Memoizar iconos por tipo para no recrearlos en cada render
 const iconosCache = new Map();
 
 const getCustomIcon = (tipo) => {
@@ -45,22 +45,22 @@ const getCustomIcon = (tipo) => {
 const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta }) => {
   const mapaRef = useRef(null);
   const mapaInstancia = useRef(null);
-  const marcadoresRef = useRef(new Map()); // Usar Map para mejor gestión
+  const marcadoresRef = useRef(new Map());
   const grupoMarcadoresRef = useRef(null);
   const initializadoRef = useRef(false);
+  const resizeTimeoutRef = useRef(null); // ✅ Para limpiar timeout
 
-  // ✅ Validar y calcular centro del mapa
+  // Validar y calcular centro del mapa
   const centroMapa = useMemo(() => {
     const alertasValidas = alertas.filter(a => a.lat && a.lng && !isNaN(a.lat) && !isNaN(a.lng));
     
     if (alertasValidas.length === 0) {
-      return { lat: 19.4326, lng: -99.1332 }; // Centro de CDMX por defecto
+      return { lat: 19.4326, lng: -99.1332 };
     }
     
     const latMedia = alertasValidas.reduce((sum, a) => sum + parseFloat(a.lat), 0) / alertasValidas.length;
     const lngMedia = alertasValidas.reduce((sum, a) => sum + parseFloat(a.lng), 0) / alertasValidas.length;
     
-    // ✅ Validar que no sean NaN
     if (isNaN(latMedia) || isNaN(lngMedia)) {
       return { lat: 19.4326, lng: -99.1332 };
     }
@@ -68,7 +68,7 @@ const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta }) => {
     return { lat: latMedia, lng: lngMedia };
   }, [alertas]);
 
-  // ✅ Función para crear popup (memoizada)
+  // Función para crear popup (memoizada)
   const crearPopupContent = useCallback((alerta) => {
     return renderToString(
       <div className="p-3 min-w-[200px]">
@@ -114,39 +114,44 @@ const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta }) => {
     );
   }, []);
 
-  // ✅ Inicializar mapa (solo una vez)
+  // ✅ Inicializar mapa (solo una vez) - CORREGIDO
   useEffect(() => {
     if (!mapaRef.current || initializadoRef.current) return;
 
     try {
-      // Crear mapa con centro por defecto
       const mapa = L.map(mapaRef.current).setView([centroMapa.lat, centroMapa.lng], 12);
       mapaInstancia.current = mapa;
 
-      // Capa base
       L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '© OpenStreetMap'
       }).addTo(mapa);
 
-      // Grupo de marcadores
       const grupo = L.layerGroup().addTo(mapa);
       grupoMarcadoresRef.current = grupo;
       
       initializadoRef.current = true;
       
-      // ✅ Manejar cambio de tamaño de ventana
+      // ✅ Manejar cambio de tamaño de ventana con timeout controlado
       const handleResize = () => {
-        if (mapaInstancia.current) {
-          setTimeout(() => {
-            mapaInstancia.current.invalidateSize();
-          }, 100);
+        if (resizeTimeoutRef.current) {
+          clearTimeout(resizeTimeoutRef.current);
         }
+        resizeTimeoutRef.current = setTimeout(() => {
+          if (mapaInstancia.current) {
+            mapaInstancia.current.invalidateSize();
+          }
+        }, 100);
       };
       
       window.addEventListener('resize', handleResize);
       
       return () => {
+        // ✅ Limpiar timeout antes de desmontar
+        if (resizeTimeoutRef.current) {
+          clearTimeout(resizeTimeoutRef.current);
+          resizeTimeoutRef.current = null;
+        }
         window.removeEventListener('resize', handleResize);
         if (mapaInstancia.current) {
           mapaInstancia.current.remove();
@@ -159,21 +164,18 @@ const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta }) => {
       console.error('Error inicializando mapa múltiple:', error);
       initializadoRef.current = false;
     }
-  }, []); // ✅ Solo se ejecuta una vez
+  }, []); // ✅ Dependencias vacías
 
   // ✅ Actualizar marcadores cuando cambian las alertas
   useEffect(() => {
     if (!mapaInstancia.current || !grupoMarcadoresRef.current) return;
 
-    // Filtrar alertas válidas
     const alertasValidas = alertas.filter(a => 
       a.lat && a.lng && !isNaN(parseFloat(a.lat)) && !isNaN(parseFloat(a.lng))
     );
 
-    // ✅ Crear conjunto de IDs actuales
     const idsActuales = new Set(alertasValidas.map(a => a.id));
     
-    // ✅ Eliminar marcadores que ya no existen
     marcadoresRef.current.forEach((marcador, id) => {
       if (!idsActuales.has(id)) {
         grupoMarcadoresRef.current.removeLayer(marcador);
@@ -181,31 +183,25 @@ const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta }) => {
       }
     });
     
-    // ✅ Agregar o actualizar marcadores
     alertasValidas.forEach(alerta => {
       const marcadorExistente = marcadoresRef.current.get(alerta.id);
       const lat = parseFloat(alerta.lat);
       const lng = parseFloat(alerta.lng);
       
       if (marcadorExistente) {
-        // Actualizar posición si cambió
         const posActual = marcadorExistente.getLatLng();
         if (posActual.lat !== lat || posActual.lng !== lng) {
           marcadorExistente.setLatLng([lat, lng]);
         }
-        // Actualizar popup
         const nuevoPopup = crearPopupContent(alerta);
         marcadorExistente.bindPopup(nuevoPopup);
       } else {
-        // Crear nuevo marcador
         const icono = getCustomIcon(alerta.tipo);
         const marcador = L.marker([lat, lng], { icon: icono }).addTo(grupoMarcadoresRef.current);
         
-        // Popup
         const popupContent = crearPopupContent(alerta);
         marcador.bindPopup(popupContent);
         
-        // Evento de clic
         marcador.on('click', () => {
           if (onSeleccionarAlerta) {
             onSeleccionarAlerta(alerta);
@@ -216,7 +212,6 @@ const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta }) => {
       }
     });
     
-    // ✅ Ajustar vista si es necesario (solo si hay alertas)
     if (alertasValidas.length > 0 && centroMapa.lat && centroMapa.lng) {
       const bounds = L.latLngBounds(
         alertasValidas.map(a => [parseFloat(a.lat), parseFloat(a.lng)])
@@ -231,7 +226,7 @@ const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta }) => {
     
   }, [alertas, onSeleccionarAlerta, crearPopupContent, centroMapa]);
 
-  // ✅ Mensaje cuando no hay alertas válidas
+  // Mensaje cuando no hay alertas válidas
   const alertasValidas = useMemo(() => 
     alertas.filter(a => a.lat && a.lng && !isNaN(a.lat) && !isNaN(a.lng)),
     [alertas]
