@@ -12,7 +12,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
-// Memoizar iconos por tipo para no recrearlos en cada render
+// Memoizar iconos por tipo
 const iconosCache = new Map();
 
 const getCustomIcon = (tipo) => {
@@ -48,12 +48,17 @@ const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta }) => {
   const marcadoresRef = useRef(new Map());
   const grupoMarcadoresRef = useRef(null);
   const initializadoRef = useRef(false);
-  const resizeTimeoutRef = useRef(null); // ✅ Para limpiar timeout
+  const resizeTimeoutRef = useRef(null);
+  const isMountedRef = useRef(true);
 
-  // Validar y calcular centro del mapa
+  // Validar alertas válidas
+  const alertasValidas = useMemo(() => 
+    alertas.filter(a => a.lat && a.lng && !isNaN(parseFloat(a.lat)) && !isNaN(parseFloat(a.lng))),
+    [alertas]
+  );
+
+  // Calcular centro del mapa
   const centroMapa = useMemo(() => {
-    const alertasValidas = alertas.filter(a => a.lat && a.lng && !isNaN(a.lat) && !isNaN(a.lng));
-    
     if (alertasValidas.length === 0) {
       return { lat: 19.4326, lng: -99.1332 };
     }
@@ -66,9 +71,9 @@ const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta }) => {
     }
     
     return { lat: latMedia, lng: lngMedia };
-  }, [alertas]);
+  }, [alertasValidas]);
 
-  // Función para crear popup (memoizada)
+  // Función para crear popup
   const crearPopupContent = useCallback((alerta) => {
     return renderToString(
       <div className="p-3 min-w-[200px]">
@@ -114,68 +119,63 @@ const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta }) => {
     );
   }, []);
 
-  // ✅ Inicializar mapa (solo una vez) - CORREGIDO
+  // ✅ INICIALIZAR MAPA - CON VERIFICACIÓN DE QUE EL CONTENEDOR EXISTE
   useEffect(() => {
-    if (!mapaRef.current || initializadoRef.current) return;
-
-    try {
-      const mapa = L.map(mapaRef.current).setView([centroMapa.lat, centroMapa.lng], 12);
-      mapaInstancia.current = mapa;
-
-      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '© OpenStreetMap'
-      }).addTo(mapa);
-
-      const grupo = L.layerGroup().addTo(mapa);
-      grupoMarcadoresRef.current = grupo;
+    isMountedRef.current = true;
+    
+    // Pequeño delay para asegurar que el contenedor está en el DOM
+    const timeoutId = setTimeout(() => {
+      if (!isMountedRef.current) return;
+      if (!mapaRef.current || initializadoRef.current) return;
       
-      initializadoRef.current = true;
-      
-      // ✅ Manejar cambio de tamaño de ventana con timeout controlado
-      const handleResize = () => {
-        if (resizeTimeoutRef.current) {
-          clearTimeout(resizeTimeoutRef.current);
-        }
-        resizeTimeoutRef.current = setTimeout(() => {
+      // Verificar que el contenedor tiene dimensiones
+      const rect = mapaRef.current.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) {
+        console.warn('Contenedor del mapa aún no tiene dimensiones, reintentando...');
+        return;
+      }
+
+      try {
+        const mapa = L.map(mapaRef.current).setView([centroMapa.lat, centroMapa.lng], 12);
+        mapaInstancia.current = mapa;
+
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '© OpenStreetMap'
+        }).addTo(mapa);
+
+        const grupo = L.layerGroup().addTo(mapa);
+        grupoMarcadoresRef.current = grupo;
+        
+        initializadoRef.current = true;
+        
+        // Forzar actualización de tamaño
+        setTimeout(() => {
           if (mapaInstancia.current) {
             mapaInstancia.current.invalidateSize();
           }
         }, 100);
-      };
-      
-      window.addEventListener('resize', handleResize);
-      
-      return () => {
-        // ✅ Limpiar timeout antes de desmontar
-        if (resizeTimeoutRef.current) {
-          clearTimeout(resizeTimeoutRef.current);
-          resizeTimeoutRef.current = null;
-        }
-        window.removeEventListener('resize', handleResize);
-        if (mapaInstancia.current) {
-          mapaInstancia.current.remove();
-          mapaInstancia.current = null;
-        }
-        marcadoresRef.current.clear();
+        
+      } catch (error) {
+        console.error('Error inicializando mapa:', error);
         initializadoRef.current = false;
-      };
-    } catch (error) {
-      console.error('Error inicializando mapa múltiple:', error);
-      initializadoRef.current = false;
-    }
-  }, []); // ✅ Dependencias vacías
+      }
+    }, 100);
+    
+    return () => {
+      clearTimeout(timeoutId);
+      isMountedRef.current = false;
+    };
+  }, []); // ✅ Dependencias vacías - solo inicializa una vez
 
-  // ✅ Actualizar marcadores cuando cambian las alertas
+  // ✅ ACTUALIZAR MARCADORES CUANDO CAMBIAN LAS ALERTAS
   useEffect(() => {
-    if (!mapaInstancia.current || !grupoMarcadoresRef.current) return;
-
-    const alertasValidas = alertas.filter(a => 
-      a.lat && a.lng && !isNaN(parseFloat(a.lat)) && !isNaN(parseFloat(a.lng))
-    );
+    if (!mapaInstancia.current || !grupoMarcadoresRef.current || !initializadoRef.current) return;
+    if (alertasValidas.length === 0) return;
 
     const idsActuales = new Set(alertasValidas.map(a => a.id));
     
+    // Remover marcadores que ya no existen
     marcadoresRef.current.forEach((marcador, id) => {
       if (!idsActuales.has(id)) {
         grupoMarcadoresRef.current.removeLayer(marcador);
@@ -183,6 +183,7 @@ const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta }) => {
       }
     });
     
+    // Agregar o actualizar marcadores
     alertasValidas.forEach(alerta => {
       const marcadorExistente = marcadoresRef.current.get(alerta.id);
       const lat = parseFloat(alerta.lat);
@@ -212,26 +213,58 @@ const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta }) => {
       }
     });
     
-    if (alertasValidas.length > 0 && centroMapa.lat && centroMapa.lng) {
+    // Ajustar vista para mostrar todos los marcadores
+    if (alertasValidas.length > 0) {
       const bounds = L.latLngBounds(
         alertasValidas.map(a => [parseFloat(a.lat), parseFloat(a.lng)])
       );
       
       if (bounds.isValid()) {
         mapaInstancia.current.fitBounds(bounds, { padding: [50, 50] });
-      } else {
-        mapaInstancia.current.setView([centroMapa.lat, centroMapa.lng], 12);
       }
     }
     
-  }, [alertas, onSeleccionarAlerta, crearPopupContent, centroMapa]);
+  }, [alertasValidas, onSeleccionarAlerta, crearPopupContent]);
 
-  // Mensaje cuando no hay alertas válidas
-  const alertasValidas = useMemo(() => 
-    alertas.filter(a => a.lat && a.lng && !isNaN(a.lat) && !isNaN(a.lng)),
-    [alertas]
-  );
+  // ✅ MANEJAR RESIZE DE VENTANA
+  useEffect(() => {
+    const handleResize = () => {
+      if (resizeTimeoutRef.current) {
+        clearTimeout(resizeTimeoutRef.current);
+      }
+      resizeTimeoutRef.current = setTimeout(() => {
+        if (mapaInstancia.current && initializadoRef.current) {
+          mapaInstancia.current.invalidateSize();
+        }
+      }, 150);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (resizeTimeoutRef.current) {
+        clearTimeout(resizeTimeoutRef.current);
+      }
+    };
+  }, []);
 
+  // ✅ LIMPIEZA AL DESMONTAR
+  useEffect(() => {
+    return () => {
+      if (resizeTimeoutRef.current) {
+        clearTimeout(resizeTimeoutRef.current);
+      }
+      if (mapaInstancia.current) {
+        mapaInstancia.current.remove();
+        mapaInstancia.current = null;
+      }
+      marcadoresRef.current.clear();
+      initializadoRef.current = false;
+    };
+  }, []);
+
+  // Mostrar placeholder si no hay alertas válidas
   if (alertasValidas.length === 0) {
     return (
       <div className="w-full h-full bg-gray-100 rounded-xl flex items-center justify-center flex-col">
@@ -242,7 +275,13 @@ const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta }) => {
     );
   }
 
-  return <div ref={mapaRef} className="w-full h-full" style={{ minHeight: '300px' }} />;
+  return (
+    <div 
+      ref={mapaRef} 
+      className="w-full h-full" 
+      style={{ minHeight: '500px', width: '100%' }}
+    />
+  );
 };
 
 export default MapaMultiAlertas;
