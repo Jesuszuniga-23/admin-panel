@@ -7,7 +7,7 @@ import { Toaster } from 'react-hot-toast';
 import useAuthStore from '../../store/authStore';
 import RateLimitBanner from "../common/RateLimitBanner";
 import SessionMonitor from '../common/SessionMonitor';
-// import SecurityGuard from '../common/SecurityGuard';    // ← COMENTAR TEMPORALMENTE
+import SecurityGuard from '../common/SecurityGuard';
 
 // ✅ Roles que tienen acceso al layout admin
 const ROLES_ADMIN = ['admin', 'superadmin', 'operador_tecnico', 'operador_policial', 'operador_medico', 'operador_general'];
@@ -26,7 +26,7 @@ const AdminLayout = () => {
         setLoading(false);
       }, 5000);
     }
-    
+
     return () => {
       if (timeoutId) {
         clearTimeout(timeoutId);
@@ -70,20 +70,19 @@ const AdminLayout = () => {
 
   if (!tieneAccesoAdmin()) {
     console.log(`🔒 AdminLayout: Usuario con rol "${user.rol}" no tiene acceso al panel admin`);
-    
+
     // ✅ Si es ciudadano, redirigir a app móvil
     if (user.rol === 'ciudadano') {
       return <Navigate to="/mobile" replace />;
     }
-    
+
     // ✅ Otros roles no autorizados
     return <Navigate to="/unauthorized" replace />;
   }
 
   return (
     <div className="flex h-screen bg-gray-100">
-      {/* <SecurityGuard /> */}  {/* ← COMENTADO */}
-      
+      <SecurityGuard />
       {/* ✅ SessionMonitor dentro del fragment principal */}
       <SessionMonitor />
       <Sidebar />
@@ -94,7 +93,7 @@ const AdminLayout = () => {
         </main>
       </div>
       <RateLimitBanner />
-      <Toaster 
+      <Toaster
         position="top-right"
         toastOptions={{
           duration: 4000,

@@ -4,7 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import AppRouter from './routes/AppRouter';
 import useAuthStore from './store/authStore';
-//import SecurityGuard from './components/common/SecurityGuard'; // ✅ CORREGIDO: exportación por defecto
+import SecurityGuard from './components/common/SecurityGuard';
 
 // ✅ Timeout para loading infinito (10 segundos)
 const LOADING_TIMEOUT = 10000;
@@ -17,7 +17,7 @@ function App() {
   useEffect(() => {
     let timeoutId;
     let isMounted = true;
-    
+
     const inicializar = async () => {
       try {
         console.log('🚀 App iniciando, inicializando auth...');
@@ -33,7 +33,7 @@ function App() {
         }
       }
     };
-    
+
     // ✅ Timeout para loading infinito
     timeoutId = setTimeout(() => {
       if (isMounted && isLoading) {
@@ -42,9 +42,9 @@ function App() {
         setLoading(false);
       }
     }, LOADING_TIMEOUT);
-    
+
     inicializar();
-    
+
     return () => {
       isMounted = false;
       if (timeoutId) {
@@ -115,9 +115,9 @@ function App() {
 
   return (
     <BrowserRouter>
- {/* <SecurityGuard /> */}  {/* ← COMENTADO */}
-       <AppRouter />
-      <Toaster 
+      <SecurityGuard />
+      <AppRouter />
+      <Toaster
         position="top-right"
         toastOptions={{
           duration: 4000,
