@@ -5,6 +5,7 @@ import 'leaflet/dist/leaflet.css';
 import { AlertTriangle, Heart } from 'lucide-react';
 import { renderToString } from 'react-dom/server';
 
+// Configuración de iconos de Leaflet
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
@@ -12,7 +13,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
-// Memoizar iconos por tipo
+// Cache de iconos personalizados
 const iconosCache = new Map();
 
 const getCustomIcon = (tipo) => {
@@ -24,8 +25,10 @@ const getCustomIcon = (tipo) => {
   const IconComponent = tipo === 'panico' ? AlertTriangle : Heart;
   
   const iconHtml = renderToString(
-    <div className={`w-8 h-8 rounded-full flex items-center justify-center shadow-lg border-2 border-white`}
-         style={{ backgroundColor: color }}>
+    <div 
+      className="w-8 h-8 rounded-full flex items-center justify-center shadow-lg border-2 border-white"
+      style={{ backgroundColor: color }}
+    >
       <IconComponent size={16} className="text-white" />
     </div>
   );
@@ -47,11 +50,12 @@ const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta }) => {
   const mapaInstancia = useRef(null);
   const marcadoresRef = useRef(new Map());
   const grupoMarcadoresRef = useRef(null);
-  const initializadoRef = useRef(false);
+  const inicializadoRef = useRef(false);
   const resizeTimeoutRef = useRef(null);
   const isMountedRef = useRef(true);
+  const inicializandoRef = useRef(false);
 
-  // Validar alertas válidas
+  // Filtrar alertas válidas
   const alertasValidas = useMemo(() => 
     alertas.filter(a => a.lat && a.lng && !isNaN(parseFloat(a.lat)) && !isNaN(parseFloat(a.lng))),
     [alertas]
@@ -73,7 +77,7 @@ const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta }) => {
     return { lat: latMedia, lng: lngMedia };
   }, [alertasValidas]);
 
-  // Función para crear popup
+  // Función para crear contenido del popup
   const crearPopupContent = useCallback((alerta) => {
     return renderToString(
       <div className="p-3 min-w-[200px]">
@@ -119,60 +123,85 @@ const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta }) => {
     );
   }, []);
 
-  // ✅ INICIALIZAR MAPA - CON VERIFICACIÓN DE QUE EL CONTENEDOR EXISTE
+  // ✅ INICIALIZACIÓN DEL MAPA - CON VERIFICACIÓN DE DOM
   useEffect(() => {
     isMountedRef.current = true;
     
-    // Pequeño delay para asegurar que el contenedor está en el DOM
-    const timeoutId = setTimeout(() => {
+    // Función para inicializar el mapa
+    const inicializarMapa = () => {
+      if (inicializandoRef.current) return;
       if (!isMountedRef.current) return;
-      if (!mapaRef.current || initializadoRef.current) return;
+      if (!mapaRef.current) return;
+      if (inicializadoRef.current) return;
       
       // Verificar que el contenedor tiene dimensiones
       const rect = mapaRef.current.getBoundingClientRect();
       if (rect.width === 0 || rect.height === 0) {
-        console.warn('Contenedor del mapa aún no tiene dimensiones, reintentando...');
+        // Reintentar después de un pequeño delay
+        setTimeout(inicializarMapa, 100);
         return;
       }
-
+      
+      inicializandoRef.current = true;
+      
       try {
-        const mapa = L.map(mapaRef.current).setView([centroMapa.lat, centroMapa.lng], 12);
+        const mapa = L.map(mapaRef.current, {
+          center: [centroMapa.lat, centroMapa.lng],
+          zoom: 12,
+          zoomControl: true
+        });
+        
         mapaInstancia.current = mapa;
-
+        
+        // Capa de tiles
         L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
           maxZoom: 19,
           attribution: '© OpenStreetMap'
         }).addTo(mapa);
-
+        
+        // Grupo para marcadores
         const grupo = L.layerGroup().addTo(mapa);
         grupoMarcadoresRef.current = grupo;
         
-        initializadoRef.current = true;
+        inicializadoRef.current = true;
+        inicializandoRef.current = false;
         
         // Forzar actualización de tamaño
         setTimeout(() => {
-          if (mapaInstancia.current) {
+          if (mapaInstancia.current && isMountedRef.current) {
             mapaInstancia.current.invalidateSize();
           }
-        }, 100);
+        }, 150);
         
       } catch (error) {
         console.error('Error inicializando mapa:', error);
-        initializadoRef.current = false;
+        inicializandoRef.current = false;
+        inicializadoRef.current = false;
       }
-    }, 100);
+    };
+    
+    // Delay para asegurar que el contenedor está en el DOM
+    const timeoutId = setTimeout(inicializarMapa, 50);
     
     return () => {
       clearTimeout(timeoutId);
       isMountedRef.current = false;
     };
-  }, []); // ✅ Dependencias vacías - solo inicializa una vez
+  }, []); // Dependencias vacías - solo se ejecuta al montar
 
   // ✅ ACTUALIZAR MARCADORES CUANDO CAMBIAN LAS ALERTAS
   useEffect(() => {
-    if (!mapaInstancia.current || !grupoMarcadoresRef.current || !initializadoRef.current) return;
-    if (alertasValidas.length === 0) return;
-
+    if (!mapaInstancia.current || !grupoMarcadoresRef.current || !inicializadoRef.current) return;
+    if (!isMountedRef.current) return;
+    if (alertasValidas.length === 0) {
+      // Limpiar todos los marcadores si no hay alertas
+      marcadoresRef.current.forEach((marcador) => {
+        grupoMarcadoresRef.current.removeLayer(marcador);
+      });
+      marcadoresRef.current.clear();
+      return;
+    }
+    
     const idsActuales = new Set(alertasValidas.map(a => a.id));
     
     // Remover marcadores que ya no existen
@@ -190,13 +219,16 @@ const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta }) => {
       const lng = parseFloat(alerta.lng);
       
       if (marcadorExistente) {
+        // Actualizar posición si cambió
         const posActual = marcadorExistente.getLatLng();
         if (posActual.lat !== lat || posActual.lng !== lng) {
           marcadorExistente.setLatLng([lat, lng]);
         }
+        // Actualizar popup
         const nuevoPopup = crearPopupContent(alerta);
         marcadorExistente.bindPopup(nuevoPopup);
       } else {
+        // Crear nuevo marcador
         const icono = getCustomIcon(alerta.tipo);
         const marcador = L.marker([lat, lng], { icon: icono }).addTo(grupoMarcadoresRef.current);
         
@@ -204,7 +236,7 @@ const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta }) => {
         marcador.bindPopup(popupContent);
         
         marcador.on('click', () => {
-          if (onSeleccionarAlerta) {
+          if (onSeleccionarAlerta && isMountedRef.current) {
             onSeleccionarAlerta(alerta);
           }
         });
@@ -214,7 +246,7 @@ const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta }) => {
     });
     
     // Ajustar vista para mostrar todos los marcadores
-    if (alertasValidas.length > 0) {
+    if (alertasValidas.length > 0 && mapaInstancia.current) {
       const bounds = L.latLngBounds(
         alertasValidas.map(a => [parseFloat(a.lat), parseFloat(a.lng)])
       );
@@ -233,7 +265,7 @@ const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta }) => {
         clearTimeout(resizeTimeoutRef.current);
       }
       resizeTimeoutRef.current = setTimeout(() => {
-        if (mapaInstancia.current && initializadoRef.current) {
+        if (mapaInstancia.current && inicializadoRef.current && isMountedRef.current) {
           mapaInstancia.current.invalidateSize();
         }
       }, 150);
@@ -249,18 +281,27 @@ const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta }) => {
     };
   }, []);
 
-  // ✅ LIMPIEZA AL DESMONTAR
+  // ✅ LIMPIEZA COMPLETA AL DESMONTAR
   useEffect(() => {
     return () => {
+      isMountedRef.current = false;
+      
       if (resizeTimeoutRef.current) {
         clearTimeout(resizeTimeoutRef.current);
       }
+      
       if (mapaInstancia.current) {
-        mapaInstancia.current.remove();
+        try {
+          mapaInstancia.current.remove();
+        } catch (e) {
+          console.warn('Error removiendo mapa:', e);
+        }
         mapaInstancia.current = null;
       }
+      
       marcadoresRef.current.clear();
-      initializadoRef.current = false;
+      inicializadoRef.current = false;
+      inicializandoRef.current = false;
     };
   }, []);
 
