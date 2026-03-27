@@ -5,10 +5,9 @@ import autoTable from 'jspdf-autotable';
 import { saveAs } from 'file-saver';
 
 // =====================================================
-// FUNCIONES DE UTILIDAD
+// FUNCIONES DE UTILIDAD (mantener igual)
 // =====================================================
 
-// CORREGIR CARACTERES ESPECIALES (ACENTOS)
 const corregirTexto = (texto) => {
   if (!texto) return '';
   if (typeof texto !== 'string') return texto.toString();
@@ -34,7 +33,6 @@ const corregirTexto = (texto) => {
   return textoCorregido;
 };
 
-// FORMATEAR FECHA (DD/MM/YYYY)
 const formatearFecha = (fecha) => {
   if (!fecha) return '—';
   try {
@@ -49,7 +47,6 @@ const formatearFecha = (fecha) => {
   }
 };
 
-// FORMATEAR FECHA LARGA
 const formatearFechaLarga = (fecha) => {
   if (!fecha) return '—';
   try {
@@ -71,7 +68,6 @@ const formatearFechaLarga = (fecha) => {
   }
 };
 
-// FORMATEAR TELÉFONO
 const formatearTelefono = (telefono) => {
   if (!telefono) return '—';
   const soloNumeros = telefono.replace(/\D/g, '');
@@ -81,7 +77,6 @@ const formatearTelefono = (telefono) => {
   return telefono;
 };
 
-// CALCULAR ZONA
 const calcularZona = (lat, lng) => {
   if (!lat || !lng) return 'No especificada';
   try {
@@ -101,11 +96,9 @@ const calcularZona = (lat, lng) => {
   }
 };
 
-// OBTENER TEXTO DE FILTROS APLICADOS - CORREGIDO (fechas en formato local)
 const obtenerTextoFiltros = (filtros) => {
   const filtrosAplicados = [];
   
-  // Formatear fechas en el mismo formato que se ve en pantalla (DD/MM/YYYY)
   const formatearFechaLocal = (fechaStr) => {
     if (!fechaStr) return '';
     const [year, month, day] = fechaStr.split('-');
@@ -141,7 +134,6 @@ const obtenerTextoFiltros = (filtros) => {
   return filtrosAplicados;
 };
 
-// ✅ NUEVO: Dividir datos en lotes para PDF (paginación)
 const dividirEnLotes = (datos, tamañoLote = 20) => {
   const lotes = [];
   for (let i = 0; i < datos.length; i += tamañoLote) {
@@ -157,27 +149,24 @@ const dividirEnLotes = (datos, tamañoLote = 20) => {
 class ReportesService {
   
   // =====================================================
-  // GENERAR EXCEL PROFESIONAL
+  // GENERAR EXCEL PROFESIONAL (CORREGIDO)
   // =====================================================
   async generarExcelPersonalizado(datos, tipo, filtros, usuario, options = {}) {
     try {
-      console.log(`Generando Excel para ${tipo} con ${datos.length} registros`);
+      console.log(`📊 Generando Excel para ${tipo} con ${datos.length} registros`);
       
-      // ✅ Verificar cancelación
       if (options.signal?.aborted) {
         throw new Error('AbortError');
       }
       
       if (!datos || datos.length === 0) {
-        console.warn('No hay datos para exportar');
+        console.warn('⚠️ No hay datos para exportar');
         return false;
       }
       
       const workbook = new ExcelJS.Workbook();
       const COLOR_PRIMARIO = '1E3A8A';
-      const COLOR_SECUNDARIO = '2563EB';
       
-      // ✅ Verificar cancelación antes de procesar cada lote
       const MAX_REGISTROS_EXCEL = 10000;
       const datosProcesar = datos.slice(0, MAX_REGISTROS_EXCEL);
       
@@ -185,15 +174,127 @@ class ReportesService {
         console.warn(`⚠️ Demasiados registros (${datos.length}). Solo se exportarán los primeros ${MAX_REGISTROS_EXCEL}`);
       }
       
-      // HOJA 1: DATOS PRINCIPALES
+      // =====================================================
+      // HOJA 1: DATOS PRINCIPALES (CORREGIDO)
+      // =====================================================
       const datosSheet = workbook.addWorksheet('DATOS');
       
-      if (options.signal?.aborted) throw new Error('AbortError');
+      // Definir columnas según el tipo de reporte
+      let columnas = [];
+      let datosParaExcel = [];
       
-      // ... (resto del código de Excel se mantiene igual)
-      // (Mantener la misma lógica de creación de columnas y filas)
+      if (tipo === 'personal') {
+        columnas = [
+          { header: 'ID', key: 'id', width: 10 },
+          { header: 'NOMBRE', key: 'nombre', width: 30 },
+          { header: 'EMAIL', key: 'email', width: 35 },
+          { header: 'ROL', key: 'rol', width: 20 },
+          { header: 'PLACA', key: 'placa', width: 15 },
+          { header: 'TELÉFONO', key: 'telefono', width: 15 },
+          { header: 'ESTADO', key: 'activo', width: 10 },
+          { header: 'DISPONIBLE', key: 'disponible', width: 12 },
+          { header: 'FECHA REGISTRO', key: 'creado_en', width: 15 }
+        ];
+        
+        datosParaExcel = datosProcesar.map(item => ({
+          id: item.id,
+          nombre: corregirTexto(item.nombre || '—'),
+          email: item.email || '—',
+          rol: item.rol === 'policia' ? 'Policía' :
+                item.rol === 'ambulancia' ? 'Ambulancia' :
+                item.rol === 'admin' ? 'Admin' : 'Superadmin',
+          placa: item.placa || '—',
+          telefono: formatearTelefono(item.telefono),
+          activo: item.activo ? 'ACTIVO' : 'INACTIVO',
+          disponible: item.disponible ? 'DISPONIBLE' : 'OCUPADO',
+          creado_en: formatearFecha(item.creado_en)
+        }));
+      } 
+      else if (tipo === 'unidades') {
+        columnas = [
+          { header: 'ID', key: 'id', width: 10 },
+          { header: 'CÓDIGO', key: 'codigo', width: 15 },
+          { header: 'TIPO', key: 'tipo', width: 12 },
+          { header: 'ESTADO', key: 'estado', width: 12 },
+          { header: 'ACTIVA', key: 'activa', width: 8 },
+          { header: 'PERSONAL', key: 'personal', width: 8 },
+          { header: 'ZONA', key: 'zona', width: 15 },
+          { header: 'FECHA REGISTRO', key: 'creado_en', width: 15 }
+        ];
+        
+        datosParaExcel = datosProcesar.map(item => ({
+          id: item.id,
+          codigo: item.codigo || '—',
+          tipo: item.tipo === 'policia' ? 'Policía' : 'Ambulancia',
+          estado: item.estado === 'disponible' ? 'DISPONIBLE' :
+                   item.estado === 'ocupada' ? 'OCUPADA' : 'INACTIVA',
+          activa: item.activa ? 'SÍ' : 'NO',
+          personal: item.personal_asignado?.length || 0,
+          zona: calcularZona(item.lat, item.lng),
+          creado_en: formatearFecha(item.creado_en)
+        }));
+      }
+      else if (tipo === 'alertas') {
+        columnas = [
+          { header: 'ID', key: 'id', width: 10 },
+          { header: 'TIPO', key: 'tipo', width: 12 },
+          { header: 'ESTADO', key: 'estado', width: 15 },
+          { header: 'CIUDADANO', key: 'ciudadano', width: 30 },
+          { header: 'UNIDAD', key: 'unidad', width: 15 },
+          { header: 'ZONA', key: 'zona', width: 15 },
+          { header: 'FECHA CREACIÓN', key: 'fecha_creacion', width: 15 }
+        ];
+        
+        datosParaExcel = datosProcesar.map(item => ({
+          id: item.id,
+          tipo: item.tipo === 'panico' ? 'PÁNICO' : 'MÉDICA',
+          estado: (item.estado || '').toUpperCase() || '—',
+          ciudadano: corregirTexto(item.ciudadano?.nombre || item.ciudadano_nombre || '—'),
+          unidad: item.unidad?.codigo || item.unidad_codigo || '—',
+          zona: calcularZona(item.lat, item.lng),
+          fecha_creacion: formatearFecha(item.fecha_creacion)
+        }));
+      }
       
+      // Agregar columnas a la hoja
+      datosSheet.columns = columnas;
+      
+      // Agregar datos
+      datosParaExcel.forEach(item => {
+        datosSheet.addRow(item);
+      });
+      
+      // Estilos para encabezados
+      const headerRow = datosSheet.getRow(1);
+      headerRow.height = 20;
+      headerRow.eachCell((cell) => {
+        cell.font = { bold: true, color: { argb: 'FFFFFF' }, size: 11, name: 'Arial' };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLOR_PRIMARIO } };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+      });
+      
+      // Estilos para datos
+      datosSheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
+        if (rowNumber === 1) return;
+        row.height = 18;
+        row.eachCell((cell) => {
+          cell.alignment = { vertical: 'middle', horizontal: 'left' };
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'E5E7EB' } },
+            left: { style: 'thin', color: { argb: 'E5E7EB' } },
+            bottom: { style: 'thin', color: { argb: 'E5E7EB' } },
+            right: { style: 'thin', color: { argb: 'E5E7EB' } }
+          };
+          if (rowNumber % 2 === 0) {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'F8FAFC' } };
+          }
+        });
+      });
+      
+      // =====================================================
       // HOJA 2: INFORMACIÓN DEL REPORTE
+      // =====================================================
       const infoSheet = workbook.addWorksheet('INFORMACIÓN');
       infoSheet.columns = [{ header: 'CAMPO', key: 'campo', width: 25 }, { header: 'VALOR', key: 'valor', width: 45 }];
       
@@ -226,39 +327,46 @@ class ReportesService {
         infoSheet.getRow(infoSheet.lastRow.number).getCell(2).font = { italic: true, color: { argb: '6B7280' } };
       }
       
+      // Estilos para info sheet
+      const infoHeaderRow = infoSheet.getRow(1);
+      infoHeaderRow.height = 22;
+      infoHeaderRow.eachCell((cell) => {
+        cell.font = { bold: true, color: { argb: 'FFFFFF' }, size: 11 };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '2563EB' } };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      });
+      
       // GUARDAR ARCHIVO
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const fecha = new Date().toISOString().split('T')[0];
       saveAs(blob, `Reporte_${tipo}_${fecha}.xlsx`);
       
-      console.log(`Excel generado correctamente con ${datosProcesar.length} registros`);
+      console.log(`✅ Excel generado correctamente con ${datosParaExcel.length} registros`);
       return true;
     } catch (error) {
-      // ✅ Manejar cancelación
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         console.log('🛑 Generación de Excel cancelada');
         throw error;
       }
-      console.error('Error generando Excel:', error);
+      console.error('❌ Error generando Excel:', error);
       throw error;
     }
   }
 
   // =====================================================
-  // GENERAR PDF PROFESIONAL (CON PAGINACIÓN COMPLETA)
+  // GENERAR PDF PROFESIONAL (CORREGIDO)
   // =====================================================
   generarPDFPersonalizado(datos, tipo, filtros, usuario, options = {}) {
     try {
-      console.log(`Generando PDF para ${tipo} con ${datos.length} registros`);
+      console.log(`📄 Generando PDF para ${tipo} con ${datos.length} registros`);
       
-      // ✅ Verificar cancelación
       if (options.signal?.aborted) {
         throw new Error('AbortError');
       }
       
       if (!datos || datos.length === 0) {
-        console.warn('No hay datos para exportar');
+        console.warn('⚠️ No hay datos para exportar');
         return false;
       }
       
@@ -273,7 +381,6 @@ class ReportesService {
       
       const fecha = formatearFechaLarga(new Date());
       
-      // ✅ Dividir datos en lotes para paginación completa
       const LOTES_POR_PAGINA = 20;
       const lotes = dividirEnLotes(datos, LOTES_POR_PAGINA);
       
@@ -318,7 +425,9 @@ class ReportesService {
         };
       }
       
-      // Procesar cada lote en una página
+      // ✅ CORRECCIÓN: Declarar yPos fuera del bloque condicional
+      let yPos = 32;
+      
       for (let loteIdx = 0; loteIdx < lotes.length; loteIdx++) {
         if (loteIdx > 0) {
           doc.addPage();
@@ -340,8 +449,6 @@ class ReportesService {
           doc.setFontSize(12);
           doc.setFont('helvetica', 'normal');
           doc.text(`Reporte de ${tipo.charAt(0).toUpperCase() + tipo.slice(1)}`, 15, 20);
-          
-          let yPos = 32;
           
           // TARJETA DE INFORMACIÓN
           doc.setFillColor(245, 247, 250);
@@ -445,15 +552,14 @@ class ReportesService {
       const fechaArchivo = new Date().toISOString().split('T')[0];
       doc.save(`Reporte_${tipo}_${fechaArchivo}.pdf`);
       
-      console.log(`PDF generado correctamente con ${datos.length} registros`);
+      console.log(`✅ PDF generado correctamente con ${datos.length} registros`);
       return true;
     } catch (error) {
-      // ✅ Manejar cancelación
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         console.log('🛑 Generación de PDF cancelada');
         throw error;
       }
-      console.error('Error generando PDF:', error);
+      console.error('❌ Error generando PDF:', error);
       throw error;
     }
   }
