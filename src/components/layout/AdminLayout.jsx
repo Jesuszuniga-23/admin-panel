@@ -84,8 +84,8 @@ const AdminLayout = () => {
     <div className="flex h-screen bg-gray-100">
       {/* <SecurityGuard /> */}  {/* ← COMENTADO */}
       
-      {/* ✅ SessionMonitor dentro del fragment principal */}
-      <SessionMonitor />
+      {/* ✅ SessionMonitor  <SessionMonitor /> dentro del fragment principal */}
+     
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
