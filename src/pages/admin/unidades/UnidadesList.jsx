@@ -137,14 +137,12 @@ const UnidadesList = () => {
   const [unidades, setUnidades] = useState([]);
   const [loading, setLoading] = useState(true);
   const [exportando, setExportando] = useState(false);
-  const [actionLoading, setActionLoading] = useState(false); // ✅ Estado para acciones
+  const [actionLoading, setActionLoading] = useState(false);
   
-  // ✅ REF para AbortController
   const abortControllerRef = useRef(null);
   
   const tipoUnidadPermitido = authService.getRolPersonalPermitido();
   
-  // ✅ Funciones de permisos para unidades (memoizadas con useCallback)
   const puedeCrearUnidades = useCallback(() => {
     const puedeCrearPolicia = authService.puedeCrearUnidad('policia');
     const puedeCrearAmbulancia = authService.puedeCrearUnidad('ambulancia');
@@ -189,17 +187,16 @@ const UnidadesList = () => {
     limite: 10,
     total_paginas: 0
   });
-  const searchTerm = useDebounce(filtros.search, 500);
+  
+  // ✅ CORRECCIÓN AQUÍ - Extraer value del objeto
+  const { value: searchTerm } = useDebounce(filtros.search, 500);
 
-  // ✅ Función para cargar unidades con AbortController
   const cargarUnidades = useCallback(async () => {
-    // Cancelar petición anterior si existe
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       console.log('🛑 Petición anterior cancelada en UnidadesList');
     }
     
-    // Crear nuevo AbortController
     abortControllerRef.current = new AbortController();
     
     setLoading(true);
@@ -207,9 +204,14 @@ const UnidadesList = () => {
       const filtrosActivos = { signal: abortControllerRef.current.signal };
       if (filtros.tipo) filtrosActivos.tipo = filtros.tipo;
       if (filtros.estado) filtrosActivos.estado = filtros.estado;
-      if (searchTerm) filtrosActivos.search = searchTerm;
+      if (searchTerm && typeof searchTerm === 'string' && searchTerm.trim() !== '') {
+        filtrosActivos.search = searchTerm;
+      }
       filtrosActivos.pagina = filtros.pagina;
       filtrosActivos.limite = filtros.limite;
+
+      console.log('🔍 [UnidadesList] searchTerm:', searchTerm);
+      console.log('🔍 [UnidadesList] filtrosActivos:', filtrosActivos);
 
       const response = await unidadService.listarUnidades(filtrosActivos);
       setUnidades(response.data || []);
@@ -220,7 +222,6 @@ const UnidadesList = () => {
         total_paginas: 1
       });
     } catch (error) {
-      // ✅ Ignorar errores de cancelación
       if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
         console.error('Error:', error);
         if (error.response?.status === 429) {
@@ -236,7 +237,6 @@ const UnidadesList = () => {
     }
   }, [filtros.tipo, filtros.estado, searchTerm, filtros.pagina, filtros.limite]);
 
-  // ✅ Efecto con limpieza
   useEffect(() => {
     cargarUnidades();
     
@@ -252,7 +252,6 @@ const UnidadesList = () => {
     return unidad.estado === 'ocupada';
   };
 
-  // ✅ Exportar Excel con loading y sin AbortController (no es necesario cancelar)
   const exportarExcel = async () => {
     setExportando(true);
     try {
@@ -271,7 +270,6 @@ const UnidadesList = () => {
     }
   };
 
-  // ✅ Exportar PDF con loading
   const exportarPDF = async () => {
     setExportando(true);
     try {
@@ -317,7 +315,6 @@ const UnidadesList = () => {
     });
   };
 
-  // ✅ Ejecutar toggle con loading
   const ejecutarToggle = async () => {
     const { id, codigo, unidad, activar } = modalToggle;
     const accion = activar ? 'activar' : 'desactivar';
@@ -394,7 +391,6 @@ const UnidadesList = () => {
     });
   };
 
-  // ✅ Ejecutar eliminar con loading
   const ejecutarEliminar = async () => {
     const { id, codigo } = modalConfirmacion;
     setActionLoading(true);
@@ -635,7 +631,7 @@ const UnidadesList = () => {
                     <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
                     <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase">Personal</th>
                     <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
-                  </tr>
+                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {unidades.map((unidad) => (
@@ -650,14 +646,14 @@ const UnidadesList = () => {
                             {unidad.codigo}
                           </span>
                         </div>
-                       </td>
+                      </td>
                       <td className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 lg:py-4">
                         <BadgeIcono 
                           entidad={tipoToEntidad[unidad.tipo] || 'PATRULLA'}
                           texto={unidad.tipo === 'policia' ? 'Policía' : 'Ambulancia'}
                           size={12}
                         />
-                       </td>
+                      </td>
                       <td className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 lg:py-4">
                         <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs whitespace-nowrap ${
                           unidad.estado === 'disponible' ? 'bg-green-100 text-green-700' :
@@ -666,7 +662,7 @@ const UnidadesList = () => {
                         }`}>
                           {capitalizar(unidad.estado)}
                         </span>
-                       </td>
+                      </td>
                       <td className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 lg:py-4">
                         <div className="flex items-center gap-1">
                           <Users size={12} className="text-gray-400" />
@@ -674,7 +670,7 @@ const UnidadesList = () => {
                             {unidad.personal_asignado?.length || 0}
                           </span>
                         </div>
-                       </td>
+                      </td>
                       <td className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 lg:py-4 text-right">
                         <div className="flex items-center justify-end gap-1 sm:gap-1.5 lg:gap-2">
                           {puedeGestionarUnidad(unidad) && (
@@ -716,47 +712,47 @@ const UnidadesList = () => {
                             </button>
                           )}
                         </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-              {/* Paginación */}
-              <div className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 border-t flex flex-col xs:flex-row items-center justify-between gap-3">
-                <p className="text-xs sm:text-sm text-gray-500 text-center xs:text-left">
-                  Mostrando <span className="font-medium">
-                    {paginacion.total > 0 ? ((paginacion.pagina - 1) * paginacion.limite) + 1 : 0}
-                  </span> a{' '}
-                  <span className="font-medium">{Math.min(paginacion.pagina * paginacion.limite, paginacion.total)}</span>{' '}
-                  de <span className="font-medium">{paginacion.total}</span> registros
-                </p>
-                <div className="flex items-center gap-1 sm:gap-2">
-                  <button
-                    onClick={() => setFiltros(prev => ({ ...prev, pagina: prev.pagina - 1 }))}
-                    disabled={paginacion.pagina === 1 || actionLoading}
-                    className="px-2 sm:px-3 py-1 text-xs sm:text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
-                  >
-                    Anterior
-                  </button>
-                  <span className="px-2 sm:px-3 py-1 text-xs sm:text-sm text-gray-600">
-                    {paginacion.pagina} / {paginacion.total_paginas}
-                  </span>
-                  <button
-                    onClick={() => setFiltros(prev => ({ ...prev, pagina: prev.pagina + 1 }))}
-                    disabled={paginacion.pagina === paginacion.total_paginas || actionLoading}
-                    className="px-2 sm:px-3 py-1 text-xs sm:text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
-                  >
-                    Siguiente
-                  </button>
-                </div>
+            {/* Paginación */}
+            <div className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 border-t flex flex-col xs:flex-row items-center justify-between gap-3">
+              <p className="text-xs sm:text-sm text-gray-500 text-center xs:text-left">
+                Mostrando <span className="font-medium">
+                  {paginacion.total > 0 ? ((paginacion.pagina - 1) * paginacion.limite) + 1 : 0}
+                </span> a{' '}
+                <span className="font-medium">{Math.min(paginacion.pagina * paginacion.limite, paginacion.total)}</span>{' '}
+                de <span className="font-medium">{paginacion.total}</span> registros
+              </p>
+              <div className="flex items-center gap-1 sm:gap-2">
+                <button
+                  onClick={() => setFiltros(prev => ({ ...prev, pagina: prev.pagina - 1 }))}
+                  disabled={paginacion.pagina === 1 || actionLoading}
+                  className="px-2 sm:px-3 py-1 text-xs sm:text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                >
+                  Anterior
+                </button>
+                <span className="px-2 sm:px-3 py-1 text-xs sm:text-sm text-gray-600">
+                  {paginacion.pagina} / {paginacion.total_paginas}
+                </span>
+                <button
+                  onClick={() => setFiltros(prev => ({ ...prev, pagina: prev.pagina + 1 }))}
+                  disabled={paginacion.pagina === paginacion.total_paginas || actionLoading}
+                  className="px-2 sm:px-3 py-1 text-xs sm:text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                >
+                  Siguiente
+                </button>
               </div>
-            </>
-          )}
-        </div>
+            </div>
+          </>
+        )}
       </div>
-    );
-  };
-  
-  export default UnidadesList;
+    </div>
+  );
+};
+
+export default UnidadesList;
