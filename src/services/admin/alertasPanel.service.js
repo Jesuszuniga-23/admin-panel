@@ -7,7 +7,12 @@ class AlertasPanelService {
   // LISTAR ALERTAS ACTIVAS
   // =====================================================
   async listarActivas(params = {}) {
-    const response = await axiosInstance.get(ENDPOINTS.ALERTAS_PANEL.ACTIVAS, { params });
+    const config = {};
+    if (params.signal) {
+      config.signal = params.signal;
+      delete params.signal;
+    }
+    const response = await axiosInstance.get(ENDPOINTS.ALERTAS_PANEL.ACTIVAS, { params, ...config });
     return response.data;
   }
 
@@ -15,7 +20,12 @@ class AlertasPanelService {
   // LISTAR ALERTAS EN PROCESO
   // =====================================================
   async listarEnProceso(params = {}) {
-    const response = await axiosInstance.get(ENDPOINTS.ALERTAS_PANEL.EN_PROCESO, { params });
+    const config = {};
+    if (params.signal) {
+      config.signal = params.signal;
+      delete params.signal;
+    }
+    const response = await axiosInstance.get(ENDPOINTS.ALERTAS_PANEL.EN_PROCESO, { params, ...config });
     return response.data;
   }
 
@@ -23,31 +33,51 @@ class AlertasPanelService {
   // LISTAR ALERTAS CERRADAS
   // =====================================================
   async listarCerradas(params = {}) {
-    const response = await axiosInstance.get(ENDPOINTS.ALERTAS_PANEL.CERRADAS, { params });
+    const config = {};
+    if (params.signal) {
+      config.signal = params.signal;
+      delete params.signal;
+    }
+    const response = await axiosInstance.get(ENDPOINTS.ALERTAS_PANEL.CERRADAS, { params, ...config });
     return response.data;
   }
 
   // =====================================================
   // OBTENER DETALLE DE ALERTA (CON OFUSCACIÓN)
   // =====================================================
-  async obtenerDetalle(id) {
-    const response = await axiosInstance.get(ENDPOINTS.ALERTAS_PANEL.DETALLE(id));
+  async obtenerDetalle(id, params = {}) {
+    const config = {};
+    if (params.signal) {
+      config.signal = params.signal;
+      delete params.signal;
+    }
+    const response = await axiosInstance.get(ENDPOINTS.ALERTAS_PANEL.DETALLE(id), { params, ...config });
     return response.data;
   }
 
   // =====================================================
   // SOLICITAR OTP PARA VER DETALLES COMPLETOS
   // =====================================================
-  async solicitarOtp(id) {
-    const response = await axiosInstance.post(ENDPOINTS.ALERTAS_PANEL.SOLICITAR_OTP(id));
+  async solicitarOtp(id, params = {}) {
+    const config = {};
+    if (params.signal) {
+      config.signal = params.signal;
+      delete params.signal;
+    }
+    const response = await axiosInstance.post(ENDPOINTS.ALERTAS_PANEL.SOLICITAR_OTP(id), {}, { params, ...config });
     return response.data;
   }
 
   // =====================================================
   // VERIFICAR OTP Y OBTENER DETALLES COMPLETOS
   // =====================================================
-  async verificarOtp(id, codigo) {
-    const response = await axiosInstance.post(ENDPOINTS.ALERTAS_PANEL.VERIFICAR_OTP(id), { codigo });
+  async verificarOtp(id, codigo, params = {}) {
+    const config = {};
+    if (params.signal) {
+      config.signal = params.signal;
+      delete params.signal;
+    }
+    const response = await axiosInstance.post(ENDPOINTS.ALERTAS_PANEL.VERIFICAR_OTP(id), { codigo }, { params, ...config });
     return response.data;
   }
 

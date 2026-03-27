@@ -1,5 +1,5 @@
 // src/pages/admin/alertas/AlertasActivas.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Bell, Filter, Calendar, ChevronLeft, ChevronRight,
@@ -13,7 +13,7 @@ import authService from '../../../services/auth.service';
 import useAuthStore from '../../../store/authStore';
 import { useOtp } from '../../../hooks/useOtp';
 
-// Función para normalizar texto
+// Función para normalizar texto (mantener igual)
 const normalizarTexto = (texto) => {
   if (!texto) return '';
   
@@ -49,6 +49,9 @@ const AlertasActivas = () => {
   const [alertas, setAlertas] = useState([]);
   const [alertasOriginal, setAlertasOriginal] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // ✅ REF para AbortController
+  const abortControllerRef = useRef(null);
   
   // Obtener tipo de alerta permitido según rol
   const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
@@ -93,19 +96,29 @@ const AlertasActivas = () => {
     total_paginas: 1
   });
 
-  useEffect(() => {
-    cargarAlertas();
-  }, []);
-
-  const cargarAlertas = async () => {
+  // ✅ Función para cargar alertas con AbortController
+  const cargarAlertas = useCallback(async () => {
+    // Cancelar petición anterior si existe
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      console.log('🛑 Petición anterior cancelada en AlertasActivas');
+    }
+    
+    // Crear nuevo AbortController
+    abortControllerRef.current = new AbortController();
+    
+    setLoading(true);
     try {
-      setLoading(true);
       const params = {};
       if (tipoAlertaPermitido) {
         params.tipo = tipoAlertaPermitido;
       }
       
-      const response = await alertasPanelService.listarActivas({ limite: 1000, ...params });
+      const response = await alertasPanelService.listarActivas({ 
+        limite: 1000, 
+        ...params,
+        signal: abortControllerRef.current.signal 
+      });
       
       if (response.success) {
         const alertasFormateadas = (response.data || []).map(alerta => ({
@@ -122,12 +135,15 @@ const AlertasActivas = () => {
         setAlertas([]);
       }
     } catch (error) {
-      console.error('Error:', error);
-      toast.error('Error al cargar alertas');
+      // ✅ Ignorar errores de cancelación
+      if (error.name !== 'AbortError') {
+        console.error('Error:', error);
+        toast.error('Error al cargar alertas');
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [tipoAlertaPermitido]);
 
   const aplicarFiltrosLocal = (datos = alertasOriginal) => {
     let datosFiltrados = datos;
@@ -192,25 +208,34 @@ const AlertasActivas = () => {
     if (alertasOriginal.length) {
       aplicarFiltrosLocal();
     }
-  }, [filtros.desde, filtros.hasta, filtros.pagina]);
+  }, [filtros.desde, filtros.hasta, filtros.pagina, alertasOriginal]);
 
-  // ✅ NUEVO: Manejar clic en alerta - ABRE MODAL OTP PRIMERO
+  // ✅ Cargar datos al montar y limpiar al desmontar
+  useEffect(() => {
+    cargarAlertas();
+    
+    // ✅ LIMPIAR al desmontar el componente
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        console.log('🛑 Componente AlertasActivas desmontado - peticiones canceladas');
+      }
+    };
+  }, [cargarAlertas]);
+
+  // ✅ Manejar clic en alerta
   const handleRowClick = async (alerta) => {
     try {
       setLoading(true);
-      // Obtener el detalle de la alerta (con ofuscación)
       const response = await alertasPanelService.obtenerDetalle(alerta.id);
       
       if (response.success) {
-        // Guardar datos completos para cuando se verifique OTP
         setDatosCompletosAlerta(response.data);
         
         if (response.requiere_otp) {
-          // Si requiere OTP, mostrar modal para solicitar código
           setAlertaSeleccionada(alerta);
           setMostrarModalOtp(true);
         } else {
-          // Si no requiere OTP, ir directamente al detalle
           navigate(`/admin/alertas/${alerta.id}`);
         }
       } else {
@@ -224,25 +249,18 @@ const AlertasActivas = () => {
     }
   };
 
-  // ✅ NUEVO: Solicitar OTP desde el modal
   const handleSolicitarOtp = async () => {
     if (!alertaSeleccionada) return;
-    
     const result = await solicitarOtp(alertaSeleccionada.id);
     if (result.success) {
-      // El hook ya maneja el modal de ingreso de código
       setMostrarModalOtp(false);
     }
   };
 
-  // ✅ NUEVO: Verificar OTP y mostrar detalle completo
   const handleVerificarOtpYVerDetalle = async () => {
     if (!alertaSeleccionada || !codigoOtp) return;
-    
     const result = await verificarOtp(alertaSeleccionada.id, codigoOtp);
     if (result.success && result.data) {
-      // Guardar los datos completos en el estado global o localStorage para el detalle
-      // Por ahora, navegar con los datos completos en el estado
       navigate(`/admin/alertas/${alertaSeleccionada.id}`, { 
         state: { datosCompletos: result.data } 
       });
@@ -376,7 +394,7 @@ const AlertasActivas = () => {
           </div>
         </div>
 
-        {/* Tabla de Alertas */}
+        {/* Tabla de Alertas - mantener igual */}
         <div className="bg-white rounded-xl shadow-lg overflow-hidden">
           {loading ? (
             <div className="p-12 text-center">
@@ -408,7 +426,7 @@ const AlertasActivas = () => {
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">TIEMPO ESPERA</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">FECHA</th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">ACCIONES</th>
-                     </tr>
+                    </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {alertas.map((alerta) => (
@@ -524,7 +542,7 @@ const AlertasActivas = () => {
         tipo={mapaModal.tipo}
       />
 
-      {/* ✅ MODAL DE SOLICITUD DE OTP (primer paso) */}
+      {/* MODAL DE SOLICITUD DE OTP */}
       {mostrarModalOtp && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl">
@@ -568,7 +586,7 @@ const AlertasActivas = () => {
         </div>
       )}
 
-      {/* ✅ MODAL DE INGRESO DE OTP (segundo paso - manejado por useOtp) */}
+      {/* MODAL DE INGRESO DE OTP */}
       {showModalHook && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl">

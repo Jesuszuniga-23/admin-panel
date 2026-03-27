@@ -1,5 +1,5 @@
 // src/pages/admin/alertas/AlertasEnProceso.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Activity, Filter, Calendar, ChevronLeft, ChevronRight,
@@ -47,6 +47,9 @@ const AlertasEnProceso = () => {
   const [alertas, setAlertas] = useState([]);
   const [alertasOriginal, setAlertasOriginal] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // REF para AbortController
+  const abortControllerRef = useRef(null);
   
   // Obtener tipo de alerta permitido según rol
   const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
@@ -96,19 +99,29 @@ const AlertasEnProceso = () => {
   const [unidadesDisponibles, setUnidadesDisponibles] = useState([]);
   const [filtrosActivos, setFiltrosActivos] = useState(false);
 
-  useEffect(() => {
-    cargarAlertas();
-  }, []);
-
-  const cargarAlertas = async () => {
+  // Función para cargar alertas con AbortController
+  const cargarAlertas = useCallback(async () => {
+    // Cancelar petición anterior si existe
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      console.log('🛑 Petición anterior cancelada en AlertasEnProceso');
+    }
+    
+    // Crear nuevo AbortController
+    abortControllerRef.current = new AbortController();
+    
+    setLoading(true);
     try {
-      setLoading(true);
       const params = {};
       if (tipoAlertaPermitido) {
         params.tipo = tipoAlertaPermitido;
       }
       
-      const response = await alertasPanelService.obtenerEnProceso({ limite: 1000, ...params });
+      const response = await alertasPanelService.obtenerEnProceso({ 
+        limite: 1000, 
+        ...params,
+        signal: abortControllerRef.current.signal 
+      });
       
       if (response.success) {
         const alertasFormateadas = (response.data || []).map(alerta => ({
@@ -129,11 +142,15 @@ const AlertasEnProceso = () => {
         aplicarFiltrosLocal(alertasFormateadas);
       }
     } catch (error) {
-      toast.error('Error al cargar alertas');
+      // Ignorar errores de cancelación
+      if (error.name !== 'AbortError') {
+        console.error('Error:', error);
+        toast.error('Error al cargar alertas');
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [tipoAlertaPermitido]);
 
   const aplicarFiltrosLocal = (datos = alertasOriginal) => {
     let datosFiltrados = datos;
@@ -212,9 +229,22 @@ const AlertasEnProceso = () => {
     if (alertasOriginal.length) {
       aplicarFiltrosLocal();
     }
-  }, [filtros.tipo, filtros.unidad, filtros.desde, filtros.hasta, filtros.pagina]);
+  }, [filtros.tipo, filtros.unidad, filtros.desde, filtros.hasta, filtros.pagina, alertasOriginal]);
 
-  // ✅ Manejar clic en alerta - ABRE MODAL OTP PRIMERO
+  // Cargar datos al montar y limpiar al desmontar
+  useEffect(() => {
+    cargarAlertas();
+    
+    // LIMPIAR al desmontar el componente
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        console.log('🛑 Componente AlertasEnProceso desmontado - peticiones canceladas');
+      }
+    };
+  }, [cargarAlertas]);
+
+  // Manejar clic en alerta
   const handleRowClick = async (alerta) => {
     try {
       setLoading(true);
@@ -240,7 +270,6 @@ const AlertasEnProceso = () => {
     }
   };
 
-  // ✅ Solicitar OTP
   const handleSolicitarOtp = async () => {
     if (!alertaSeleccionada) return;
     const result = await solicitarOtp(alertaSeleccionada.id);
@@ -249,7 +278,6 @@ const AlertasEnProceso = () => {
     }
   };
 
-  // ✅ Verificar OTP y mostrar detalle
   const handleVerificarOtpYVerDetalle = async () => {
     if (!alertaSeleccionada || !codigoOtp) return;
     const result = await verificarOtp(alertaSeleccionada.id, codigoOtp);
