@@ -39,16 +39,13 @@ const getCustomIcon = (tipo) => {
 };
 
 const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta, altura = '500px' }) => {
-  const mapaRef = useRef(null);
+  const containerRef = useRef(null);
   const mapaInstancia = useRef(null);
   const marcadoresRef = useRef(new Map());
-  const grupoMarcadoresRef = useRef(null);
-  const [mapaInicializado, setMapaInicializado] = useState(false);
-  const [cargandoMapa, setCargandoMapa] = useState(true);
-  const initTimeoutRef = useRef(null);
-  const resizeTimeoutRef = useRef(null);
-  const retryCountRef = useRef(0);
+  const [mapaListo, setMapaListo] = useState(false);
+  const [error, setError] = useState(null);
 
+  // Filtrar alertas válidas
   const alertasValidas = useMemo(() => {
     return alertas.filter(a => {
       const lat = parseFloat(a.lat);
@@ -57,6 +54,7 @@ const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta, altura = '500px' 
     });
   }, [alertas]);
 
+  // Centro del mapa
   const centroMapa = useMemo(() => {
     if (alertasValidas.length === 0) return { lat: 19.4326, lng: -99.1332 };
     const latMedia = alertasValidas.reduce((sum, a) => sum + parseFloat(a.lat), 0) / alertasValidas.length;
@@ -64,6 +62,7 @@ const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta, altura = '500px' 
     return { lat: latMedia, lng: lngMedia };
   }, [alertasValidas]);
 
+  // Contenido del popup
   const crearPopupContent = useCallback((alerta) => {
     const fechaFormateada = alerta.fecha_creacion ? new Date(alerta.fecha_creacion).toLocaleString('es-MX') : 'Fecha desconocida';
     const estadoTexto = {
@@ -90,119 +89,140 @@ const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta, altura = '500px' 
           <div className="flex items-center justify-between"><span className="font-medium">Estado:</span><span className={`px-2 py-0.5 rounded-full text-xs ${estadoColor}`}>{estadoTexto}</span></div>
           <div className="flex items-center gap-1"><span className="font-medium">Tipo:</span><span>{alerta.tipo === 'panico' ? '🚨 Pánico' : '🚑 Médica'}</span></div>
           <div className="flex items-center gap-1"><span className="font-medium">Fecha:</span><span className="text-xs">{fechaFormateada}</span></div>
-          <div className="flex items-center gap-1"><span className="font-medium">Ubicación:</span><span className="text-xs font-mono">{parseFloat(alerta.lat).toFixed(4)}, {parseFloat(alerta.lng).toFixed(4)}</span></div>
         </div>
         <button className="mt-2 w-full text-center text-xs text-blue-600 hover:text-blue-800 font-medium py-1 border-t border-gray-100 pt-2" onClick={() => { if (onSeleccionarAlerta) onSeleccionarAlerta(alerta); }}>Ver detalles</button>
       </div>
     );
   }, [onSeleccionarAlerta]);
 
-  // ✅ useEffect CORREGIDO con reintentos automáticos
+  // Inicializar el mapa cuando el contenedor esté listo
   useEffect(() => {
-    console.log('🔍 [MapaMultiAlertas] useEffect - mapaRef:', !!mapaRef.current);
+    if (!containerRef.current) {
+      console.log('⚠️ [MapaMultiAlertas] containerRef aún no está disponible');
+      return;
+    }
     
-    const inicializarMapa = () => {
-      if (!mapaRef.current || mapaInicializado) {
-        console.log('⚠️ [MapaMultiAlertas] No se inicializa - contenedor no listo o ya inicializado');
-        return;
-      }
+    if (mapaInstancia.current) {
+      console.log('⚠️ [MapaMultiAlertas] Mapa ya inicializado');
+      return;
+    }
+    
+    console.log('🗺️ [MapaMultiAlertas] Inicializando mapa...');
+    console.log('📐 [MapaMultiAlertas] Contenedor:', containerRef.current);
+    
+    try {
+      const mapa = L.map(containerRef.current).setView([centroMapa.lat, centroMapa.lng], 12);
       
-      const rect = mapaRef.current.getBoundingClientRect();
-      console.log('📐 [MapaMultiAlertas] Dimensiones:', rect.width, 'x', rect.height);
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap contributors',
+        detectRetina: true
+      }).addTo(mapa);
       
-      if (rect.width === 0 || rect.height === 0) {
-        retryCountRef.current++;
-        if (retryCountRef.current < 5) {
-          console.log(`⚠️ [MapaMultiAlertas] Sin dimensiones, reintento ${retryCountRef.current}/5...`);
-          initTimeoutRef.current = setTimeout(inicializarMapa, 500);
-        } else {
-          console.error('❌ [MapaMultiAlertas] Máximos reintentos alcanzados, el contenedor no tiene dimensiones');
-          setCargandoMapa(false);
+      mapaInstancia.current = mapa;
+      setMapaListo(true);
+      console.log('✅ [MapaMultiAlertas] Mapa inicializado correctamente');
+      
+      // Forzar actualización de tamaño
+      setTimeout(() => {
+        if (mapaInstancia.current) {
+          mapaInstancia.current.invalidateSize();
         }
-        return;
+      }, 200);
+      
+    } catch (err) {
+      console.error('❌ [MapaMultiAlertas] Error inicializando mapa:', err);
+      setError(err.message);
+    }
+  }, [centroMapa.lat, centroMapa.lng]);
+
+  // Agregar marcadores cuando el mapa esté listo
+  useEffect(() => {
+    if (!mapaListo || !mapaInstancia.current) return;
+    
+    console.log('📍 [MapaMultiAlertas] Agregando marcadores, alertas:', alertasValidas.length);
+    
+    // Limpiar marcadores existentes
+    marcadoresRef.current.forEach((marcador) => {
+      if (mapaInstancia.current) {
+        mapaInstancia.current.removeLayer(marcador);
       }
+    });
+    marcadoresRef.current.clear();
+    
+    // Agregar nuevos marcadores
+    alertasValidas.forEach(alerta => {
+      const lat = parseFloat(alerta.lat);
+      const lng = parseFloat(alerta.lng);
+      const icono = getCustomIcon(alerta.tipo);
       
       try {
-        console.log('🗺️ [MapaMultiAlertas] Inicializando mapa...');
-        const mapa = L.map(mapaRef.current, { center: [centroMapa.lat, centroMapa.lng], zoom: 12 });
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(mapa);
-        const grupo = L.layerGroup().addTo(mapa);
-        grupoMarcadoresRef.current = grupo;
-        mapaInstancia.current = mapa;
-        setMapaInicializado(true);
-        setCargandoMapa(false);
-        console.log('✅ [MapaMultiAlertas] Mapa inicializado');
-        setTimeout(() => { if (mapaInstancia.current) mapaInstancia.current.invalidateSize(); }, 200);
-      } catch (error) {
-        console.error('❌ Error:', error);
-        setCargandoMapa(false);
+        const marcador = L.marker([lat, lng], { icon: icono }).addTo(mapaInstancia.current);
+        marcador.bindPopup(crearPopupContent(alerta));
+        marcador.on('click', () => {
+          if (onSeleccionarAlerta) onSeleccionarAlerta(alerta);
+        });
+        marcadoresRef.current.set(alerta.id, marcador);
+      } catch (err) {
+        console.error('Error creando marcador:', err);
+      }
+    });
+    
+    // Ajustar vista si hay alertas
+    if (alertasValidas.length > 0) {
+      const bounds = L.latLngBounds(alertasValidas.map(a => [parseFloat(a.lat), parseFloat(a.lng)]));
+      if (bounds.isValid()) {
+        mapaInstancia.current.fitBounds(bounds, { padding: [50, 50] });
+      }
+    }
+    
+  }, [alertasValidas, mapaListo, crearPopupContent, onSeleccionarAlerta]);
+
+  // Manejar resize de ventana
+  useEffect(() => {
+    const handleResize = () => {
+      if (mapaInstancia.current) {
+        mapaInstancia.current.invalidateSize();
       }
     };
-    
-    initTimeoutRef.current = setTimeout(inicializarMapa, 300);
-    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Limpieza al desmontar
+  useEffect(() => {
     return () => {
-      if (initTimeoutRef.current) clearTimeout(initTimeoutRef.current);
       if (mapaInstancia.current) {
         mapaInstancia.current.remove();
         mapaInstancia.current = null;
       }
-      setMapaInicializado(false);
+      marcadoresRef.current.clear();
+      console.log('🗺️ [MapaMultiAlertas] Mapa destruido');
     };
-  }, [centroMapa.lat, centroMapa.lng]);
+  }, []);
 
-  // Actualizar marcadores
-  useEffect(() => {
-    if (!mapaInstancia.current || !grupoMarcadoresRef.current || !mapaInicializado) return;
-    
-    const idsActuales = new Set(alertasValidas.map(a => a.id));
-    marcadoresRef.current.forEach((marcador, id) => {
-      if (!idsActuales.has(id)) {
-        grupoMarcadoresRef.current.removeLayer(marcador);
-        marcadoresRef.current.delete(id);
-      }
-    });
-    
-    alertasValidas.forEach(alerta => {
-      if (marcadoresRef.current.has(alerta.id)) return;
-      const lat = parseFloat(alerta.lat), lng = parseFloat(alerta.lng);
-      const icono = getCustomIcon(alerta.tipo);
-      const marcador = L.marker([lat, lng], { icon: icono }).addTo(grupoMarcadoresRef.current);
-      marcador.bindPopup(crearPopupContent(alerta));
-      marcador.on('click', () => { if (onSeleccionarAlerta) onSeleccionarAlerta(alerta); });
-      marcadoresRef.current.set(alerta.id, marcador);
-    });
-    
-    if (alertasValidas.length > 0 && mapaInstancia.current) {
-      const bounds = L.latLngBounds(alertasValidas.map(a => [parseFloat(a.lat), parseFloat(a.lng)]));
-      if (bounds.isValid()) mapaInstancia.current.fitBounds(bounds, { padding: [50, 50] });
-    }
-  }, [alertasValidas, mapaInicializado, crearPopupContent, onSeleccionarAlerta]);
-
-  // Resize
-  useEffect(() => {
-    const handleResize = () => {
-      if (resizeTimeoutRef.current) clearTimeout(resizeTimeoutRef.current);
-      resizeTimeoutRef.current = setTimeout(() => {
-        if (mapaInstancia.current && mapaInicializado) mapaInstancia.current.invalidateSize();
-      }, 150);
-    };
-    window.addEventListener('resize', handleResize);
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      if (resizeTimeoutRef.current) clearTimeout(resizeTimeoutRef.current);
-    };
-  }, [mapaInicializado]);
-
-  if (cargandoMapa) {
+  // Mostrar error si ocurrió
+  if (error) {
     return (
-      <div className="w-full bg-gray-100 rounded-xl flex flex-col items-center justify-center" style={{ height: altura, minHeight: '300px' }}>
-        <Loader size={32} className="text-blue-600 animate-spin mb-3" />
-        <p className="text-gray-500 text-sm">Cargando mapa...</p>
+      <div className="w-full bg-red-50 rounded-xl flex flex-col items-center justify-center border border-red-200" style={{ height: altura, minHeight: '300px' }}>
+        <AlertTriangle size={32} className="text-red-500 mb-2" />
+        <p className="text-red-600 text-sm font-medium">Error al cargar el mapa</p>
+        <p className="text-red-500 text-xs mt-1">{error}</p>
       </div>
     );
   }
 
+  // Mostrar loading mientras se inicializa
+  if (!mapaListo) {
+    return (
+      <div className="w-full bg-gray-100 rounded-xl flex flex-col items-center justify-center" style={{ height: altura, minHeight: '300px' }}>
+        <Loader size={32} className="text-blue-600 animate-spin mb-3" />
+        <p className="text-gray-500 text-sm">Inicializando mapa...</p>
+      </div>
+    );
+  }
+
+  // Mostrar placeholder si no hay alertas
   if (alertasValidas.length === 0) {
     return (
       <div className="w-full bg-gray-100 rounded-xl flex flex-col items-center justify-center" style={{ height: altura, minHeight: '300px' }}>
@@ -213,7 +233,14 @@ const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta, altura = '500px' 
     );
   }
 
-  return <div ref={mapaRef} className="w-full rounded-xl overflow-hidden" style={{ height: altura, minHeight: '300px' }} />;
+  // Renderizar el contenedor del mapa
+  return (
+    <div 
+      ref={containerRef} 
+      className="w-full rounded-xl overflow-hidden bg-gray-100"
+      style={{ height: altura, minHeight: '300px' }}
+    />
+  );
 };
 
 export default MapaMultiAlertas;
