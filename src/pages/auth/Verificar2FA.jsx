@@ -1,7 +1,9 @@
 // src/pages/auth/Verificar2FA.jsx
+// REEMPLAZAR TODO EL ARCHIVO CON ESTA VERSIÓN CORREGIDA
+
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Shield, ArrowLeft, Mail, Loader, CheckCircle, XCircle } from 'lucide-react';
+import { Shield, ArrowLeft, Mail, Loader, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import authService from '../../services/auth.service';
 import useAuthStore from '../../store/authStore';
@@ -16,6 +18,7 @@ const Verificar2FA = () => {
   const [email, setEmail] = useState('');
   const [tiempoEspera, setTiempoEspera] = useState(0);
   const [error, setError] = useState('');
+  const [errorDetalle, setErrorDetalle] = useState('');
   
   const abortControllerRef = useRef(null);
   const timerRef = useRef(null);
@@ -30,6 +33,7 @@ const Verificar2FA = () => {
       setEmail(decodeURIComponent(emailParam));
     } else {
       setError('No se encontró el email de verificación');
+      setErrorDetalle('Por favor, inicia sesión nuevamente');
       setTimeout(() => navigate('/login'), 3000);
     }
   }, [location, navigate]);
@@ -56,8 +60,20 @@ const Verificar2FA = () => {
     };
   }, []);
 
+  // ✅ Función para limpiar errores y resetear el estado
+  const limpiarError = useCallback(() => {
+    setError('');
+    setErrorDetalle('');
+    setCodigo('');
+    // No resetear el tiempo de espera para no permitir spam
+  }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // ✅ Limpiar error anterior antes de nuevo intento
+    limpiarError();
+    
     if (codigo.length !== 6) {
       toast.error('Ingresa el código de 6 dígitos');
       return;
@@ -85,17 +101,13 @@ const Verificar2FA = () => {
         if (response.usuario) {
           console.log('✅ Guardando usuario en store:', response.usuario);
           setUser(response.usuario);
-        } else {
-          console.error('❌ No hay usuario en la respuesta');
         }
         
         const rolesAdmin = ['superadmin', 'admin', 'operador_tecnico', 'operador_policial', 'operador_medico', 'operador_general'];
         
         if (rolesAdmin.includes(response.usuario?.rol)) {
-          console.log('✅ Redirigiendo a /admin/dashboard');
           navigate('/admin/dashboard', { replace: true });
         } else {
-          console.log('✅ Redirigiendo a /mobile');
           navigate('/mobile', { replace: true });
         }
       }
@@ -104,11 +116,23 @@ const Verificar2FA = () => {
         console.error('Error verificando código:', error);
         const errorMsg = error.response?.data?.error || 'Error al verificar código';
         
-        // ✅ Mensaje específico para código expirado
+        // ✅ Guardar error detallado para mostrar al usuario
+        setError(errorMsg);
+        
+        // ✅ Mensaje específico según tipo de error
         if (errorMsg.includes('expirado') || errorMsg.includes('expiró')) {
+          setErrorDetalle('El código expiró. Usa el botón "Reenviar código" para obtener uno nuevo.');
           toast.error(errorMsg, { duration: 8000 });
           setCodigo('');
+        } else if (errorMsg.includes('incorrecto')) {
+          setErrorDetalle('Verifica que el código sea correcto. Puedes solicitar uno nuevo si lo necesitas.');
+          toast.error(errorMsg);
+          // ✅ Mantener el código para que el usuario pueda corregirlo
+        } else if (errorMsg.includes('bloqueado')) {
+          setErrorDetalle('Demasiados intentos fallidos. Espera unos minutos antes de intentar nuevamente.');
+          toast.error(errorMsg, { duration: 8000 });
         } else {
+          setErrorDetalle('Intenta nuevamente o usa el botón "Reenviar código" si el problema persiste.');
           toast.error(errorMsg);
         }
       }
@@ -118,7 +142,13 @@ const Verificar2FA = () => {
   };
 
   const handleReenviar = useCallback(async () => {
-    if (tiempoEspera > 0) return;
+    if (tiempoEspera > 0) {
+      toast.info(`Espera ${tiempoEspera} segundos antes de reenviar`);
+      return;
+    }
+
+    // ✅ Limpiar error antes de reenviar
+    limpiarError();
 
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -138,24 +168,41 @@ const Verificar2FA = () => {
         toast.success(response.message || 'Código reenviado correctamente');
         setTiempoEspera(30);
         setCodigo('');
+        setError('');
+        setErrorDetalle('');
       } else {
-        toast.error(response.error || 'Error al reenviar código');
+        const errorMsg = response.error || 'Error al reenviar código';
+        setError(errorMsg);
+        setErrorDetalle('Intenta nuevamente en unos momentos.');
+        toast.error(errorMsg);
       }
     } catch (error) {
       if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
         console.error('Error reenviando código:', error);
-        toast.error(error.response?.data?.error || 'Error al reenviar código');
+        const errorMsg = error.response?.data?.error || 'Error al reenviar código';
+        setError(errorMsg);
+        
+        if (errorMsg.includes('demasiados') || errorMsg.includes('límite')) {
+          setErrorDetalle('Has solicitado demasiados códigos. Espera unos minutos.');
+        } else {
+          setErrorDetalle('No se pudo reenviar el código. Verifica tu conexión.');
+        }
+        toast.error(errorMsg);
       }
     } finally {
       setReenviando(false);
     }
-  }, [tiempoEspera]);
+  }, [tiempoEspera, limpiarError]);
+
+  const handleVolverALogin = () => {
+    navigate('/login', { replace: true });
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="max-w-md w-full">
         <button
-          onClick={() => navigate('/login')}
+          onClick={handleVolverALogin}
           className="mb-6 flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
         >
           <ArrowLeft size={20} />
@@ -175,15 +222,34 @@ const Verificar2FA = () => {
           </div>
 
           {error ? (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 text-center">
-              <XCircle className="h-8 w-8 text-red-500 mx-auto mb-2" />
-              <p className="text-red-600">{error}</p>
-              <button
-                onClick={() => navigate('/login')}
-                className="mt-3 text-sm text-blue-600 hover:text-blue-700"
-              >
-                Ir al inicio de sesión
-              </button>
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+              <div className="flex items-start gap-3">
+                <XCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-red-700 font-medium">{error}</p>
+                  {errorDetalle && (
+                    <p className="text-red-600 text-sm mt-1">{errorDetalle}</p>
+                  )}
+                </div>
+              </div>
+              <div className="flex gap-3 mt-4">
+                <button
+                  onClick={limpiarError}
+                  className="flex-1 text-sm text-gray-600 hover:text-gray-800 bg-gray-100 hover:bg-gray-200 py-2 rounded-lg transition-colors"
+                >
+                  Intentar de nuevo
+                </button>
+                {tiempoEspera === 0 && (
+                  <button
+                    onClick={handleReenviar}
+                    disabled={reenviando}
+                    className="flex-1 text-sm text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 py-2 rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-1"
+                  >
+                    <RefreshCw size={14} className={reenviando ? 'animate-spin' : ''} />
+                    Reenviar código
+                  </button>
+                )}
+              </div>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -196,15 +262,17 @@ const Verificar2FA = () => {
                   value={codigo}
                   onChange={(e) => setCodigo(e.target.value.replace(/\D/g, '').slice(0, 6))}
                   placeholder="000000"
-                  className="w-full text-center text-2xl tracking-widest border border-gray-300 rounded-lg p-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full text-center text-2xl tracking-widest border border-gray-300 rounded-lg p-4 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   autoFocus
-                  disabled={!!error}
                 />
+                <p className="text-xs text-gray-400 mt-2 text-center">
+                  El código expira en 20 minutos
+                </p>
               </div>
 
               <button
                 type="submit"
-                disabled={loading || codigo.length !== 6 || !!error}
+                disabled={loading || codigo.length !== 6}
                 className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-indigo-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {loading ? (
@@ -219,7 +287,7 @@ const Verificar2FA = () => {
                 <button
                   type="button"
                   onClick={handleReenviar}
-                  disabled={reenviando || tiempoEspera > 0 || !!error}
+                  disabled={reenviando || tiempoEspera > 0}
                   className="text-sm text-blue-600 hover:text-blue-700 disabled:opacity-50 flex items-center justify-center gap-2 mx-auto"
                 >
                   <Mail size={16} />
