@@ -1,7 +1,5 @@
 // src/pages/admin/analisis/AnalisisGeografico.jsx
-// VERSIÓN SIMPLIFICADA - SIN EFECTOS COMPLEJOS
-
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   MapPin, Calendar, Filter, ChevronLeft, AlertTriangle,
@@ -11,6 +9,7 @@ import {
 import analisisGeograficoService from '../../../services/admin/analisisGeografico.service';
 import reportesService from '../../../services/admin/reportes.service';
 import Loader from '../../../components/common/Loader';
+import MapaMultiAlertas from '../../../components/maps/MapaMultiAlertas';
 import useAuthStore from '../../../store/authStore';
 import toast from 'react-hot-toast';
 import IconoEntidad, { BadgeTipoAlerta } from '../../../components/ui/IconoEntidad';
@@ -34,6 +33,7 @@ const AnalisisGeografico = () => {
     panico: 0, medica: 0, activas: 0, proceso: 0, cerradas: 0, expiradas: 0
   });
   const [zonas, setZonas] = useState([]);
+  const [mostrarMapa, setMostrarMapa] = useState(true); // Mapa visible por defecto
   
   const [filtros, setFiltros] = useState({
     fechaInicio: '',
@@ -127,6 +127,18 @@ const AnalisisGeografico = () => {
     return Object.values(zonasMap).sort((a, b) => b.total - a.total);
   };
 
+  // Alertas para el mapa (filtradas por tipo según rol)
+  const alertasParaMapa = useMemo(() => {
+    let filtradas = alertasFiltradas;
+    
+    // Si el rol tiene restricción de tipo, filtrar
+    if (tipoAlertaPermitido) {
+      filtradas = filtradas.filter(a => a.tipo === tipoAlertaPermitido);
+    }
+    
+    return filtradas.filter(a => a.lat && a.lng);
+  }, [alertasFiltradas, tipoAlertaPermitido]);
+
   // Cargar datos UNA SOLA VEZ
   useEffect(() => {
     const cargarDatos = async () => {
@@ -175,7 +187,7 @@ const AnalisisGeografico = () => {
         abortControllerRef.current.abort();
       }
     };
-  }, [tipoAlertaPermitido]); // Solo se ejecuta UNA VEZ
+  }, [tipoAlertaPermitido]);
 
   // Aplicar filtros cuando cambian
   useEffect(() => {
@@ -185,9 +197,7 @@ const AnalisisGeografico = () => {
     setAlertasFiltradas(filtrados);
     setEstadisticas(calcularEstadisticas(filtrados));
     setZonas(procesarZonas(filtrados));
-  }, [filtros, alertas]); // Dependencias correctas
-
-  const alertasConUbicacion = alertasFiltradas.filter(a => a.lat && a.lng);
+  }, [filtros, alertas]);
 
   const limpiarFiltros = () => {
     setFiltros({
@@ -284,6 +294,116 @@ const AnalisisGeografico = () => {
           </div>
         </div>
 
+        {/* MAPA PRINCIPAL - VERSIÓN ESTABLE CON FILTRO POR ROL */}
+        <div className="bg-white rounded-2xl shadow-xl p-6 mb-8 border border-gray-100">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl shadow-md">
+                <Map size={20} className="text-white" />
+              </div>
+              <h2 className="text-lg font-semibold text-gray-800">
+                Mapa de Incidentes
+                {tipoAlertaPermitido && (
+                  <span className="ml-2 text-sm font-normal text-gray-500">
+                    ({tipoAlertaPermitido === 'panico' ? 'Solo alertas de Pánico' : 'Solo alertas Médicas'})
+                  </span>
+                )}
+              </h2>
+              <div className="flex items-center gap-2 ml-4">
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                  <span className="text-xs text-gray-500">Pánico</span>
+                </div>
+                {!tipoAlertaPermitido && (
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                    <span className="text-xs text-gray-500">Médica</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full">
+                {alertasParaMapa.length} puntos visibles
+              </span>
+              <button
+                onClick={() => setMostrarMapa(!mostrarMapa)}
+                className="text-xs text-gray-500 hover:text-gray-700"
+              >
+                {mostrarMapa ? 'Ocultar mapa' : 'Mostrar mapa'}
+              </button>
+            </div>
+          </div>
+
+          {mostrarMapa ? (
+            <MapaMultiAlertas 
+              alertas={alertasParaMapa}
+              onSeleccionarAlerta={setAlertaSeleccionada}
+              altura="500px"
+            />
+          ) : (
+            <div className="h-[500px] w-full rounded-xl overflow-hidden border border-gray-200 shadow-inner bg-gray-50 flex flex-col items-center justify-center">
+              <Map size={48} className="text-gray-400 mb-4" />
+              <p className="text-gray-500 text-sm">Mapa oculto</p>
+              <button
+                onClick={() => setMostrarMapa(true)}
+                className="mt-2 text-sm text-indigo-600 hover:text-indigo-800"
+              >
+                Mostrar mapa
+              </button>
+            </div>
+          )}
+
+          {/* Alerta seleccionada */}
+          {alertaSeleccionada && (
+            <div className="mt-4 p-4 bg-indigo-50 rounded-xl border border-indigo-200">
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-3">
+                  <div className={`p-2 rounded-lg ${alertaSeleccionada.tipo === 'panico' ? 'bg-red-100' : 'bg-green-100'}`}>
+                    <IconoEntidad 
+                      entidad={alertaSeleccionada.tipo === 'panico' ? 'ALERTA_PANICO' : 'ALERTA_MEDICA'} 
+                      size={16}
+                    />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-semibold text-gray-800">Alerta #{alertaSeleccionada.id}</h3>
+                      <BadgeTipoAlerta tipo={alertaSeleccionada.tipo} size={12} />
+                    </div>
+                    <p className="text-sm text-gray-600 mb-2">
+                      {alertaSeleccionada.ciudadano?.nombre || 'Ciudadano desconocido'}
+                    </p>
+                    <div className="flex items-center gap-4 text-xs text-gray-500">
+                      <span className="flex items-center gap-1">
+                        <IconoEntidad entidad="UBICACION" size={12} />
+                        {alertaSeleccionada.lat?.toFixed(4)}, {alertaSeleccionada.lng?.toFixed(4)}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Clock size={12} />
+                        {new Date(alertaSeleccionada.fecha_creacion).toLocaleString()}
+                      </span>
+                      <span className={`px-2 py-0.5 rounded-full text-xs ${
+                        alertaSeleccionada.estado === 'activa' ? 'bg-red-100 text-red-700' :
+                        alertaSeleccionada.estado === 'asignada' ? 'bg-blue-100 text-blue-700' :
+                        alertaSeleccionada.estado === 'cerrada' ? 'bg-green-100 text-green-700' :
+                        'bg-gray-100 text-gray-700'
+                      }`}>
+                        {alertaSeleccionada.estado.toUpperCase()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setAlertaSeleccionada(null)}
+                  className="p-1 hover:bg-white rounded-lg transition-colors"
+                >
+                  <XCircle size={18} className="text-gray-400" />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Tarjetas */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-3 mb-8">
           <ResumenCard label="Total" value={estadisticas.total} icon={Bell} color="indigo" />
@@ -303,7 +423,12 @@ const AnalisisGeografico = () => {
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
-                  <tr><th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Zona</th><th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Total</th><th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Pánico</th><th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Médica</th></tr>
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Zona</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Total</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Pánico</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Médica</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {zonas.map((zona, i) => (
@@ -317,7 +442,25 @@ const AnalisisGeografico = () => {
                 </tbody>
               </table>
             </div>
-          ) : <div className="text-center py-8 text-gray-400">No hay datos</div>}
+          ) : (
+            <div className="text-center py-8 text-gray-400">No hay datos</div>
+          )}
+        </div>
+
+        {/* Nota informativa */}
+        <div className="mt-8 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl p-6 border border-indigo-200">
+          <div className="flex items-start gap-4">
+            <div className="p-2 bg-white rounded-xl shadow-sm"><Info size={20} className="text-indigo-600" /></div>
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-indigo-900 mb-1">Análisis basado en datos reales</h3>
+              <p className="text-sm text-indigo-700">
+                Este análisis utiliza las coordenadas reales de {estadisticas.conUbicacion} alertas con ubicación geográfica válida.
+                {estadisticas.sinUbicacion} alertas no tienen coordenadas y no se incluyen en el análisis por zona.
+                {tipoAlertaPermitido && ` Actualmente filtrado para mostrar solo alertas de tipo ${tipoAlertaPermitido === 'panico' ? 'Pánico' : 'Médicas'}.`}
+                {alertasParaMapa.length > 0 && ` Se muestran ${alertasParaMapa.length} puntos en el mapa.`}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
