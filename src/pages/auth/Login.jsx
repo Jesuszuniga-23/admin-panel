@@ -11,12 +11,10 @@ const Login = () => {
   const { user } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
   
-  // ✅ Ref para timeout de redirección
   const redirectTimeoutRef = useRef(null);
 
   useEffect(() => {
     if (user) {
-      // ✅ Manejar todos los roles correctamente
       const rolesAdmin = ['superadmin', 'admin', 'operador_tecnico', 'operador_policial', 'operador_medico', 'operador_general'];
       
       if (rolesAdmin.includes(user.rol)) {
@@ -27,7 +25,6 @@ const Login = () => {
     }
   }, [user, navigate]);
   
-  // ✅ Limpiar timeout al desmontar
   useEffect(() => {
     return () => {
       if (redirectTimeoutRef.current) {
@@ -39,7 +36,6 @@ const Login = () => {
   const handleLoginClick = () => {
     setIsLoading(true);
     
-    // ✅ Validar que la URL esté configurada
     const apiUrl = import.meta.env.VITE_API_URL;
     if (!apiUrl) {
       toast.error('Error de configuración: URL de API no definida');
@@ -47,15 +43,16 @@ const Login = () => {
       return;
     }
     
-    // ✅ Timeout para resetear el estado de carga si la redirección falla
+    // ✅ Normalizar URL (eliminar trailing slash)
+    const baseUrl = apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
+    
     redirectTimeoutRef.current = setTimeout(() => {
       setIsLoading(false);
       toast.error('La redirección está tomando más tiempo de lo esperado. Intenta nuevamente.');
     }, 10000);
     
-    // ✅ Redirigir al backend
     try {
-      window.location.href = `${apiUrl}/auth/login/google`;
+      window.location.href = `${baseUrl}/auth/login/google`;
     } catch (error) {
       console.error('Error en redirección:', error);
       setIsLoading(false);

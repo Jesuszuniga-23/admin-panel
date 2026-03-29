@@ -18,13 +18,13 @@ class AuthService {
         config.signal = options.signal;
       }
       
+      // ✅ Usar endpoint correcto
       const response = await axiosInstance.post(ENDPOINTS.AUTH.GOOGLE_ADMIN_LOGIN, {
         idToken: token
       }, config);
       
       return response.data;
     } catch (error) {
-      // ✅ Propagar error de cancelación
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
@@ -46,7 +46,6 @@ class AuthService {
       console.log('🔐 Respuesta de verificar2FA:', response.data);
       return response.data;
     } catch (error) {
-      // ✅ Propagar error de cancelación
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
@@ -65,7 +64,6 @@ class AuthService {
       const response = await axiosInstance.post(ENDPOINTS.AUTH.RESEND_2FA, {}, config);
       return response.data;
     } catch (error) {
-      // ✅ Propagar error de cancelación
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
@@ -84,7 +82,6 @@ class AuthService {
       const response = await axiosInstance.get(ENDPOINTS.AUTH.SESSION_STATUS, config);
       return response.data;
     } catch (error) {
-      // ✅ Propagar error de cancelación
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
@@ -102,7 +99,6 @@ class AuthService {
       
       await axiosInstance.post(ENDPOINTS.AUTH.ACTIVITY, {}, config);
     } catch (error) {
-      // ✅ Ignorar errores de cancelación silenciosamente
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         return;
       }
@@ -123,7 +119,6 @@ class AuthService {
       localStorage.removeItem('pending_2fa_token');
       sessionStorage.clear();
       
-      // ✅ Usar navigate si está disponible, sino window.location
       if (navigate && typeof navigate === 'function') {
         navigate('/login', { replace: true });
       } else {
@@ -153,7 +148,6 @@ class AuthService {
       
       return false;
     } catch (error) {
-      // ✅ Propagar error de cancelación
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
@@ -232,10 +226,6 @@ class AuthService {
     return null;
   }
 
-  // =====================================================
-  // PERMISOS PARA CREAR PERSONAL Y UNIDADES
-  // =====================================================
-  
   puedeCrearPersonal(rolACrear) {
     const user = this.getCurrentUser();
     if (!user) return false;
@@ -314,7 +304,6 @@ class AuthService {
     return this.puedeEditarUnidad(tipoUnidad);
   }
   
-  // Métodos existentes
   puedeModificarPersonal(rolPersonal) {
     return this.puedeEditarPersonal(rolPersonal);
   }

@@ -17,7 +17,6 @@ const Verificar2FA = () => {
   const [tiempoEspera, setTiempoEspera] = useState(0);
   const [error, setError] = useState('');
   
-  // ✅ REF para AbortController y timeout
   const abortControllerRef = useRef(null);
   const timerRef = useRef(null);
 
@@ -35,7 +34,6 @@ const Verificar2FA = () => {
     }
   }, [location, navigate]);
 
-  // ✅ Efecto con limpieza para el timer de espera
   useEffect(() => {
     if (tiempoEspera > 0) {
       timerRef.current = setTimeout(() => setTiempoEspera(tiempoEspera - 1), 1000);
@@ -47,7 +45,6 @@ const Verificar2FA = () => {
     }
   }, [tiempoEspera]);
 
-  // ✅ Limpieza general al desmontar
   useEffect(() => {
     return () => {
       if (abortControllerRef.current) {
@@ -66,7 +63,6 @@ const Verificar2FA = () => {
       return;
     }
 
-    // Cancelar petición anterior si existe
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       console.log('🛑 Petición 2FA anterior cancelada');
@@ -86,7 +82,6 @@ const Verificar2FA = () => {
       if (response.success) {
         toast.success('Verificación exitosa');
         
-        // ✅ GUARDAR EL USUARIO EN EL STORE
         if (response.usuario) {
           console.log('✅ Guardando usuario en store:', response.usuario);
           setUser(response.usuario);
@@ -96,7 +91,6 @@ const Verificar2FA = () => {
         
         const rolesAdmin = ['superadmin', 'admin', 'operador_tecnico', 'operador_policial', 'operador_medico', 'operador_general'];
         
-        // ✅ Usar navigate en lugar de window.location.href
         if (rolesAdmin.includes(response.usuario?.rol)) {
           console.log('✅ Redirigiendo a /admin/dashboard');
           navigate('/admin/dashboard', { replace: true });
@@ -104,15 +98,19 @@ const Verificar2FA = () => {
           console.log('✅ Redirigiendo a /mobile');
           navigate('/mobile', { replace: true });
         }
-      } else {
-        toast.error(response.error || 'Código incorrecto');
       }
     } catch (error) {
-      // ✅ Ignorar errores de cancelación
       if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
         console.error('Error verificando código:', error);
         const errorMsg = error.response?.data?.error || 'Error al verificar código';
-        toast.error(errorMsg);
+        
+        // ✅ Mensaje específico para código expirado
+        if (errorMsg.includes('expirado') || errorMsg.includes('expiró')) {
+          toast.error(errorMsg, { duration: 8000 });
+          setCodigo('');
+        } else {
+          toast.error(errorMsg);
+        }
       }
     } finally {
       setLoading(false);
@@ -122,7 +120,6 @@ const Verificar2FA = () => {
   const handleReenviar = useCallback(async () => {
     if (tiempoEspera > 0) return;
 
-    // Cancelar petición anterior si existe
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       console.log('🛑 Petición de reenvío anterior cancelada');
@@ -139,12 +136,12 @@ const Verificar2FA = () => {
       
       if (response.success) {
         toast.success(response.message || 'Código reenviado correctamente');
-        setTiempoEspera(60);
+        setTiempoEspera(30);
+        setCodigo('');
       } else {
         toast.error(response.error || 'Error al reenviar código');
       }
     } catch (error) {
-      // ✅ Ignorar errores de cancelación
       if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
         console.error('Error reenviando código:', error);
         toast.error(error.response?.data?.error || 'Error al reenviar código');
