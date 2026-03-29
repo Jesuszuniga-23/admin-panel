@@ -1,5 +1,5 @@
 // src/components/maps/MapaMultiAlertas.jsx
-import { useEffect, useRef, useCallback, useMemo, useState } from 'react';
+import { useEffect, useRef, useCallback, useMemo, useState, useLayoutEffect } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { AlertTriangle, Heart, Loader } from 'lucide-react';
@@ -67,7 +67,7 @@ const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta, altura = '500px' 
   // Calcular centro del mapa basado en las alertas
   const centroMapa = useMemo(() => {
     if (alertasValidas.length === 0) {
-      return { lat: 19.4326, lng: -99.1332 }; // Centro de México
+      return { lat: 19.4326, lng: -99.1332 };
     }
     
     const latMedia = alertasValidas.reduce((sum, a) => sum + parseFloat(a.lat), 0) / alertasValidas.length;
@@ -147,14 +147,38 @@ const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta, altura = '500px' 
     );
   }, [onSeleccionarAlerta]);
 
-  // Inicializar el mapa (solo una vez)
-  useEffect(() => {
-    if (!mapaRef.current || mapaInicializado) return;
+  // Inicializar el mapa (solo una vez) - USANDO useLayoutEffect
+  useLayoutEffect(() => {
+    console.log('🔍 [MapaMultiAlertas] useLayoutEffect - mapaRef:', !!mapaRef.current);
+    console.log('🔍 [MapaMultiAlertas] mapaInicializado:', mapaInicializado);
+    
+    if (!mapaRef.current || mapaInicializado) {
+      console.log('⚠️ [MapaMultiAlertas] No se inicializa - contenedor no listo o ya inicializado');
+      return;
+    }
     
     const initMap = () => {
-      if (!mapaRef.current) return;
+      if (!mapaRef.current) {
+        console.log('❌ [MapaMultiAlertas] mapaRef.current es null');
+        return;
+      }
+      
+      // Verificar dimensiones del contenedor
+      const rect = mapaRef.current.getBoundingClientRect();
+      console.log('📐 [MapaMultiAlertas] Dimensiones del contenedor:', {
+        width: rect.width,
+        height: rect.height
+      });
+      
+      if (rect.width === 0 || rect.height === 0) {
+        console.log('⚠️ [MapaMultiAlertas] Contenedor sin dimensiones, reintentando...');
+        setTimeout(initMap, 200);
+        return;
+      }
       
       try {
+        console.log('🗺️ [MapaMultiAlertas] Inicializando mapa...');
+        
         const mapa = L.map(mapaRef.current, {
           center: [centroMapa.lat, centroMapa.lng],
           zoom: 12,
@@ -177,37 +201,43 @@ const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta, altura = '500px' 
         setMapaInicializado(true);
         setCargandoMapa(false);
         
+        console.log('✅ [MapaMultiAlertas] Mapa inicializado correctamente');
+        
         // Forzar actualización de tamaño después de un breve delay
         setTimeout(() => {
           if (mapaInstancia.current) {
             mapaInstancia.current.invalidateSize();
+            console.log('🔄 [MapaMultiAlertas] invalidateSize ejecutado');
           }
         }, 200);
         
       } catch (error) {
-        console.error('Error inicializando mapa:', error);
+        console.error('❌ [MapaMultiAlertas] Error inicializando mapa:', error);
         setCargandoMapa(false);
       }
     };
     
-    // Pequeño delay para asegurar que el DOM está listo
-    initTimeoutRef.current = setTimeout(initMap, 100);
+    // Usar requestAnimationFrame para asegurar que el DOM está pintado
+    const rafId = requestAnimationFrame(() => {
+      initTimeoutRef.current = setTimeout(initMap, 100);
+    });
     
     return () => {
-      if (initTimeoutRef.current) {
-        clearTimeout(initTimeoutRef.current);
-      }
+      cancelAnimationFrame(rafId);
+      if (initTimeoutRef.current) clearTimeout(initTimeoutRef.current);
       if (mapaInstancia.current) {
         mapaInstancia.current.remove();
         mapaInstancia.current = null;
       }
       setMapaInicializado(false);
     };
-  }, [centroMapa.lat, centroMapa.lng]);
+  }, [centroMapa.lat, centroMapa.lng]); // Dependencias necesarias
 
   // Actualizar marcadores cuando cambian las alertas
   useEffect(() => {
     if (!mapaInstancia.current || !grupoMarcadoresRef.current || !mapaInicializado) return;
+    
+    console.log('📍 [MapaMultiAlertas] Actualizando marcadores, alertas válidas:', alertasValidas.length);
     
     const idsActuales = new Set(alertasValidas.map(a => a.id));
     

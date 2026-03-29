@@ -37,7 +37,6 @@ const SecurityGuard = () => {
   const enviarLote = useCallback(async () => {
     if (reportQueueRef.current.length === 0) return;
     
-    // Cancelar petición anterior si existe
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
@@ -55,10 +54,8 @@ const SecurityGuard = () => {
       });
       console.log(`📊 ${lote.length} reportes enviados al servidor`);
     } catch (error) {
-      // ✅ Ignorar errores de cancelación
       if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
         console.debug('Error enviando lote de reportes:', error);
-        // ✅ Reintentar después de un tiempo
         if (reportQueueRef.current.length === 0) {
           reportQueueRef.current = [...lote, ...reportQueueRef.current];
           scheduleEnvioLote();
@@ -87,10 +84,8 @@ const SecurityGuard = () => {
       return;
     }
     
-    // Registrar timestamp
     recentReportsRef.current.push(Date.now());
     
-    // Agregar al lote
     reportQueueRef.current.push({
       tipo,
       detalles,
@@ -99,7 +94,6 @@ const SecurityGuard = () => {
       userAgent: navigator.userAgent
     });
     
-    // Programar envío del lote
     scheduleEnvioLote();
   }, [puedeReportar, scheduleEnvioLote]);
   
@@ -116,7 +110,6 @@ const SecurityGuard = () => {
   }, []);
   
   useEffect(() => {
-    // ✅ Verificar si el contexto es seguro
     if (!window.isSecureContext) {
       console.warn('⚠️ Contexto no seguro. Algunas protecciones pueden no funcionar.');
     }
@@ -191,18 +184,18 @@ const SecurityGuard = () => {
         return false;
       }
       
-      // ✅ Prevenir F12 (DevTools) pero sin reportar (muy común)
-      if (e.key === 'F12') {
-        e.preventDefault();
-        return false;
-      }
+      // 🔓 F12 DESBLOQUEADO PARA DEPURACIÓN
+      // if (e.key === 'F12') {
+      //   e.preventDefault();
+      //   return false;
+      // }
       
-      // ✅ Prevenir Ctrl+Shift+I (DevTools)
-      if ((e.ctrlKey && e.shiftKey && e.key === 'I') ||
-          (e.metaKey && e.shiftKey && e.key === 'I')) {
-        e.preventDefault();
-        return false;
-      }
+      // 🔓 Ctrl+Shift+I DESBLOQUEADO PARA DEPURACIÓN
+      // if ((e.ctrlKey && e.shiftKey && e.key === 'I') ||
+      //     (e.metaKey && e.shiftKey && e.key === 'I')) {
+      //   e.preventDefault();
+      //   return false;
+      // }
     };
     document.addEventListener('keydown', handleKeyDown);
     
@@ -225,12 +218,11 @@ const SecurityGuard = () => {
     };
     document.addEventListener('dragstart', handleDragStart);
     
-    // 7. ✅ DETECTAR CAMBIO DE TAMAÑO DE VENTANA (puede indicar intento de ocultar elementos)
+    // 7. DETECTAR CAMBIO DE TAMAÑO DE VENTANA
     let resizeTimer;
     const handleResize = () => {
       if (resizeTimer) clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
-        // Solo reportar cambios drásticos
         if (window.innerWidth < 300 || window.innerHeight < 200) {
           reportarIntento('resize', {
             width: window.innerWidth,
@@ -241,7 +233,7 @@ const SecurityGuard = () => {
     };
     window.addEventListener('resize', handleResize);
     
-    // 8. ✅ DETECTAR VISIBILITY CHANGE (pestaña oculta)
+    // 8. DETECTAR VISIBILITY CHANGE
     const handleVisibilityChange = () => {
       if (document.hidden) {
         reportarIntento('visibility', { hidden: true });
