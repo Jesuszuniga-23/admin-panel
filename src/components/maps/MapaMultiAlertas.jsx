@@ -1,4 +1,4 @@
-// src/components/maps/MapaMultiAlertas.jsx - VERSIÓN CORREGIDA
+// src/components/maps/MapaMultiAlertas.jsx
 import { useEffect, useRef, useCallback, useMemo, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -47,6 +47,7 @@ const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta, altura = '500px' 
   const [cargandoMapa, setCargandoMapa] = useState(true);
   const initTimeoutRef = useRef(null);
   const resizeTimeoutRef = useRef(null);
+  const retryCountRef = useRef(0);
 
   const alertasValidas = useMemo(() => {
     return alertas.filter(a => {
@@ -96,24 +97,28 @@ const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta, altura = '500px' 
     );
   }, [onSeleccionarAlerta]);
 
-  // ✅ useEffect CORREGIDO con setTimeout para esperar al DOM
+  // ✅ useEffect CORREGIDO con reintentos automáticos
   useEffect(() => {
     console.log('🔍 [MapaMultiAlertas] useEffect - mapaRef:', !!mapaRef.current);
     
-    if (!mapaRef.current || mapaInicializado) {
-      console.log('⚠️ [MapaMultiAlertas] No se inicializa - contenedor no listo o ya inicializado');
-      return;
-    }
-    
-    const initMap = () => {
-      if (!mapaRef.current || mapaInicializado) return;
+    const inicializarMapa = () => {
+      if (!mapaRef.current || mapaInicializado) {
+        console.log('⚠️ [MapaMultiAlertas] No se inicializa - contenedor no listo o ya inicializado');
+        return;
+      }
       
       const rect = mapaRef.current.getBoundingClientRect();
       console.log('📐 [MapaMultiAlertas] Dimensiones:', rect.width, 'x', rect.height);
       
       if (rect.width === 0 || rect.height === 0) {
-        console.log('⚠️ [MapaMultiAlertas] Sin dimensiones, reintentando...');
-        initTimeoutRef.current = setTimeout(initMap, 300);
+        retryCountRef.current++;
+        if (retryCountRef.current < 5) {
+          console.log(`⚠️ [MapaMultiAlertas] Sin dimensiones, reintento ${retryCountRef.current}/5...`);
+          initTimeoutRef.current = setTimeout(inicializarMapa, 500);
+        } else {
+          console.error('❌ [MapaMultiAlertas] Máximos reintentos alcanzados, el contenedor no tiene dimensiones');
+          setCargandoMapa(false);
+        }
         return;
       }
       
@@ -134,7 +139,7 @@ const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta, altura = '500px' 
       }
     };
     
-    initTimeoutRef.current = setTimeout(initMap, 200);
+    initTimeoutRef.current = setTimeout(inicializarMapa, 300);
     
     return () => {
       if (initTimeoutRef.current) clearTimeout(initTimeoutRef.current);
