@@ -33,7 +33,7 @@ const AnalisisGeografico = () => {
     panico: 0, medica: 0, activas: 0, proceso: 0, cerradas: 0, expiradas: 0
   });
   const [zonas, setZonas] = useState([]);
-  const [mostrarMapa, setMostrarMapa] = useState(true); // Mapa visible por defecto
+  const [mostrarMapa, setMostrarMapa] = useState(true);
   
   const [filtros, setFiltros] = useState({
     fechaInicio: '',
@@ -95,26 +95,37 @@ const AnalisisGeografico = () => {
     return filtrados;
   };
 
-  // Función para calcular estadísticas
+  // Función para calcular estadísticas SOLO del tipo permitido
   const calcularEstadisticas = (datos) => {
-    const conUbicacion = datos.filter(a => a.lat && a.lng).length;
+    // Si hay restricción de tipo, solo mostrar estadísticas de ese tipo
+    const datosFiltrados = tipoAlertaPermitido 
+      ? datos.filter(a => a.tipo === tipoAlertaPermitido)
+      : datos;
+    
+    const conUbicacion = datosFiltrados.filter(a => a.lat && a.lng).length;
+    
     return {
-      total: datos.length,
+      total: datosFiltrados.length,
       conUbicacion,
-      sinUbicacion: datos.length - conUbicacion,
-      panico: datos.filter(a => a.tipo === 'panico').length,
-      medica: datos.filter(a => a.tipo === 'medica').length,
-      activas: datos.filter(a => a.estado === 'activa').length,
-      proceso: datos.filter(a => ['asignada', 'atendiendo'].includes(a.estado)).length,
-      cerradas: datos.filter(a => a.estado === 'cerrada').length,
-      expiradas: datos.filter(a => a.estado === 'expirada').length
+      sinUbicacion: datosFiltrados.length - conUbicacion,
+      // Si hay restricción, el contrapuesto es 0
+      panico: tipoAlertaPermitido === 'panico' ? datosFiltrados.length : datos.filter(a => a.tipo === 'panico').length,
+      medica: tipoAlertaPermitido === 'medica' ? datosFiltrados.length : datos.filter(a => a.tipo === 'medica').length,
+      activas: datosFiltrados.filter(a => a.estado === 'activa').length,
+      proceso: datosFiltrados.filter(a => ['asignada', 'atendiendo'].includes(a.estado)).length,
+      cerradas: datosFiltrados.filter(a => a.estado === 'cerrada').length,
+      expiradas: datosFiltrados.filter(a => a.estado === 'expirada').length
     };
   };
 
-  // Función para procesar zonas
+  // Función para procesar zonas SOLO del tipo permitido
   const procesarZonas = (datos) => {
+    const datosFiltrados = tipoAlertaPermitido 
+      ? datos.filter(a => a.tipo === tipoAlertaPermitido)
+      : datos;
+    
     const zonasMap = {};
-    datos.forEach(alerta => {
+    datosFiltrados.forEach(alerta => {
       if (!alerta.lat || !alerta.lng) return;
       const zona = calcularZona(alerta.lat, alerta.lng);
       if (!zonasMap[zona]) {
@@ -127,15 +138,12 @@ const AnalisisGeografico = () => {
     return Object.values(zonasMap).sort((a, b) => b.total - a.total);
   };
 
-  // Alertas para el mapa (filtradas por tipo según rol)
+  // Alertas para el mapa
   const alertasParaMapa = useMemo(() => {
     let filtradas = alertasFiltradas;
-    
-    // Si el rol tiene restricción de tipo, filtrar
     if (tipoAlertaPermitido) {
       filtradas = filtradas.filter(a => a.tipo === tipoAlertaPermitido);
     }
-    
     return filtradas.filter(a => a.lat && a.lng);
   }, [alertasFiltradas, tipoAlertaPermitido]);
 
@@ -160,7 +168,6 @@ const AnalisisGeografico = () => {
         if (response.success && response.alertas) {
           setAlertas(response.alertas);
           
-          // Aplicar filtros iniciales
           const filtrados = aplicarFiltros(response.alertas);
           setAlertasFiltradas(filtrados);
           setEstadisticas(calcularEstadisticas(filtrados));
@@ -231,6 +238,10 @@ const AnalisisGeografico = () => {
     );
   }
 
+  // Determinar qué tarjetas mostrar según el rol
+  const mostrarTarjetaPanico = !tipoAlertaPermitido || tipoAlertaPermitido === 'panico';
+  const mostrarTarjetaMedica = !tipoAlertaPermitido || tipoAlertaPermitido === 'medica';
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -250,7 +261,9 @@ const AnalisisGeografico = () => {
                   <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
                   <span>{zonas.length} zonas identificadas</span>
                   {tipoAlertaPermitido && (
-                    <span className="text-indigo-600">Filtrado: {tipoAlertaPermitido === 'panico' ? 'Solo Pánico' : 'Solo Médicas'}</span>
+                    <span className="text-indigo-600">
+                      {tipoAlertaPermitido === 'panico' ? ' (Solo Pánico)' : ' (Solo Médicas)'}
+                    </span>
                   )}
                 </p>
               </div>
@@ -294,7 +307,7 @@ const AnalisisGeografico = () => {
           </div>
         </div>
 
-        {/* MAPA PRINCIPAL - VERSIÓN ESTABLE CON FILTRO POR ROL */}
+        {/* MAPA PRINCIPAL */}
         <div className="bg-white rounded-2xl shadow-xl p-6 mb-8 border border-gray-100">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -310,11 +323,13 @@ const AnalisisGeografico = () => {
                 )}
               </h2>
               <div className="flex items-center gap-2 ml-4">
-                <div className="flex items-center gap-1">
-                  <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                  <span className="text-xs text-gray-500">Pánico</span>
-                </div>
-                {!tipoAlertaPermitido && (
+                {mostrarTarjetaPanico && (
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                    <span className="text-xs text-gray-500">Pánico</span>
+                  </div>
+                )}
+                {mostrarTarjetaMedica && !tipoAlertaPermitido && (
                   <div className="flex items-center gap-1">
                     <div className="w-3 h-3 bg-green-500 rounded-full"></div>
                     <span className="text-xs text-gray-500">Médica</span>
@@ -404,12 +419,21 @@ const AnalisisGeografico = () => {
           )}
         </div>
 
-        {/* Tarjetas */}
+        {/* Tarjetas - SOLO MOSTRAR SEGÚN ROL */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-3 mb-8">
           <ResumenCard label="Total" value={estadisticas.total} icon={Bell} color="indigo" />
           <ResumenCard label="Con ubicación" value={estadisticas.conUbicacion} icon={MapPin} color="green" />
-          <ResumenCard label="Pánico" value={estadisticas.panico} icon={AlertTriangle} color="red" />
-          <ResumenCard label="Médica" value={estadisticas.medica} icon={Heart} color="green" />
+          
+          {/* ✅ SOLO mostrar tarjeta de Pánico si corresponde */}
+          {mostrarTarjetaPanico && (
+            <ResumenCard label="Pánico" value={estadisticas.panico} icon={AlertTriangle} color="red" />
+          )}
+          
+          {/* ✅ SOLO mostrar tarjeta de Médica si corresponde */}
+          {mostrarTarjetaMedica && (
+            <ResumenCard label="Médica" value={estadisticas.medica} icon={Heart} color="green" />
+          )}
+          
           <ResumenCard label="Activas" value={estadisticas.activas} icon={Activity} color="blue" />
           <ResumenCard label="En Proceso" value={estadisticas.proceso} icon={Clock} color="amber" />
           <ResumenCard label="Cerradas" value={estadisticas.cerradas} icon={CheckCircle} color="purple" />
@@ -426,24 +450,34 @@ const AnalisisGeografico = () => {
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Zona</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Total</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Pánico</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Médica</th>
-                  </tr>
+                    {/* ✅ SOLO mostrar columna Pánico si corresponde */}
+                    {mostrarTarjetaPanico && (
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Pánico</th>
+                    )}
+                    {/* ✅ SOLO mostrar columna Médica si corresponde */}
+                    {mostrarTarjetaMedica && !tipoAlertaPermitido && (
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Médica</th>
+                    )}
+                   </tr>
                 </thead>
                 <tbody>
                   {zonas.map((zona, i) => (
                     <tr key={zona.zona} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                       <td className="px-6 py-4 text-sm font-medium">{zona.zona}</td>
                       <td className="px-6 py-4 text-sm">{zona.total}</td>
-                      <td className="px-6 py-4 text-sm text-red-600">{zona.panico}</td>
-                      <td className="px-6 py-4 text-sm text-green-600">{zona.medica}</td>
+                      {mostrarTarjetaPanico && (
+                        <td className="px-6 py-4 text-sm text-red-600">{zona.panico}</td>
+                      )}
+                      {mostrarTarjetaMedica && !tipoAlertaPermitido && (
+                        <td className="px-6 py-4 text-sm text-green-600">{zona.medica}</td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           ) : (
-            <div className="text-center py-8 text-gray-400">No hay datos</div>
+            <div className="text-center py-8 text-gray-400">No hay datos disponibles</div>
           )}
         </div>
 
