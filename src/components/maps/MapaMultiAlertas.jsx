@@ -1,4 +1,6 @@
 // src/components/maps/MapaMultiAlertas.jsx
+// VERSIÓN CORREGIDA - El contenedor siempre existe
+
 import { useEffect, useRef, useCallback, useMemo, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -42,8 +44,8 @@ const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta, altura = '500px' 
   const containerRef = useRef(null);
   const mapaInstancia = useRef(null);
   const marcadoresRef = useRef(new Map());
-  const [mapaListo, setMapaListo] = useState(false);
   const [error, setError] = useState(null);
+  const [inicializando, setInicializando] = useState(true);
 
   const alertasValidas = useMemo(() => {
     return alertas.filter(a => {
@@ -92,72 +94,49 @@ const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta, altura = '500px' 
     );
   }, [onSeleccionarAlerta]);
 
-  // ✅ Inicializar el mapa con reintentos
+  // ✅ Inicializar el mapa cuando el contenedor esté listo
   useEffect(() => {
-    let intentos = 0;
-    const maxIntentos = 10;
-    const intervalo = 200;
-    let timeoutId = null;
+    if (!containerRef.current) {
+      console.log('⚠️ [MapaMultiAlertas] containerRef aún no disponible');
+      return;
+    }
     
-    const inicializar = () => {
-      if (!containerRef.current) {
-        intentos++;
-        if (intentos < maxIntentos) {
-          console.log(`⚠️ [MapaMultiAlertas] containerRef no disponible, reintento ${intentos}/${maxIntentos}`);
-          timeoutId = setTimeout(inicializar, intervalo);
-        } else {
-          console.error('❌ [MapaMultiAlertas] No se pudo obtener el contenedor después de varios intentos');
-          setError('No se pudo cargar el mapa');
+    if (mapaInstancia.current) {
+      console.log('⚠️ [MapaMultiAlertas] Mapa ya inicializado');
+      return;
+    }
+    
+    console.log('🗺️ [MapaMultiAlertas] Inicializando mapa...');
+    
+    try {
+      const mapa = L.map(containerRef.current).setView([centroMapa.lat, centroMapa.lng], 12);
+      
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap contributors',
+        detectRetina: true
+      }).addTo(mapa);
+      
+      mapaInstancia.current = mapa;
+      setInicializando(false);
+      console.log('✅ [MapaMultiAlertas] Mapa inicializado correctamente');
+      
+      setTimeout(() => {
+        if (mapaInstancia.current) {
+          mapaInstancia.current.invalidateSize();
         }
-        return;
-      }
+      }, 200);
       
-      if (mapaInstancia.current) {
-        console.log('⚠️ [MapaMultiAlertas] Mapa ya inicializado');
-        return;
-      }
-      
-      console.log('🗺️ [MapaMultiAlertas] Inicializando mapa...');
-      
-      try {
-        const mapa = L.map(containerRef.current).setView([centroMapa.lat, centroMapa.lng], 12);
-        
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          maxZoom: 19,
-          attribution: '© OpenStreetMap contributors',
-          detectRetina: true
-        }).addTo(mapa);
-        
-        mapaInstancia.current = mapa;
-        setMapaListo(true);
-        console.log('✅ [MapaMultiAlertas] Mapa inicializado correctamente');
-        
-        setTimeout(() => {
-          if (mapaInstancia.current) {
-            mapaInstancia.current.invalidateSize();
-          }
-        }, 200);
-        
-      } catch (err) {
-        console.error('❌ [MapaMultiAlertas] Error inicializando mapa:', err);
-        setError(err.message);
-      }
-    };
-    
-    inicializar();
-    
-    return () => {
-      if (timeoutId) clearTimeout(timeoutId);
-      if (mapaInstancia.current) {
-        mapaInstancia.current.remove();
-        mapaInstancia.current = null;
-      }
-    };
+    } catch (err) {
+      console.error('❌ [MapaMultiAlertas] Error inicializando mapa:', err);
+      setError(err.message);
+      setInicializando(false);
+    }
   }, [centroMapa.lat, centroMapa.lng]);
 
   // Agregar marcadores cuando el mapa esté listo
   useEffect(() => {
-    if (!mapaListo || !mapaInstancia.current) return;
+    if (inicializando || !mapaInstancia.current) return;
     
     console.log('📍 [MapaMultiAlertas] Agregando marcadores, alertas:', alertasValidas.length);
     
@@ -192,7 +171,7 @@ const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta, altura = '500px' 
       }
     }
     
-  }, [alertasValidas, mapaListo, crearPopupContent, onSeleccionarAlerta]);
+  }, [alertasValidas, inicializando, crearPopupContent, onSeleccionarAlerta]);
 
   // Manejar resize
   useEffect(() => {
@@ -216,6 +195,7 @@ const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta, altura = '500px' 
     };
   }, []);
 
+  // Si hay error, mostrar mensaje
   if (error) {
     return (
       <div className="w-full bg-red-50 rounded-xl flex flex-col items-center justify-center border border-red-200" style={{ height: altura, minHeight: '300px' }}>
@@ -226,25 +206,7 @@ const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta, altura = '500px' 
     );
   }
 
-  if (!mapaListo) {
-    return (
-      <div className="w-full bg-gray-100 rounded-xl flex flex-col items-center justify-center" style={{ height: altura, minHeight: '300px' }}>
-        <Loader size={32} className="text-blue-600 animate-spin mb-3" />
-        <p className="text-gray-500 text-sm">Cargando mapa...</p>
-      </div>
-    );
-  }
-
-  if (alertasValidas.length === 0) {
-    return (
-      <div className="w-full bg-gray-100 rounded-xl flex flex-col items-center justify-center" style={{ height: altura, minHeight: '300px' }}>
-        <AlertTriangle size={32} className="text-gray-400 mb-2" />
-        <p className="text-gray-400 text-sm">No hay ubicaciones para mostrar</p>
-        <p className="text-xs text-gray-300 mt-1">Total alertas: {alertas.length}</p>
-      </div>
-    );
-  }
-
+  // ✅ EL CONTENEDOR SIEMPRE EXISTE - no hay returns condicionales antes
   return (
     <div 
       ref={containerRef} 
