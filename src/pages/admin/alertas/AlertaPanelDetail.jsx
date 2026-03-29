@@ -7,11 +7,10 @@ import {
   Clock, Truck, User, Calendar, MapPinned,
   UserCircle, PhoneCall, MailIcon, Loader,
   AlertCircle, Info, ChevronRight, Copy,
-  Navigation, ExternalLink, Clipboard, Check,ChevronLeft 
+  Navigation, ExternalLink, Clipboard, Check, ChevronLeft 
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import alertasPanelService from '../../../services/admin/alertasPanel.service';
-import { useOtp } from '../../../hooks/useOtp';
 import IconoEntidad, { BadgeTipoAlerta, ModalMapa } from '../../../components/ui/IconoEntidad';
 import BotonUbicacion from '../../../components/ui/BotonUbicacion';
 import authService from '../../../services/auth.service';
@@ -84,26 +83,11 @@ const AlertaPanelDetail = () => {
   const [alerta, setAlerta] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [requiereOtp, setRequiereOtp] = useState(true);
-  const [datosCompletos, setDatosCompletos] = useState(null);
   const [copied, setCopied] = useState(false);
   const [mostrarMapaModal, setMostrarMapaModal] = useState(false);
 
   const abortControllerRef = useRef(null);
   const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
-
-  const {
-    solicitando,
-    verificando,
-    showModal,
-    otpEmail,
-    otpExpiracion,
-    codigoOtp,
-    setCodigoOtp,
-    solicitarOtp,
-    verificarOtp,
-    cerrarModal
-  } = useOtp();
 
   const cargarAlerta = useCallback(async () => {
     if (!id) return;
@@ -121,40 +105,17 @@ const AlertaPanelDetail = () => {
         signal: abortControllerRef.current.signal
       });
 
-      setDatosCompletos(response.data);
-      setRequiereOtp(response.requiere_otp);
-
-      if (response.requiere_otp && response.data.ciudadano) {
-        const dataOfuscada = {
-          ...response.data,
-          ciudadano: {
-            ...response.data.ciudadano,
-            nombre: ofuscarNombre(response.data.ciudadano.nombre),
-            telefono: ofuscarTelefono(response.data.ciudadano.telefono),
-            email: ofuscarEmail(response.data.ciudadano.email)
-          }
-        };
-        setAlerta(dataOfuscada);
-        toast.custom(
-          <div className={`bg-gradient-to-r ${getTipoGradient(response.data.tipo)}/10 border-l-4 border-${response.data.tipo === 'panico' ? 'red' : 'green'}-500 rounded-lg shadow-lg p-4`}>
-            <div className="flex items-center gap-3">
-              <Shield size={20} className={response.data.tipo === 'panico' ? 'text-red-600' : 'text-green-600'} />
-              <p className="text-sm text-gray-700">Los datos sensibles están protegidos. Solicita un código para verlos.</p>
-            </div>
-          </div>,
-          { duration: 5000 }
-        );
-      } else if (response.data.ciudadano) {
+      if (response.data) {
         const alertaFormateada = {
           ...response.data,
-          ciudadano: {
+          ciudadano: response.data.ciudadano ? {
             ...response.data.ciudadano,
             nombre: formatearNombre(response.data.ciudadano.nombre)
-          }
+          } : null
         };
         setAlerta(alertaFormateada);
       } else {
-        setAlerta(response.data);
+        setError('Alerta no encontrada');
       }
 
     } catch (error) {
@@ -172,7 +133,6 @@ const AlertaPanelDetail = () => {
   useEffect(() => {
     const state = location.state;
     if (state?.datosCompletos) {
-      setDatosCompletos(state.datosCompletos);
       setAlerta(state.datosCompletos);
       setLoading(false);
     } else {
@@ -185,36 +145,6 @@ const AlertaPanelDetail = () => {
       }
     };
   }, [id, location.state, cargarAlerta]);
-
-  const handleSolicitarOtp = async () => {
-    const result = await solicitarOtp(id);
-    if (result.success) {
-      // El hook maneja el modal
-    }
-  };
-
-  const handleVerificarOtp = async () => {
-    const result = await verificarOtp(id, codigoOtp);
-    if (result.success && result.data) {
-      if (tipoAlertaPermitido && result.data.tipo !== tipoAlertaPermitido) {
-        setError(`No tienes permiso para ver alertas de tipo ${result.data.tipo === 'panico' ? 'Pánico' : 'Médica'}`);
-        setAlerta(null);
-        return;
-      }
-      
-      const alertaFormateada = {
-        ...result.data,
-        ciudadano: result.data.ciudadano ? {
-          ...result.data.ciudadano,
-          nombre: formatearNombre(result.data.ciudadano.nombre)
-        } : null
-      };
-      setAlerta(alertaFormateada);
-      setRequiereOtp(false);
-      setCodigoOtp('');
-      toast.success('Datos desbloqueados correctamente');
-    }
-  };
 
   const handleCopyCoordenadas = () => {
     if (alerta?.lat && alerta?.lng) {
@@ -302,26 +232,6 @@ const AlertaPanelDetail = () => {
               <EstadoIcon size={12} />
               {estadoConfig.label}
             </span>
-            {!requiereOtp && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-green-100 text-green-600">
-                <CheckCircle size={12} />
-                Datos verificados
-              </span>
-            )}
-            {requiereOtp && (
-              <button
-                onClick={handleSolicitarOtp}
-                disabled={solicitando}
-                className="flex items-center gap-2 px-4 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all text-sm font-medium shadow-md disabled:opacity-50"
-              >
-                {solicitando ? (
-                  <Loader size={14} className="animate-spin" />
-                ) : (
-                  <Lock size={14} />
-                )}
-                Solicitar código
-              </button>
-            )}
           </div>
         </div>
 
@@ -401,7 +311,6 @@ const AlertaPanelDetail = () => {
                         icon={User}
                         label="Nombre completo"
                         value={alerta.ciudadano.nombre || 'No disponible'}
-                        ofuscado={requiereOtp}
                       />
                       
                       {alerta.ciudadano.telefono && (
@@ -409,9 +318,8 @@ const AlertaPanelDetail = () => {
                           icon={Phone}
                           label="Teléfono"
                           value={alerta.ciudadano.telefono}
-                          action={!requiereOtp ? () => window.open(`tel:${alerta.ciudadano.telefono}`) : null}
+                          action={() => window.open(`tel:${alerta.ciudadano.telefono}`)}
                           actionIcon={PhoneCall}
-                          ofuscado={requiereOtp}
                         />
                       )}
                       
@@ -420,9 +328,8 @@ const AlertaPanelDetail = () => {
                           icon={Mail}
                           label="Email"
                           value={alerta.ciudadano.email}
-                          action={!requiereOtp ? () => window.open(`mailto:${alerta.ciudadano.email}`) : null}
+                          action={() => window.open(`mailto:${alerta.ciudadano.email}`)}
                           actionIcon={MailIcon}
-                          ofuscado={requiereOtp}
                         />
                       )}
                     </div>
@@ -537,75 +444,6 @@ const AlertaPanelDetail = () => {
         </div>
       </div>
 
-      {/* Modal OTP */}
-      {showModal && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl animate-fadeInUp">
-            <div className="text-center mb-6">
-              <div className={`w-16 h-16 bg-gradient-to-r ${getTipoGradient(alerta.tipo)} rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg`}>
-                <Shield size={28} className="text-white" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-800">Verificación de seguridad</h3>
-              <p className="text-sm text-gray-500 mt-2">
-                Ingresa el código de 6 dígitos enviado a:
-              </p>
-              <p className="font-medium text-gray-700 mt-1">{otpEmail}</p>
-              {otpExpiracion && (
-                <p className="text-xs text-gray-400 mt-2 flex items-center justify-center gap-1">
-                  <Clock size={12} />
-                  Válido hasta: {new Date(otpExpiracion).toLocaleTimeString()}
-                </p>
-              )}
-            </div>
-
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2 text-center">
-                Código de 6 dígitos
-              </label>
-              <input
-                type="text"
-                value={codigoOtp}
-                onChange={(e) => setCodigoOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                placeholder="000000"
-                className="w-full text-center text-3xl tracking-[0.5em] font-mono border border-gray-300 rounded-xl p-4 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                autoFocus
-              />
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={cerrarModal}
-                className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50 transition-colors font-medium"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleVerificarOtp}
-                disabled={verificando || codigoOtp.length !== 6}
-                className="flex-1 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-all font-medium shadow-md"
-              >
-                {verificando ? (
-                  <Loader size={18} className="animate-spin" />
-                ) : (
-                  <CheckCircle size={18} />
-                )}
-                Verificar
-              </button>
-            </div>
-
-            <div className="mt-4 text-center">
-              <button
-                onClick={handleSolicitarOtp}
-                disabled={solicitando}
-                className="text-xs text-blue-600 hover:text-blue-700 disabled:opacity-50"
-              >
-                ¿No recibiste el código? Reenviar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Modal Mapa Expandido */}
       <ModalMapa
         isOpen={mostrarMapaModal}
@@ -645,21 +483,18 @@ const InfoCard = ({ icon: Icon, label, value, color = 'blue' }) => {
 };
 
 // Componente para contactos con acción
-const ContactCard = ({ icon: Icon, label, value, action, actionIcon: ActionIcon, ofuscado }) => (
-  <div className={`flex items-center justify-between p-3 rounded-xl border ${ofuscado ? 'bg-gray-50 border-gray-200' : 'bg-gray-50 border-gray-200 hover:bg-gray-100 transition-colors'}`}>
+const ContactCard = ({ icon: Icon, label, value, action, actionIcon: ActionIcon }) => (
+  <div className="flex items-center justify-between p-3 rounded-xl border bg-gray-50 border-gray-200 hover:bg-gray-100 transition-colors">
     <div className="flex items-center gap-3">
       <div className="p-2 bg-white rounded-lg shadow-sm">
         <Icon size={16} className="text-gray-600" />
       </div>
       <div>
         <p className="text-xs text-gray-500">{label}</p>
-        <p className={`text-sm font-medium ${ofuscado ? 'text-gray-400' : 'text-gray-800'}`}>
-          {value}
-          {ofuscado && <Lock size={10} className="inline ml-1 text-amber-500" />}
-        </p>
+        <p className="text-sm font-medium text-gray-800">{value}</p>
       </div>
     </div>
-    {action && !ofuscado && ActionIcon && (
+    {action && ActionIcon && (
       <button
         onClick={action}
         className="p-2 hover:bg-white rounded-lg transition-colors"
