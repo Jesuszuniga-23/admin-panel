@@ -1,6 +1,6 @@
 // src/pages/admin/alertas/AlertaPanelDetail.jsx
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useNavigate } useLocation } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom'; 
 import {
   ArrowLeft, MapPin, Phone, Mail, AlertTriangle,
   Shield, Lock, CheckCircle, XCircle,
