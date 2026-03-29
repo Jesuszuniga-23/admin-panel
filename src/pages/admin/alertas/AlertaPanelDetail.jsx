@@ -7,7 +7,7 @@ import {
   Clock, Truck, User, Calendar, MapPinned,
   UserCircle, PhoneCall, MailIcon, Loader,
   AlertCircle, Info, ChevronRight, Copy,
-  Navigation, ExternalLink, Clipboard, Check
+  Navigation, ExternalLink, Clipboard, Check,ChevronLeft 
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import alertasPanelService from '../../../services/admin/alertasPanel.service';
