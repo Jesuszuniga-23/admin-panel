@@ -1,22 +1,22 @@
 // src/pages/admin/alertas/AlertaPanelDetail.jsx
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } useLocation } from 'react-router-dom';
 import {
   ArrowLeft, MapPin, Phone, Mail, AlertTriangle,
   Shield, Lock, CheckCircle, XCircle,
   Clock, Truck, User, Calendar, MapPinned,
   UserCircle, PhoneCall, MailIcon, Loader,
   AlertCircle, Info, ChevronRight, Copy,
-  Navigation, ExternalLink
+  Navigation, ExternalLink, Clipboard, Check
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import alertasPanelService from '../../../services/admin/alertasPanel.service';
-import MapaOSM from '../../../components/maps/MapaOSM';
 import { useOtp } from '../../../hooks/useOtp';
 import IconoEntidad, { BadgeTipoAlerta, ModalMapa } from '../../../components/ui/IconoEntidad';
+import BotonUbicacion from '../../../components/ui/BotonUbicacion';
 import authService from '../../../services/auth.service';
 
-// Función para ofuscar datos (mantener)
+// Función para ofuscar datos
 const ofuscarNombre = (nombre) => {
   if (!nombre) return '***';
   if (nombre.length <= 2) return nombre[0] + '*';
@@ -48,13 +48,45 @@ const formatearFecha = (fecha) => {
   });
 };
 
+// Normalizar texto
+const normalizarTexto = (texto) => {
+  if (!texto) return '';
+  
+  const reemplazos = [
+    { de: 'Ã¡', para: 'á' }, { de: 'Ã©', para: 'é' }, { de: 'Ã­', para: 'í' },
+    { de: 'Ã³', para: 'ó' }, { de: 'Ãº', para: 'ú' }, { de: 'Ã±', para: 'ñ' },
+    { de: 'Ã�', para: 'Á' }, { de: 'Ã‰', para: 'É' }, { de: 'Ã“', para: 'Ó' },
+    { de: 'Ãš', para: 'Ú' }, { de: 'Ã‘', para: 'Ñ' }
+  ];
+  
+  let textoNormalizado = texto;
+  reemplazos.forEach(({ de, para }) => {
+    textoNormalizado = textoNormalizado.split(de).join(para);
+  });
+  
+  return textoNormalizado;
+};
+
+const formatearNombre = (nombre) => {
+  if (!nombre) return '';
+  const nombreNormalizado = normalizarTexto(nombre);
+  return nombreNormalizado
+    .toLowerCase()
+    .split(' ')
+    .map(palabra => palabra.charAt(0).toUpperCase() + palabra.slice(1))
+    .join(' ');
+};
+
 const AlertaPanelDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [alerta, setAlerta] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [requiereOtp, setRequiereOtp] = useState(true);
   const [datosCompletos, setDatosCompletos] = useState(null);
+  const [copied, setCopied] = useState(false);
   const [mostrarMapaModal, setMostrarMapaModal] = useState(false);
 
   const abortControllerRef = useRef(null);
@@ -82,6 +114,7 @@ const AlertaPanelDetail = () => {
     
     abortControllerRef.current = new AbortController();
     setLoading(true);
+    setError(null);
     
     try {
       const response = await alertasPanelService.obtenerDetalle(id, {
@@ -103,14 +136,23 @@ const AlertaPanelDetail = () => {
         };
         setAlerta(dataOfuscada);
         toast.custom(
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg shadow-lg p-4">
+          <div className={`bg-gradient-to-r ${getTipoGradient(response.data.tipo)}/10 border-l-4 border-${response.data.tipo === 'panico' ? 'red' : 'green'}-500 rounded-lg shadow-lg p-4`}>
             <div className="flex items-center gap-3">
-              <Shield size={20} className="text-blue-600" />
-              <p className="text-sm text-blue-800">Los datos sensibles están protegidos. Solicita un código para verlos.</p>
+              <Shield size={20} className={response.data.tipo === 'panico' ? 'text-red-600' : 'text-green-600'} />
+              <p className="text-sm text-gray-700">Los datos sensibles están protegidos. Solicita un código para verlos.</p>
             </div>
           </div>,
           { duration: 5000 }
         );
+      } else if (response.data.ciudadano) {
+        const alertaFormateada = {
+          ...response.data,
+          ciudadano: {
+            ...response.data.ciudadano,
+            nombre: formatearNombre(response.data.ciudadano.nombre)
+          }
+        };
+        setAlerta(alertaFormateada);
       } else {
         setAlerta(response.data);
       }
@@ -118,22 +160,31 @@ const AlertaPanelDetail = () => {
     } catch (error) {
       if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
         console.error('Error cargando alerta:', error);
-        toast.error('Error al cargar los detalles de la alerta');
-        navigate('/admin/alertas/activas');
+        const errorMsg = error.response?.data?.error || error.message || 'Error al cargar la alerta';
+        setError(errorMsg);
+        toast.error(errorMsg);
       }
     } finally {
       setLoading(false);
     }
-  }, [id, navigate]);
+  }, [id]);
 
   useEffect(() => {
-    cargarAlerta();
+    const state = location.state;
+    if (state?.datosCompletos) {
+      setDatosCompletos(state.datosCompletos);
+      setAlerta(state.datosCompletos);
+      setLoading(false);
+    } else {
+      cargarAlerta();
+    }
+    
     return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
     };
-  }, [cargarAlerta]);
+  }, [id, location.state, cargarAlerta]);
 
   const handleSolicitarOtp = async () => {
     const result = await solicitarOtp(id);
@@ -144,14 +195,33 @@ const AlertaPanelDetail = () => {
 
   const handleVerificarOtp = async () => {
     const result = await verificarOtp(id, codigoOtp);
-    if (result.success) {
-      setAlerta({
-        ...datosCompletos,
-        requiere_otp: false
-      });
+    if (result.success && result.data) {
+      if (tipoAlertaPermitido && result.data.tipo !== tipoAlertaPermitido) {
+        setError(`No tienes permiso para ver alertas de tipo ${result.data.tipo === 'panico' ? 'Pánico' : 'Médica'}`);
+        setAlerta(null);
+        return;
+      }
+      
+      const alertaFormateada = {
+        ...result.data,
+        ciudadano: result.data.ciudadano ? {
+          ...result.data.ciudadano,
+          nombre: formatearNombre(result.data.ciudadano.nombre)
+        } : null
+      };
+      setAlerta(alertaFormateada);
       setRequiereOtp(false);
       setCodigoOtp('');
       toast.success('Datos desbloqueados correctamente');
+    }
+  };
+
+  const handleCopyCoordenadas = () => {
+    if (alerta?.lat && alerta?.lng) {
+      navigator.clipboard.writeText(`${alerta.lat},${alerta.lng}`);
+      setCopied(true);
+      toast.success('Coordenadas copiadas al portapapeles');
+      setTimeout(() => setCopied(false), 2000);
     }
   };
 
@@ -184,19 +254,21 @@ const AlertaPanelDetail = () => {
     );
   }
 
-  if (!alerta) {
+  if (error || !alerta) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-xl p-12 text-center max-w-md">
-          <AlertTriangle size={64} className="text-gray-300 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-800 mb-2">Alerta no encontrada</h3>
-          <p className="text-gray-500 mb-6">La alerta que buscas no existe o no tienes permisos para verla.</p>
-          <button
-            onClick={() => navigate('/admin/alertas/activas')}
-            className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-medium"
-          >
-            Volver a alertas activas
-          </button>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 sm:p-6 md:p-8">
+        <div className="max-w-6xl mx-auto">
+          <div className="bg-red-50 rounded-2xl shadow-lg p-12 text-center border border-red-200">
+            <AlertCircle size={64} className="text-red-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-red-800 mb-2">Error</h2>
+            <p className="text-red-600 mb-6">{error || 'No se encontró la alerta'}</p>
+            <button
+              onClick={() => navigate('/admin/alertas/activas')}
+              className="px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors font-medium"
+            >
+              Volver a alertas activas
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -207,118 +279,81 @@ const AlertaPanelDetail = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         {/* Header con navegación */}
-        <div className="mb-8">
-          <button
-            onClick={() => navigate(-1)}
-            className="group flex items-center gap-2 text-gray-500 hover:text-gray-700 mb-4 transition-colors"
-          >
-            <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
-            <span className="text-sm font-medium">Volver</span>
-          </button>
-
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className={`p-3 rounded-2xl bg-gradient-to-r ${getTipoGradient(alerta.tipo)} shadow-lg`}>
-                <IconoEntidad 
-                  entidad={alerta.tipo === 'panico' ? 'ALERTA_PANICO' : 'ALERTA_MEDICA'} 
-                  size={28}
-                  color="text-white"
-                />
-              </div>
-              <div>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">
-                    Alerta #{alerta.id}
-                  </h1>
-                  <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${estadoConfig.bg} ${estadoConfig.text}`}>
-                    <EstadoIcon size={12} />
-                    {estadoConfig.label}
-                  </span>
-                </div>
-                <p className="text-sm text-gray-500 mt-1 flex items-center gap-2">
-                  <span>Registrada el {formatearFecha(alerta.fecha_creacion)}</span>
-                  <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
-                  <span>Tipo: {alerta.tipo === 'panico' ? '🚨 Emergencia de Pánico' : '🚑 Emergencia Médica'}</span>
-                </p>
-              </div>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => navigate('/admin/alertas/activas')}
+              className="p-2 hover:bg-white rounded-xl transition-colors"
+              title="Volver"
+            >
+              <ChevronLeft size={20} className="text-gray-500" />
+            </button>
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Detalle de Alerta</h1>
+              <p className="text-sm text-gray-500 mt-1">Información completa de la alerta #{alerta.id}</p>
             </div>
+          </div>
 
+          <div className="flex items-center gap-3 flex-wrap">
+            <BadgeTipoAlerta tipo={alerta.tipo} size={14} />
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${estadoConfig.bg} ${estadoConfig.text}`}>
+              <EstadoIcon size={12} />
+              {estadoConfig.label}
+            </span>
+            {!requiereOtp && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-green-100 text-green-600">
+                <CheckCircle size={12} />
+                Datos verificados
+              </span>
+            )}
             {requiereOtp && (
               <button
                 onClick={handleSolicitarOtp}
                 disabled={solicitando}
-                className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-md disabled:opacity-50 font-medium"
+                className="flex items-center gap-2 px-4 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all text-sm font-medium shadow-md disabled:opacity-50"
               >
                 {solicitando ? (
-                  <Loader size={18} className="animate-spin" />
+                  <Loader size={14} className="animate-spin" />
                 ) : (
-                  <Lock size={18} />
+                  <Lock size={14} />
                 )}
-                Solicitar código para ver datos
+                Solicitar código
               </button>
             )}
           </div>
         </div>
 
-        {/* Grid principal */}
+        {/* Contenido principal - Grid de 2 columnas */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Columna izquierda - Información principal */}
+          {/* Columna izquierda: Información de la alerta */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Mapa */}
-            {alerta.lat && alerta.lng && (
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="p-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <MapPinned size={18} className="text-red-500" />
-                      <h2 className="font-semibold text-gray-800">Ubicación del incidente</h2>
-                    </div>
-                    <button
-                      onClick={() => setMostrarMapaModal(true)}
-                      className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
-                    >
-                      <ExternalLink size={12} />
-                      Ampliar mapa
-                    </button>
-                  </div>
-                </div>
-                <div className="p-5">
-                  <div className="h-64 rounded-xl overflow-hidden shadow-inner">
-                    <MapaOSM
-                      lat={alerta.lat}
-                      lng={alerta.lng}
-                      zoom={15}
-                      markerTitle={`Alerta ${alerta.tipo}`}
+            <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100">
+              <div className={`bg-gradient-to-r ${getTipoGradient(alerta.tipo)} px-6 py-4`}>
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
+                    <IconoEntidad 
+                      entidad={alerta.tipo === 'panico' ? 'ALERTA_PANICO' : 'ALERTA_MEDICA'} 
+                      size={28}
+                      color="text-white"
                     />
                   </div>
-                  <div className="mt-3 flex items-center justify-between text-xs text-gray-500 bg-gray-50 p-2 rounded-lg">
-                    <span className="font-mono">
-                      📍 {parseFloat(alerta.lat).toFixed(6)}, {parseFloat(alerta.lng).toFixed(6)}
-                    </span>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(`${alerta.lat},${alerta.lng}`);
-                        toast.success('Coordenadas copiadas');
-                      }}
-                      className="flex items-center gap-1 text-blue-600 hover:text-blue-700"
-                    >
-                      <Copy size={12} />
-                      Copiar
-                    </button>
+                  <div>
+                    <h2 className="text-xl font-bold text-white">
+                      Alerta de {alerta.tipo === 'panico' ? 'Pánico' : 'Emergencia Médica'}
+                    </h2>
+                    <p className="text-white/80 text-sm mt-1">
+                      {alerta.tipo === 'panico' 
+                        ? 'Activada por el ciudadano en situación de peligro'
+                        : 'Solicitud de asistencia médica urgente'}
+                    </p>
                   </div>
                 </div>
               </div>
-            )}
 
-            {/* Detalles del evento */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="p-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
-                <h2 className="font-semibold text-gray-800">Detalles del evento</h2>
-              </div>
-              <div className="p-5">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                   <InfoCard
                     icon={Calendar}
                     label="Fecha de creación"
@@ -353,79 +388,151 @@ const AlertaPanelDetail = () => {
                     />
                   )}
                 </div>
+
+                {alerta.ciudadano && (
+                  <div className="border-t border-gray-100 pt-6">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                      <UserCircle size={20} className="text-purple-600" />
+                      Información del Ciudadano
+                    </h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <ContactCard
+                        icon={User}
+                        label="Nombre completo"
+                        value={alerta.ciudadano.nombre || 'No disponible'}
+                        ofuscado={requiereOtp}
+                      />
+                      
+                      {alerta.ciudadano.telefono && (
+                        <ContactCard
+                          icon={Phone}
+                          label="Teléfono"
+                          value={alerta.ciudadano.telefono}
+                          action={!requiereOtp ? () => window.open(`tel:${alerta.ciudadano.telefono}`) : null}
+                          actionIcon={PhoneCall}
+                          ofuscado={requiereOtp}
+                        />
+                      )}
+                      
+                      {alerta.ciudadano.email && (
+                        <ContactCard
+                          icon={Mail}
+                          label="Email"
+                          value={alerta.ciudadano.email}
+                          action={!requiereOtp ? () => window.open(`mailto:${alerta.ciudadano.email}`) : null}
+                          actionIcon={MailIcon}
+                          ofuscado={requiereOtp}
+                        />
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {alerta.motivo_reasignacion && (
+                  <div className="mt-6 p-4 bg-amber-50 rounded-xl border border-amber-200">
+                    <div className="flex items-start gap-3">
+                      <Info size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs font-semibold text-amber-700 uppercase tracking-wider">Motivo de reasignación</p>
+                        <p className="text-sm text-amber-800 mt-1">{alerta.motivo_reasignacion}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Columna derecha - Información del ciudadano */}
-          <div className="space-y-6">
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="p-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
-                <div className="flex items-center gap-2">
-                  <UserCircle size={18} className="text-purple-600" />
-                  <h2 className="font-semibold text-gray-800">Información del ciudadano</h2>
+          {/* Columna derecha: Mapa y ubicación */}
+          <div className="lg:col-span-1 space-y-6">
+            <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100">
+              <div className={`bg-gradient-to-r ${getTipoGradient(alerta.tipo)} px-6 py-4`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
+                      <MapPinned size={20} className="text-white" />
+                    </div>
+                    <h3 className="font-semibold text-white">Ubicación del Evento</h3>
+                  </div>
+                  {alerta.lat && alerta.lng && (
+                    <button
+                      onClick={() => setMostrarMapaModal(true)}
+                      className="text-white/80 hover:text-white text-xs flex items-center gap-1 transition-colors"
+                    >
+                      <ExternalLink size={12} />
+                      Ampliar
+                    </button>
+                  )}
                 </div>
-                {requiereOtp && (
-                  <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
-                    <Lock size={10} />
-                    Datos protegidos
-                  </p>
-                )}
               </div>
 
               <div className="p-5">
-                {alerta.ciudadano ? (
-                  <div className="space-y-4">
-                    <ContactInfo
-                      icon={User}
-                      label="Nombre completo"
-                      value={alerta.ciudadano.nombre}
-                      ofuscado={requiereOtp}
+                {alerta.lat && alerta.lng ? (
+                  <>
+                    <div className="mb-4 p-3 bg-gray-50 rounded-xl border border-gray-200">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <MapPin size={16} className="text-red-500" />
+                          <span className="text-xs text-gray-500">Coordenadas:</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-mono font-medium text-gray-700">
+                            {parseFloat(alerta.lat).toFixed(6)}, {parseFloat(alerta.lng).toFixed(6)}
+                          </span>
+                          <button
+                            onClick={handleCopyCoordenadas}
+                            className="p-1 hover:bg-white rounded-md transition-colors"
+                            title="Copiar coordenadas"
+                          >
+                            {copied ? (
+                              <Check size={14} className="text-green-600" />
+                            ) : (
+                              <Clipboard size={14} className="text-gray-400" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <BotonUbicacion
+                      lat={alerta.lat}
+                      lng={alerta.lng}
+                      titulo={`Alerta #${alerta.id} - ${alerta.tipo === 'panico' ? 'Pánico' : 'Médica'}`}
+                      alertaId={alerta.id}
+                      altura="280px"
                     />
-                    
-                    {alerta.ciudadano.telefono && (
-                      <ContactInfo
-                        icon={Phone}
-                        label="Teléfono"
-                        value={alerta.ciudadano.telefono}
-                        action={() => !requiereOtp && window.open(`tel:${alerta.ciudadano.telefono}`)}
-                        actionIcon={PhoneCall}
-                        ofuscado={requiereOtp}
-                      />
-                    )}
-                    
-                    {alerta.ciudadano.email && (
-                      <ContactInfo
-                        icon={Mail}
-                        label="Correo electrónico"
-                        value={alerta.ciudadano.email}
-                        action={() => !requiereOtp && window.open(`mailto:${alerta.ciudadano.email}`)}
-                        actionIcon={MailIcon}
-                        ofuscado={requiereOtp}
-                      />
-                    )}
-                  </div>
+                  </>
                 ) : (
-                  <div className="text-center py-6">
-                    <User size={32} className="text-gray-300 mx-auto mb-2" />
-                    <p className="text-gray-500 text-sm">No hay información del ciudadano disponible</p>
+                  <div className="h-[200px] bg-gray-100 rounded-xl flex flex-col items-center justify-center text-gray-400">
+                    <MapPin size={32} className="mb-2 opacity-30" />
+                    <p className="text-sm">Coordenadas no disponibles</p>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Estado adicional */}
-            {alerta.motivo_reasignacion && (
-              <div className="bg-amber-50 rounded-2xl border border-amber-200 p-5">
-                <div className="flex items-start gap-3">
-                  <Info size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-xs font-semibold text-amber-700 uppercase tracking-wider">Motivo de reasignación</p>
-                    <p className="text-sm text-amber-800 mt-1">{alerta.motivo_reasignacion}</p>
-                  </div>
+            <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
+              <h4 className="text-sm font-semibold text-gray-700 mb-4">Información adicional</h4>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                  <span className="text-xs text-gray-500">ID de alerta</span>
+                  <span className="text-sm font-mono font-medium text-gray-800">#{alerta.id}</span>
                 </div>
+                <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                  <span className="text-xs text-gray-500">Tipo</span>
+                  <BadgeTipoAlerta tipo={alerta.tipo} size={12} />
+                </div>
+                {alerta.fecha_creacion && (
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-xs text-gray-500">Tiempo transcurrido</span>
+                    <span className="text-sm font-medium text-gray-800">
+                      {Math.floor((Date.now() - new Date(alerta.fecha_creacion)) / 60000)} minutos
+                    </span>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
         </div>
       </div>
@@ -435,7 +542,7 @@ const AlertaPanelDetail = () => {
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl animate-fadeInUp">
             <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+              <div className={`w-16 h-16 bg-gradient-to-r ${getTipoGradient(alerta.tipo)} rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg`}>
                 <Shield size={28} className="text-white" />
               </div>
               <h3 className="text-xl font-bold text-gray-800">Verificación de seguridad</h3>
@@ -513,7 +620,7 @@ const AlertaPanelDetail = () => {
   );
 };
 
-// Componente de tarjeta de información
+// Componente para tarjetas de información
 const InfoCard = ({ icon: Icon, label, value, color = 'blue' }) => {
   const colorStyles = {
     blue: { bg: 'bg-blue-50', border: 'border-blue-100', iconBg: 'bg-blue-100', iconColor: 'text-blue-600' },
@@ -537,8 +644,8 @@ const InfoCard = ({ icon: Icon, label, value, color = 'blue' }) => {
   );
 };
 
-// Componente de información de contacto
-const ContactInfo = ({ icon: Icon, label, value, action, actionIcon: ActionIcon, ofuscado }) => (
+// Componente para contactos con acción
+const ContactCard = ({ icon: Icon, label, value, action, actionIcon: ActionIcon, ofuscado }) => (
   <div className={`flex items-center justify-between p-3 rounded-xl border ${ofuscado ? 'bg-gray-50 border-gray-200' : 'bg-gray-50 border-gray-200 hover:bg-gray-100 transition-colors'}`}>
     <div className="flex items-center gap-3">
       <div className="p-2 bg-white rounded-lg shadow-sm">
