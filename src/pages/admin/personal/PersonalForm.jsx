@@ -5,13 +5,41 @@ import {
   User, Mail, Phone, Shield, Hash, Save, X,
   ChevronLeft, AlertCircle, CheckCircle, Loader,
   AlertTriangle, Info, Lock, Clock,
-  BadgeCheck, Activity, HelpCircle
+  BadgeCheck, Activity, HelpCircle,
+  ShieldUser, HandHeart, UserCog, UserMinus, Crown, Star, ShieldCheck, ShieldPlus
 } from 'lucide-react';
 import personalService from '../../../services/admin/personal.service';
 import toast from 'react-hot-toast';
 import IconoEntidad, { BadgeIcono } from '../../../components/ui/IconoEntidad';
 import authService from '../../../services/auth.service';
 import useAuthStore from '../../../store/authStore';
+
+// ✅ Función para obtener icono según rol (para preview)
+const getIconoPorRolPreview = (rol, size = 20) => {
+  const iconos = {
+    operador_policial: { icon: ShieldUser, color: 'text-blue-600', bg: 'bg-blue-100' },
+    operador_medico: { icon: HandHeart, color: 'text-green-600', bg: 'bg-green-100' },
+    operador_tecnico: { icon: UserCog, color: 'text-purple-600', bg: 'bg-purple-100' },
+    operador_general: { icon: UserMinus, color: 'text-gray-600', bg: 'bg-gray-100' },
+    admin: { icon: Crown, color: 'text-indigo-600', bg: 'bg-indigo-100' },
+    superadmin: { icon: Star, color: 'text-amber-600', bg: 'bg-amber-100' },
+    policia: { icon: ShieldCheck, color: 'text-blue-600', bg: 'bg-blue-100' },
+    ambulancia: { icon: ShieldPlus, color: 'text-green-600', bg: 'bg-green-100' }
+  };
+
+  const config = iconos[rol];
+  if (config) {
+    const IconComponent = config.icon;
+    return {
+      icono: <IconComponent size={size} className={config.color} />,
+      bgColor: config.bg
+    };
+  }
+  return {
+    icono: <User size={size} className="text-gray-400" />,
+    bgColor: 'bg-gray-100'
+  };
+};
 
 // Mapeo de roles a entidades para iconos consistentes
 const rolToEntidad = {
@@ -66,7 +94,7 @@ const corregirTexto = (texto) => {
   return textoCorregido;
 };
 
-// Componente de barra de progreso (sin cambios)
+// Componente de barra de progreso
 const ProgressBar = ({ completed, total }) => {
   const percentage = Math.min(100, Math.round((completed / total) * 100));
   
@@ -102,11 +130,9 @@ const PersonalForm = () => {
   const [loading, setLoading] = useState(false);
   const [cargandoDatos, setCargandoDatos] = useState(isEditing);
   
-  // ✅ REF para AbortControllers
   const abortControllerRef = useRef(null);
   const abortControllerListaRef = useRef(null);
   
-  // Obtener permisos según rol del usuario actual
   const rolesPermitidos = rolesDisponiblesPorUsuario[currentUser?.rol] || [];
   
   const [formData, setFormData] = useState(() => {
@@ -186,7 +212,7 @@ const PersonalForm = () => {
     return false;
   };
 
-  // Emitir evento de cambios sin guardar (sin cambios)
+  // Emitir evento de cambios sin guardar
   useEffect(() => {
     const emitUnsavedStatus = () => {
       const hasChanges = hasUnsavedChanges() && !isEditing;
@@ -218,7 +244,7 @@ const PersonalForm = () => {
     };
   }, []);
 
-  // Escuchar eventos del sidebar (sin cambios)
+  // Escuchar eventos del sidebar
   useEffect(() => {
     const handleSaveProgress = () => {
       if (!isEditing) {
@@ -249,7 +275,7 @@ const PersonalForm = () => {
     };
   }, [formData, isEditing, storageKey]);
 
-  // Interceptar navegación con beforeunload (sin cambios)
+  // Interceptar navegación con beforeunload
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (hasUnsavedChanges() && !isEditing) {
@@ -268,9 +294,8 @@ const PersonalForm = () => {
     sessionStorage.removeItem(storageKey);
   };
 
-  // ✅ Función para cargar todos los personales con AbortController
+  // Cargar todos los personales con AbortController
   const cargarTodosPersonales = useCallback(async () => {
-    // Cancelar petición anterior si existe
     if (abortControllerListaRef.current) {
       abortControllerListaRef.current.abort();
       console.log('🛑 Petición anterior cancelada en cargarTodosPersonales');
@@ -291,18 +316,16 @@ const PersonalForm = () => {
       }));
       setTodosPersonales(personalesCorregidos);
     } catch (error) {
-      // ✅ Ignorar errores de cancelación
       if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
         console.error('Error cargando personales:', error);
       }
     }
   }, []);
 
-  // ✅ Función para cargar personal individual con AbortController
+  // Cargar personal individual con AbortController
   const cargarPersonal = useCallback(async () => {
     if (!id) return;
     
-    // Cancelar petición anterior si existe
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       console.log('🛑 Petición anterior cancelada en cargarPersonal');
@@ -331,7 +354,6 @@ const PersonalForm = () => {
       setFormData(loadedData);
       setOriginalFormData(JSON.parse(JSON.stringify(loadedData)));
     } catch (error) {
-      // ✅ Ignorar errores de cancelación
       if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
         console.error('Error cargando personal:', error);
         toast.error('Error al cargar los datos');
@@ -342,7 +364,7 @@ const PersonalForm = () => {
     }
   }, [id, navigate]);
 
-  // ✅ Efectos con limpieza
+  // Efectos con limpieza
   useEffect(() => {
     cargarTodosPersonales();
     
@@ -576,13 +598,13 @@ const PersonalForm = () => {
   const getRolPreview = () => {
     const entidad = rolToEntidad[formData.rol] || 'ADMIN';
     const texto = rolTexto[formData.rol] || formData.rol;
-    return { entidad, texto };
+    const iconoPreview = getIconoPorRolPreview(formData.rol, 18);
+    return { entidad, texto, icono: iconoPreview.icono };
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Verificar permisos según el rol que se intenta crear
     if (!isEditing && !authService.puedeCrearPersonal(formData.rol)) {
       toast.error(`No tienes permisos para crear personal con rol: ${rolTexto[formData.rol] || formData.rol}`);
       return;
@@ -743,7 +765,7 @@ const PersonalForm = () => {
 
         {!isEditing && <ProgressBar completed={calcularProgreso()} total={4} />}
 
-        {/* Formulario - el resto del JSX se mantiene igual */}
+        {/* Formulario */}
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-200">
           <div className="h-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-600"></div>
           
@@ -966,7 +988,9 @@ const PersonalForm = () => {
                       Rol <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
-                      <IconoEntidad entidad={rolPreview.entidad} size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
+                        {rolPreview.icono}
+                      </div>
                       <select
                         ref={rolRef}
                         name="rol"

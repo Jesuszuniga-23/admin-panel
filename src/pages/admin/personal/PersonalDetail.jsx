@@ -4,7 +4,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import {
   User, Mail, Phone, Shield, Hash, Calendar, Clock,
   ChevronLeft, Edit, Power, Trash2, Smartphone,
-  CheckCircle, XCircle, AlertCircle, Loader, Lock
+  CheckCircle, XCircle, AlertCircle, Loader, Lock,
+  ShieldUser, HandHeart, UserCog, UserMinus, Crown, Star, ShieldCheck, ShieldPlus
 } from 'lucide-react';
 import personalService from '../../../services/admin/personal.service';
 import toast from 'react-hot-toast';
@@ -12,7 +13,34 @@ import IconoEntidad, { BadgeIcono } from '../../../components/ui/IconoEntidad';
 import authService from '../../../services/auth.service';
 import useAuthStore from '../../../store/authStore';
 
-// Mapeo de roles a entidades para iconos consistentes
+// ✅ Mapeo de roles a iconos personalizados
+const getIconoPorRol = (rol, size = 32) => {
+  const iconos = {
+    operador_policial: { icon: ShieldUser, color: 'text-blue-600', bg: 'bg-blue-100' },
+    operador_medico: { icon: HandHeart, color: 'text-green-600', bg: 'bg-green-100' },
+    operador_tecnico: { icon: UserCog, color: 'text-purple-600', bg: 'bg-purple-100' },
+    operador_general: { icon: UserMinus, color: 'text-gray-600', bg: 'bg-gray-100' },
+    admin: { icon: Crown, color: 'text-indigo-600', bg: 'bg-indigo-100' },
+    superadmin: { icon: Star, color: 'text-amber-600', bg: 'bg-amber-100' },
+    policia: { icon: ShieldCheck, color: 'text-blue-600', bg: 'bg-blue-100' },
+    ambulancia: { icon: ShieldPlus, color: 'text-green-600', bg: 'bg-green-100' }
+  };
+
+  const config = iconos[rol];
+  if (config) {
+    const IconComponent = config.icon;
+    return {
+      icono: <IconComponent size={size} className={config.color} />,
+      bgColor: config.bg
+    };
+  }
+  return {
+    icono: <User size={size} className="text-gray-400" />,
+    bgColor: 'bg-gray-100'
+  };
+};
+
+// Mapeo de roles a entidades para badges
 const rolToEntidad = {
   admin: 'ADMIN',
   superadmin: 'SUPERADMIN',
@@ -49,33 +77,23 @@ const PersonalDetail = () => {
   const [personal, setPersonal] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [actionLoading, setActionLoading] = useState(false); // ✅ Estado para acciones
+  const [actionLoading, setActionLoading] = useState(false);
   
-  // ✅ REF para AbortController
   const abortControllerRef = useRef(null);
   
-  // ✅ CORRECTO: Usar los nuevos métodos de permisos
   const rolPersonal = personal?.rol;
   const puedeEditar = authService.puedeEditarPersonal(rolPersonal);
   const puedeEliminar = authService.puedeEliminarPersonal(rolPersonal);
-  // ✅ Eliminada variable redundante 'puedeCambiarEstado' (usa puedeEditar)
-  
-  // Verificar si es el propio usuario (no puede eliminarse a sí mismo)
   const esPropioUsuario = currentUser?.id === parseInt(id);
 
-  // ✅ Función para cargar personal con AbortController
   const cargarPersonal = useCallback(async () => {
     if (!id) return;
     
-    // Cancelar petición anterior si existe
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
-      console.log('🛑 Petición anterior cancelada en PersonalDetail');
     }
     
-    // Crear nuevo AbortController
     abortControllerRef.current = new AbortController();
-    
     setLoading(true);
     setError(null);
     
@@ -85,7 +103,6 @@ const PersonalDetail = () => {
       });
       setPersonal(response.data);
     } catch (error) {
-      // ✅ Ignorar errores de cancelación
       if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
         console.error("Error cargando personal:", error);
         setError(error.error || 'Error al cargar los datos');
@@ -96,14 +113,12 @@ const PersonalDetail = () => {
     }
   }, [id]);
 
-  // ✅ Efecto con limpieza
   useEffect(() => {
     cargarPersonal();
     
     return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
-        console.log('🛑 Componente PersonalDetail desmontado - peticiones canceladas');
       }
     };
   }, [cargarPersonal]);
@@ -125,7 +140,7 @@ const PersonalDetail = () => {
     try {
       await personalService.toggleActivo(id, nuevoEstado);
       toast.success(`Personal ${accion}do correctamente`);
-      await cargarPersonal(); // Recargar datos
+      await cargarPersonal();
     } catch (error) {
       console.error(`Error al ${accion}:`, error);
       toast.error(error.error || `Error al ${accion} personal`);
@@ -210,6 +225,8 @@ const PersonalDetail = () => {
     );
   }
 
+  const iconoConfig = getIconoPorRol(personal.rol, 32);
+
   return (
     <div className="p-6 max-w-4xl mx-auto">
       {/* Header */}
@@ -249,7 +266,7 @@ const PersonalDetail = () => {
 
       {/* Tarjeta principal */}
       <div className="bg-white rounded-xl shadow overflow-hidden">
-        {/* Cabecera con avatar - Color según rol */}
+        {/* Cabecera con avatar - Icono personalizado según rol */}
         <div className={`bg-gradient-to-r ${
           personal.rol === 'policia' ? 'from-blue-600 to-blue-700' :
           personal.rol === 'ambulancia' ? 'from-green-600 to-emerald-700' :
@@ -261,12 +278,8 @@ const PersonalDetail = () => {
           'from-gray-600 to-gray-700'
         } px-6 py-8`}>
           <div className="flex items-center gap-6">
-            <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-lg">
-              <IconoEntidad 
-                entidad={rolToEntidad[personal.rol] || 'ADMIN'} 
-                size={32} 
-                color="text-blue-600"
-              />
+            <div className={`w-20 h-20 ${iconoConfig.bgColor} rounded-full flex items-center justify-center shadow-lg`}>
+              {iconoConfig.icono}
             </div>
             <div>
               <h2 className="text-2xl font-bold text-white">{getNombreCompleto(personal)}</h2>
@@ -282,87 +295,35 @@ const PersonalDetail = () => {
 
         {/* Contenido */}
         <div className="p-6">
-          {/* Grid de información */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            <InfoItem 
-              icon={User} 
-              label="Nombre(s)" 
-              value={personal.nombre} 
-            />
-            <InfoItem 
-              icon={User} 
-              label="Apellido paterno" 
-              value={personal.apellido_paterno || 'No registrado'} 
-            />
-            <InfoItem 
-              icon={User} 
-              label="Apellido materno" 
-              value={personal.apellido_materno || 'No registrado'} 
-            />
-            <InfoItem 
-              icon={Mail} 
-              label="Correo electrónico" 
-              value={personal.email} 
-            />
-            <InfoItem 
-              icon={Phone} 
-              label="Teléfono" 
-              value={personal.telefono || 'No registrado'} 
-            />
-            <InfoItem 
-              icon={Hash} 
-              label="Placa" 
-              value={personal.placa} 
-            />
-            <InfoItem 
-              icon={Shield} 
-              label="Rol" 
-              value={
-                <BadgeIcono 
-                  entidad={rolToEntidad[personal.rol] || 'ADMIN'}
-                  texto={rolTexto[personal.rol] || personal.rol}
-                  size={12}
-                />
-              } 
-            />
+            <InfoItem icon={User} label="Nombre(s)" value={personal.nombre} />
+            <InfoItem icon={User} label="Apellido paterno" value={personal.apellido_paterno || 'No registrado'} />
+            <InfoItem icon={User} label="Apellido materno" value={personal.apellido_materno || 'No registrado'} />
+            <InfoItem icon={Mail} label="Correo electrónico" value={personal.email} />
+            <InfoItem icon={Phone} label="Teléfono" value={personal.telefono || 'No registrado'} />
+            <InfoItem icon={Hash} label="Placa" value={personal.placa} />
+            <InfoItem icon={Shield} label="Rol" value={
+              <BadgeIcono 
+                entidad={rolToEntidad[personal.rol] || 'ADMIN'}
+                texto={rolTexto[personal.rol] || personal.rol}
+                size={12}
+              />
+            } />
           </div>
 
-          {/* Sección de auditoría */}
           <div className="border-t pt-6 mb-8">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Información de auditoría</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <AuditItem 
-                icon={Calendar} 
-                label="Creado el" 
-                value={formatDate(personal.creado_en)} 
-              />
-              <AuditItem 
-                icon={User} 
-                label="Creado por" 
-                value={personal.creador?.nombre || 'Sistema'} 
-              />
-              <AuditItem 
-                icon={Calendar} 
-                label="Actualizado el" 
-                value={formatDate(personal.actualizado_en)} 
-              />
-              <AuditItem 
-                icon={User} 
-                label="Actualizado por" 
-                value={personal.actualizador?.nombre || 'Sistema'} 
-              />
+              <AuditItem icon={Calendar} label="Creado el" value={formatDate(personal.creado_en)} />
+              <AuditItem icon={User} label="Creado por" value={personal.creador?.nombre || 'Sistema'} />
+              <AuditItem icon={Calendar} label="Actualizado el" value={formatDate(personal.actualizado_en)} />
+              <AuditItem icon={User} label="Actualizado por" value={personal.actualizador?.nombre || 'Sistema'} />
               {personal.fecha_eliminacion && (
-                <AuditItem 
-                  icon={Trash2} 
-                  label="Eliminado el" 
-                  value={formatDate(personal.fecha_eliminacion)} 
-                  className="text-red-600"
-                />
+                <AuditItem icon={Trash2} label="Eliminado el" value={formatDate(personal.fecha_eliminacion)} className="text-red-600" />
               )}
             </div>
           </div>
 
-          {/* Dispositivos */}
           <div className="border-t pt-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
               <Smartphone size={20} />
@@ -378,9 +339,7 @@ const PersonalDetail = () => {
                       <span className="text-sm text-gray-600">{token.plataforma}</span>
                     </div>
                     <span className={`text-xs px-2 py-1 rounded-full ${
-                      token.activo 
-                        ? 'bg-green-100 text-green-700' 
-                        : 'bg-gray-100 text-gray-700'
+                      token.activo ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
                     }`}>
                       {token.activo ? 'Activo' : 'Inactivo'}
                     </span>
@@ -405,11 +364,7 @@ const PersonalDetail = () => {
                   : 'bg-green-600 text-white hover:bg-green-700'
               } disabled:opacity-50`}
             >
-              {actionLoading ? (
-                <Loader size={18} className="animate-spin" />
-              ) : (
-                <Power size={18} />
-              )}
+              {actionLoading ? <Loader size={18} className="animate-spin" /> : <Power size={18} />}
               {personal.activo ? 'Desactivar' : 'Activar'}
             </button>
           )}
@@ -431,11 +386,7 @@ const PersonalDetail = () => {
               disabled={actionLoading}
               className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2 disabled:opacity-50"
             >
-              {actionLoading ? (
-                <Loader size={18} className="animate-spin" />
-              ) : (
-                <Trash2 size={18} />
-              )}
+              {actionLoading ? <Loader size={18} className="animate-spin" /> : <Trash2 size={18} />}
               Eliminar
             </button>
           )}

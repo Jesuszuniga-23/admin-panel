@@ -266,7 +266,7 @@ const Verificar2FA = () => {
                   autoFocus
                 />
                 <p className="text-xs text-gray-400 mt-2 text-center">
-                  El código expira en 20 minutos
+                  El código expira en 10 minutos
                 </p>
               </div>
 

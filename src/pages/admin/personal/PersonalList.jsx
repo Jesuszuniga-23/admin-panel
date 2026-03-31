@@ -4,8 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Users, Plus, Search, Filter, ChevronLeft, ChevronRight,
   Eye, Edit, Trash2, Power, User, Mail, Phone, X, AlertTriangle, CheckCircle,
-  UserRoundShield, UserRoundHeart, UserRoundCog, UserRound, UserRoundCrown, UserRoundStar,
-  Badge, Ambulance
+  ShieldUser, ShieldCheck, ShieldPlus, HandHeart, UserCog, UserMinus, Crown, Star
 } from 'lucide-react';
 import personalService from '../../../services/admin/personal.service';
 import toast from 'react-hot-toast';
@@ -56,56 +55,56 @@ const formatearNombreCompleto = (persona) => {
     .join(' ');
 };
 
-// ✅ NUEVA FUNCIÓN: Obtener icono según rol (iconos combinados de Lucide)
+// ✅ FUNCIÓN CON ICONOS SEGÚN TU PROPUESTA (TODOS EXISTEN)
 const getIconoPorRol = (rol, size = 18) => {
   const iconos = {
-    // Operadores con iconos combinados
+    // Operadores
     operador_policial: { 
-      icon: UserRoundShield, 
+      icon: ShieldUser, 
       color: 'text-blue-600', 
       bg: 'bg-blue-100',
       nombre: 'Operador Policial'
     },
     operador_medico: { 
-      icon: UserRoundHeart, 
+      icon: HandHeart, 
       color: 'text-green-600', 
       bg: 'bg-green-100',
       nombre: 'Operador Médico'
     },
     operador_tecnico: { 
-      icon: UserRoundCog, 
+      icon: UserCog, 
       color: 'text-purple-600', 
       bg: 'bg-purple-100',
       nombre: 'Operador Técnico'
     },
     operador_general: { 
-      icon: UserRound, 
+      icon: UserMinus, 
       color: 'text-gray-600', 
       bg: 'bg-gray-100',
       nombre: 'Operador General'
     },
-    // Administrativos con iconos combinados
+    // Administrativos
     admin: { 
-      icon: UserRoundCrown, 
+      icon: Crown, 
       color: 'text-indigo-600', 
       bg: 'bg-indigo-100',
       nombre: 'Administrador'
     },
     superadmin: { 
-      icon: UserRoundStar, 
+      icon: Star, 
       color: 'text-amber-600', 
       bg: 'bg-amber-100',
       nombre: 'Super Administrador'
     },
     // Personal operativo
     policia: { 
-      icon: Badge, 
+      icon: ShieldCheck, 
       color: 'text-blue-600', 
       bg: 'bg-blue-100',
       nombre: 'Policía'
     },
     ambulancia: { 
-      icon: Ambulance, 
+      icon: ShieldPlus, 
       color: 'text-green-600', 
       bg: 'bg-green-100',
       nombre: 'Ambulancia'
@@ -133,7 +132,7 @@ const getIconoPorRol = (rol, size = 18) => {
   };
 };
 
-// Mapeo de roles a entidades para badges (mantener para compatibilidad)
+// Mapeo de roles a entidades para badges
 const rolToEntidad = {
   admin: 'ADMIN',
   superadmin: 'SUPERADMIN',
