@@ -1,5 +1,5 @@
 // src/pages/admin/audit/AuditLogs.jsx
-// VERSIÓN SIN BOTONES DE EXPORTACIÓN
+// VERSIÓN SIN PARPADEO - CARGA INICIAL SILENCIOSA
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -186,7 +186,7 @@ const AuditLogs = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const [logs, setLogs] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // ✅ Solo carga inicial true
   const [ultimaActualizacion, setUltimaActualizacion] = useState(null);
   const [paginacion, setPaginacion] = useState({
     total: 0,
@@ -198,6 +198,7 @@ const AuditLogs = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [estadisticas, setEstadisticas] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [actualizando, setActualizando] = useState(false); // ✅ Estado para actualizaciones manuales
 
   const [filtros, setFiltros] = useState({
     fecha_desde: '',
@@ -216,14 +217,20 @@ const AuditLogs = () => {
     return format(new Date(fecha), "dd/MM/yyyy HH:mm:ss", { locale: es });
   };
 
-  // ✅ Función para cargar logs (SIN POLLING, solo cuando el usuario lo solicita)
-  const cargarLogs = useCallback(async (pagina = 1, mostrarLoading = true) => {
+  // ✅ Función para cargar logs (SIN mostrar loading en filtros)
+  const cargarLogs = useCallback(async (pagina = 1, mostrarLoading = false, esPrimeraCarga = false) => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
 
     abortControllerRef.current = new AbortController();
-    if (mostrarLoading) setLoading(true);
+    
+    // ✅ Solo mostrar loading en primera carga o si se solicita explícitamente
+    if (esPrimeraCarga) {
+      setLoading(true);
+    } else if (mostrarLoading) {
+      setActualizando(true);
+    }
 
     try {
       const params = {
@@ -249,16 +256,20 @@ const AuditLogs = () => {
     } catch (error) {
       if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
         console.error('Error cargando logs:', error);
-        if (mostrarLoading) toast.error('Error al cargar logs');
+        if (!esPrimeraCarga) toast.error('Error al cargar logs');
       }
     } finally {
-      if (mostrarLoading) setLoading(false);
+      if (esPrimeraCarga) {
+        setLoading(false);
+      } else if (mostrarLoading) {
+        setActualizando(false);
+      }
     }
   }, [filtros, paginacion.limite]);
 
-  // ✅ Cargar solo al montar el componente (UNA SOLA VEZ)
+  // ✅ Cargar solo al montar el componente (UNA SOLA VEZ, con loading)
   useEffect(() => {
-    cargarLogs(1);
+    cargarLogs(1, false, true); // esPrimeraCarga = true
     
     return () => {
       if (abortControllerRef.current) {
@@ -267,12 +278,13 @@ const AuditLogs = () => {
     };
   }, []); // ✅ Dependencias vacías - SOLO AL MONTAR
 
-  // ✅ Aplicar filtros cuando cambian (DEBOUNCE + CARGA MANUAL)
+  // ✅ Aplicar filtros cuando cambian (SIN mostrar loading, para evitar parpadeo)
   useEffect(() => {
     if (debouncedUsuario !== undefined || debouncedAccion !== undefined || 
         filtros.fecha_desde !== undefined || filtros.fecha_hasta !== undefined || 
         filtros.severidad !== undefined) {
-      cargarLogs(1);
+      // ✅ No mostrar loading en filtros - solo recarga en segundo plano
+      cargarLogs(1, false, false);
     }
   }, [debouncedUsuario, debouncedAccion, filtros.fecha_desde, filtros.fecha_hasta, filtros.severidad]);
 
@@ -299,11 +311,13 @@ const AuditLogs = () => {
   };
 
   const cambiarPagina = (nuevaPagina) => {
-    cargarLogs(nuevaPagina);
+    // ✅ Mostrar loading solo en cambio de página (pequeño indicador)
+    cargarLogs(nuevaPagina, true, false);
   };
 
   const handleActualizar = () => {
-    cargarLogs(paginacion.pagina);
+    // ✅ Mostrar loading en actualización manual
+    cargarLogs(paginacion.pagina, true, false);
     toast.success('Datos actualizados', { icon: <RefreshCw size={14} />, duration: 2000 });
   };
 
@@ -316,6 +330,18 @@ const AuditLogs = () => {
 
   const inicio = paginacion.total > 0 ? ((paginacion.pagina - 1) * paginacion.limite) + 1 : 0;
   const fin = Math.min(paginacion.pagina * paginacion.limite, paginacion.total);
+
+  // ✅ Mostrar loading SOLO en primera carga
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
+          <Loader size={40} className="animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-500">Cargando registros de auditoría...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 sm:p-6 md:p-8">
@@ -337,11 +363,11 @@ const AuditLogs = () => {
           <div className="flex gap-2">
             <button
               onClick={handleActualizar}
-              disabled={loading}
+              disabled={actualizando}
               className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-sm shadow-md hover:from-blue-700 hover:to-indigo-700 transition-all disabled:opacity-50"
               title="Actualizar datos manualmente"
             >
-              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+              <RefreshCw size={14} className={actualizando ? 'animate-spin' : ''} />
               Actualizar
             </button>
             <button
@@ -403,14 +429,18 @@ const AuditLogs = () => {
               <AlertCircle size={12} />
               <span>Los datos se actualizan manualmente. Usa el botón "Actualizar" para ver nuevos registros.</span>
             </div>
+            {actualizando && (
+              <div className="flex items-center gap-1 text-blue-600">
+                <Loader size={12} className="animate-spin" />
+                <span>Actualizando...</span>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Tabla */}
         <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100">
-          {loading ? (
-            <div className="p-12 text-center"><Loader size={32} className="animate-spin text-blue-600 mx-auto" /><p className="mt-3 text-gray-500">Cargando registros...</p></div>
-          ) : logs.length === 0 ? (
+          {logs.length === 0 ? (
             <div className="p-12 text-center">
               <FileText size={48} className="text-gray-300 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-800 mb-2">No hay registros</h3>

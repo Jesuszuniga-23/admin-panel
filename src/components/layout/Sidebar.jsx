@@ -499,7 +499,7 @@ const Sidebar = () => {
               <span>Análisis Geográfico</span>
             </button>
           )}
-          {/* AUDITORÍA - Solo admin y superadmin */}
+          {/* AUDITORÍA - Solo admin y superadmin 
           {(esAdmin || rol === 'superadmin') && (
             <button
               onClick={() => handleNavigation("/admin/audit-logs")}
@@ -513,7 +513,7 @@ const Sidebar = () => {
               <FileText size={18} />
               <span>Auditoría</span>
             </button>
-          )}
+          )}*/}
           
         </nav>
 
