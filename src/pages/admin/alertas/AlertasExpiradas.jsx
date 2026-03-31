@@ -442,12 +442,7 @@ const AlertasExpiradas = () => {
             </div>
 
             <div className="flex items-end gap-2 sm:col-span-2 lg:col-span-1">
-              <button
-                onClick={aplicarFiltros}
-                className="flex-1 px-3 sm:px-4 py-2 bg-gray-600 text-white rounded-lg md:rounded-xl shadow-sm shadow-gray-200 hover:bg-gray-700 hover:shadow-md transition-all text-xs sm:text-sm font-medium whitespace-nowrap"
-              >
-                Aplicar
-              </button>
+            
               <button
                 onClick={limpiarFiltros}
                 className="flex-1 px-3 sm:px-4 py-2 border border-slate-200 bg-white rounded-lg md:rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all text-xs sm:text-sm font-medium text-slate-600 whitespace-nowrap"
@@ -503,7 +498,6 @@ const AlertasExpiradas = () => {
                       <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-slate-500 uppercase">CIUDADANO</th>
                       <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-slate-500 uppercase">UBICACIÓN</th>
                       <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-slate-500 uppercase">FECHA</th>
-                      <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-slate-500 uppercase">ESTADO</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -543,12 +537,7 @@ const AlertasExpiradas = () => {
                             </span>
                           </div>
                         </td>
-                        <td className="px-3 md:px-6 py-2 md:py-3">
-                          <span className="inline-flex items-center gap-1 text-xs px-1.5 md:px-2 py-0.5 md:py-1 bg-slate-100 text-slate-600 rounded-full">
-                            <span className="w-1 h-1 bg-slate-400 rounded-full"></span>
-                            <span>Expirada</span>
-                          </span>
-                        </td>
+                        
                       </tr>
                     ))}
                   </tbody>

@@ -481,10 +481,10 @@ const AlertasCerradasManual = () => {
                     <tr className="bg-slate-50 border-b border-slate-200">
                       <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-slate-500 uppercase">TIPO</th>
                       <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-slate-500 uppercase">CIUDADANO</th>
+                      <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-slate-500 uppercase">UBICACIÓN</th>
                       <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-slate-500 uppercase">CERRADO POR</th>
                       <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-slate-500 uppercase">MOTIVO</th>
                       <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-slate-500 uppercase">FECHA</th>
-                      <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-slate-500 uppercase">UBICACIÓN</th>
                       </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -504,6 +504,17 @@ const AlertasCerradasManual = () => {
                               {alerta.ciudadano?.nombre || 'Desconocido'}
                             </span>
                           </div>
+                        </td>
+                         <td className="px-3 md:px-6 py-2 md:py-3">
+                          {alerta.lat && alerta.lng ? (
+                            <BotonMapa
+                              onClick={(e) => abrirMapaModal(e, alerta)}
+                              texto="Ver mapa"
+                              size={14}
+                            />
+                          ) : (
+                            <span className="text-xs text-slate-400">—</span>
+                          )}
                         </td>
                         <td className="px-3 md:px-6 py-2 md:py-3">
                           <div className="flex items-center gap-1 md:gap-2">
@@ -526,17 +537,7 @@ const AlertasCerradasManual = () => {
                             </span>
                           </div>
                         </td>
-                        <td className="px-3 md:px-6 py-2 md:py-3">
-                          {alerta.lat && alerta.lng ? (
-                            <BotonMapa
-                              onClick={(e) => abrirMapaModal(e, alerta)}
-                              texto="Ver mapa"
-                              size={14}
-                            />
-                          ) : (
-                            <span className="text-xs text-slate-400">—</span>
-                          )}
-                        </td>
+                       
                       </tr>
                     ))}
                   </tbody>

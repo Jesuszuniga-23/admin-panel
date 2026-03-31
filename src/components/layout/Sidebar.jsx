@@ -434,7 +434,7 @@ const Sidebar = () => {
                     <span>Personal</span>
                   </button>
 
-                  {/* Recuperaciones - Solo admin y técnico */}
+                  {/* Recuperaciones - Solo admin y técnico 
                   {puedeVerRecuperaciones && (
                     <button
                       onClick={() => handleNavigation("/admin/recuperaciones/pendientes")}
@@ -448,7 +448,7 @@ const Sidebar = () => {
                       <Key size={16} />
                       <span>Recuperaciones</span>
                     </button>
-                  )}
+                  )}*/}
                 </div>
               )}
             </div>
@@ -497,6 +497,21 @@ const Sidebar = () => {
             >
               <Globe size={18} />
               <span>Análisis Geográfico</span>
+            </button>
+          )}
+          {/* AUDITORÍA - Solo admin y superadmin */}
+          {(esAdmin || rol === 'superadmin') && (
+            <button
+              onClick={() => handleNavigation("/admin/audit-logs")}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                location.pathname === "/admin/audit-logs"
+                  ? 'bg-blue-50 text-blue-600 font-semibold border-l-4 border-blue-600'
+                  : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600'
+              }`}
+              aria-label="Ver logs de auditoría"
+            >
+              <FileText size={18} />
+              <span>Auditoría</span>
             </button>
           )}
           

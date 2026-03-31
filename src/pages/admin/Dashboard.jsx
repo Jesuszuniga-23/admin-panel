@@ -126,7 +126,9 @@ const StatCard = ({ icon, title, value, subtitle, color }) => {
     teal: 'from-teal-500 to-teal-600 shadow-teal-200',
     violet: 'from-violet-500 to-violet-600 shadow-violet-200',
     orange: 'from-orange-500 to-orange-600 shadow-orange-200',
-    indigo: 'from-indigo-500 to-indigo-600 shadow-indigo-200'
+    indigo: 'from-indigo-500 to-indigo-600 shadow-indigo-200',
+    green: 'from-green-500 to-green-600 shadow-green-200',
+    gray: 'from-gray-500 to-gray-600 shadow-gray-200'
   };
 
   return (
@@ -159,8 +161,31 @@ const Dashboard = () => {
   // ✅ Determinar qué tarjetas mostrar según rol
   const mostrarTarjetaPanico = !tipoAlertaPermitido || tipoAlertaPermitido === 'panico';
   const mostrarTarjetaMedica = !tipoAlertaPermitido || tipoAlertaPermitido === 'medica';
-  const mostrarPersonalPolicia = !rolPersonalPermitido || rolPersonalPermitido === 'policia';
-  const mostrarPersonalAmbulancia = !rolPersonalPermitido || rolPersonalPermitido === 'ambulancia';
+
+  // ✅ Colores dinámicos según rol del usuario
+  const getColorsByRol = useCallback(() => {
+    if (rolPersonalPermitido === 'policia') {
+      return {
+        personal: 'blue',
+        unidades: 'indigo',
+        neutral: 'blue'
+      };
+    }
+    if (rolPersonalPermitido === 'ambulancia') {
+      return {
+        personal: 'green',
+        unidades: 'emerald',
+        neutral: 'green'
+      };
+    }
+    return {
+      personal: 'gray',
+      unidades: 'gray',
+      neutral: 'gray'
+    };
+  }, [rolPersonalPermitido]);
+
+  const coloresPorRol = getColorsByRol();
 
   const getVariacionColor = useCallback((tendencia) => {
     switch (tendencia) {
@@ -195,7 +220,7 @@ const Dashboard = () => {
 
   const COLORS = useMemo(() => ['#3b82f6', '#ef4444', '#f59e0b', '#10b981', '#8b5cf6'], []);
 
-  // ✅ Actualizar estado cuando llegan los datos (CON CÁLCULO DE VARIACIONES)
+  // ✅ Actualizar estado cuando llegan los datos
   useEffect(() => {
     if (data) {
       const periodoAnterior = data.periodoAnterior || {};
@@ -283,21 +308,36 @@ const Dashboard = () => {
       <main className="p-4 sm:p-6 md:p-8">
         {/* KPIs principales */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
-          {stats?.kpis && Object.entries(stats.kpis).map(([key, data]) => (
-            <KpiCard
-              key={key}
-              icon={
-                key === 'personal' ? <Users size={20} className="md:w-6 md:h-6 text-white" /> :
-                key === 'unidades' ? <Truck size={20} className="md:w-6 md:h-6 text-white" /> :
-                <Bell size={20} className="md:w-6 md:h-6 text-white" />
-              }
-              title={key === 'alertas' ? 'Alertas Cerradas/Expiradas' : key}
-              value={data.total || 0}
-              variacion={data.variacion}
-              tendencia={data.tendencia}
-              color={key === 'personal' ? 'blue' : key === 'unidades' ? 'purple' : 'amber'}
-            />
-          ))}
+          {stats?.kpis && Object.entries(stats.kpis).map(([key, data]) => {
+            // ✅ Títulos con mayúscula inicial
+            const titulo = 
+              key === 'personal' ? 'Personal' :
+              key === 'unidades' ? 'Unidades' :
+              key === 'alertas' ? 'Alertas cerradas/expiradas' :
+              key.charAt(0).toUpperCase() + key.slice(1);
+            
+            const icono = 
+              key === 'personal' ? <Users size={20} className="md:w-6 md:h-6 text-white" /> :
+              key === 'unidades' ? <Truck size={20} className="md:w-6 md:h-6 text-white" /> :
+              <Bell size={20} className="md:w-6 md:h-6 text-white" />;
+            
+            const color = 
+              key === 'personal' ? 'blue' :
+              key === 'unidades' ? 'purple' :
+              'amber';
+            
+            return (
+              <KpiCard
+                key={key}
+                icon={icono}
+                title={titulo}
+                value={data.total || 0}
+                variacion={data.variacion}
+                tendencia={data.tendencia}
+                color={color}
+              />
+            );
+          })}
         </div>
 
         {/* Gráficas */}
@@ -390,76 +430,85 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Stats Cards - PRIMERA FILA */}
+        {/* Stats Cards - Personal y Unidades (detalle operativo) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8">
+          {/* Personal Activo */}
           <StatCard
-            icon={<IconoEntidad entidad="POLICIA" size={20} color="text-white" />}
+            icon={<Users size={20} className="text-white" />}
             title="Personal Activo"
             value={stats?.personal?.activos || 0}
             subtitle={`${stats?.personal?.disponibles || 0} disponibles`}
-            color="blue"
+            color={coloresPorRol.personal}
           />
+          
+          {/* Unidades Activas */}
           <StatCard
-            icon={<IconoEntidad entidad="PATRULLA" size={20} color="text-white" />}
+            icon={<Truck size={20} className="text-white" />}
             title="Unidades Activas"
             value={stats?.unidades?.activas || 0}
             subtitle={`${stats?.unidades?.disponibles || 0} disponibles`}
-            color="purple"
+            color={coloresPorRol.unidades}
           />
+          
+          {/* Alertas Activas */}
           <StatCard
-            icon={<IconoEntidad entidad="ALERTA_PANICO" size={20} color="text-white" />}
-            title="Alertas Expiradas"
-            value={stats?.alertas?.expiradas || 0}
-            subtitle="Sin atender"
-            color="amber"
+            icon={<Bell size={20} className="text-white" />}
+            title="Alertas Activas"
+            value={stats?.alertas?.activas || 0}
+            subtitle="Sin asignar"
+            color="rose"
           />
+          
+          {/* Alertas Cerradas Manual */}
           <StatCard
-            icon={<IconoEntidad entidad="ALERTA_CERRADA" size={20} color="text-white" />}
-            title="Alertas Cerradas Manual"
+            icon={<XCircle size={20} className="text-white" />}
+            title="Cerradas Manual"
             value={stats?.alertas?.cerradasManual || 0}
             subtitle="Manualmente"
-            color="emerald"
+            color="purple"
           />
         </div>
 
-        {/* Stats Cards - SEGUNDA FILA (con filtro por rol) */}
+        {/* Stats Cards - Ciclo de vida de alertas + Personal Total */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8">
+          {/* Alertas en Proceso */}
           {mostrarTarjetaPanico && (
             <StatCard
-              icon={<IconoEntidad entidad="ALERTA_PANICO" size={20} color="text-white" />}
-              title="Alertas Activas"
-              value={stats?.alertas?.activas || 0}
-              subtitle="Sin asignar"
-              color="rose"
-            />
-          )}
-          
-          {mostrarTarjetaPanico && (
-            <StatCard
-              icon={<IconoEntidad entidad="ALERTA_EN_PROCESO" size={20} color="text-white" />}
+              icon={<Activity size={20} className="text-white" />}
               title="En Proceso"
               value={stats?.alertas?.enProceso || 0}
               subtitle="Siendo atendidas"
-              color="teal"
+              color="amber"
             />
           )}
           
+          {/* Alertas Cerradas Totales */}
           {mostrarTarjetaPanico && (
             <StatCard
-              icon={<IconoEntidad entidad="ALERTA_CERRADA" size={20} color="text-white" />}
+              icon={<CheckCircle size={20} className="text-white" />}
               title="Cerradas (Totales)"
               value={stats?.alertas?.cerradasTotales || 0}
               subtitle="Historial completo"
-              color="violet"
+              color="emerald"
             />
           )}
           
+          {/* Alertas Expiradas */}
           <StatCard
-            icon={<IconoEntidad entidad="CIUDADANO" size={20} color="text-white" />}
+            icon={<AlertTriangle size={20} className="text-white" />}
+            title="Alertas Expiradas"
+            value={stats?.alertas?.expiradas || 0}
+            subtitle="Sin atender"
+            color="gray"
+          />
+          
+          {/* Personal Total */}
+          <StatCard
+            icon={<Users size={20} className="text-white" />}
             title="Personal Total"
             value={stats?.personal?.total || 0}
             subtitle="Registrados"
-            color="orange"
+            color={coloresPorRol.neutral}
           />
         </div>
 

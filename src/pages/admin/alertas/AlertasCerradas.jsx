@@ -542,7 +542,7 @@ const AlertasCerradas = () => {
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">UBICACIÓN</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">TIEMPO ATENCIÓN</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">FECHA CIERRE</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">ACCIONES</th>
+                      
                      </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -560,12 +560,6 @@ const AlertasCerradas = () => {
                             <span className="text-sm font-medium text-gray-800">
                               {alerta.ciudadano?.nombre || 'Desconocido'}
                             </span>
-                            {alerta.ciudadano?.telefono && (
-                              <span className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
-                                <Phone size={10} />
-                                {alerta.ciudadano.telefono}
-                              </span>
-                            )}
                           </div>
                         </td>
                         <td className="px-4 py-3">
@@ -595,18 +589,7 @@ const AlertasCerradas = () => {
                         <td className="px-4 py-3 text-sm text-gray-500">
                           {formatearFechaCorta(alerta.fecha_cierre)}
                         </td>
-                        <td className="px-4 py-3 text-right">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRowClick(alerta);
-                            }}
-                            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                            title="Ver detalle completo"
-                          >
-                            <Eye size={16} className="text-gray-500" />
-                          </button>
-                        </td>
+                        
                       </tr>
                     ))}
                   </tbody>

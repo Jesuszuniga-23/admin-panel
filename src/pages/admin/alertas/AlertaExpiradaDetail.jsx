@@ -278,7 +278,7 @@ const AlertaExpiradaDetail = () => {
             <BadgeTipoAlerta tipo={alerta.tipo} size={14} />
             <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
               <Clock size={12} />
-              EXPIRADA
+              Expirada
             </span>
             {!alerta.requiere_otp && (
               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-green-100 text-green-600">

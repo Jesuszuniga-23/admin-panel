@@ -623,7 +623,7 @@ const UnidadDetail = () => {
             </div>
             <div>
               <h2 className="text-2xl font-bold text-white">{unidad.codigo}</h2>
-              <p className="text-white/80 mt-1">ID: {unidad.id}</p>
+             
             </div>
           </div>
         </div>

@@ -83,7 +83,11 @@ export const ENDPOINTS = {
   },
   ANALISIS_GEOGRAFICO: {
     COMPLETO: `${BASE_URL}/admin/analisis-geografico/completo`
-}
+},
+AUDIT: {
+    LOGS: `${BASE_URL}/admin/audit-logs/completo`,
+    DETALLE: (id) => `${BASE_URL}/admin/audit-logs/${id}`
+  },
 };
 
 // ✅ Función de utilidad para verificar endpoints

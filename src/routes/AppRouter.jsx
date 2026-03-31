@@ -27,6 +27,8 @@ import AlertaPanelDetail from '../pages/admin/alertas/AlertaPanelDetail';
 import AnalisisGeografico from '../pages/admin/analisis/AnalisisGeografico';
 import AlertaExpiradaDetail from '../pages/admin/alertas/AlertaExpiradaDetail';
 import NotFound from '../pages/NotFound';
+import AuditLogs from '../pages/admin/audit/AuditLogs';
+
 
 // ✅ Logs condicionales solo en desarrollo
 if (import.meta.env.DEV) {
@@ -76,8 +78,8 @@ const AppRouter = () => {
         {/* ✅ Ruta genérica para detalle de alerta - VA DESPUÉS de las específicas */}
         <Route path="alertas/:id" element={<AlertaPanelDetail />} />
         
-        {/* Recuperaciones */}
-        <Route path="recuperaciones/pendientes" element={<RecuperacionesPendientes />} />
+        {/* Recuperaciones 
+        <Route path="recuperaciones/pendientes" element={<RecuperacionesPendientes />} />*/}
         
         {/* Unidades */}
         <Route path="unidades" element={<UnidadesList />} />
@@ -94,6 +96,8 @@ const AppRouter = () => {
         
         {/* Análisis */}
         <Route path="analisis/geografico" element={<AnalisisGeografico />} />
+         {/* Auditoría - Solo admin y superadmin */}
+        <Route path="audit-logs" element={<AuditLogs />} />
       </Route>
 
       {/* ✅ Ruta para superadmin (opcional, puede redirigir a admin) */}

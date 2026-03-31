@@ -3,7 +3,9 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Users, Plus, Search, Filter, ChevronLeft, ChevronRight,
-  Eye, Edit, Trash2, Power, User, Mail, Phone, X, AlertTriangle, CheckCircle
+  Eye, Edit, Trash2, Power, User, Mail, Phone, X, AlertTriangle, CheckCircle,
+  UserRoundShield, UserRoundHeart, UserRoundCog, UserRound, UserRoundCrown, UserRoundStar,
+  Badge, Ambulance
 } from 'lucide-react';
 import personalService from '../../../services/admin/personal.service';
 import toast from 'react-hot-toast';
@@ -54,7 +56,84 @@ const formatearNombreCompleto = (persona) => {
     .join(' ');
 };
 
-// Mapeo de roles a entidades para iconos consistentes
+// ✅ NUEVA FUNCIÓN: Obtener icono según rol (iconos combinados de Lucide)
+const getIconoPorRol = (rol, size = 18) => {
+  const iconos = {
+    // Operadores con iconos combinados
+    operador_policial: { 
+      icon: UserRoundShield, 
+      color: 'text-blue-600', 
+      bg: 'bg-blue-100',
+      nombre: 'Operador Policial'
+    },
+    operador_medico: { 
+      icon: UserRoundHeart, 
+      color: 'text-green-600', 
+      bg: 'bg-green-100',
+      nombre: 'Operador Médico'
+    },
+    operador_tecnico: { 
+      icon: UserRoundCog, 
+      color: 'text-purple-600', 
+      bg: 'bg-purple-100',
+      nombre: 'Operador Técnico'
+    },
+    operador_general: { 
+      icon: UserRound, 
+      color: 'text-gray-600', 
+      bg: 'bg-gray-100',
+      nombre: 'Operador General'
+    },
+    // Administrativos con iconos combinados
+    admin: { 
+      icon: UserRoundCrown, 
+      color: 'text-indigo-600', 
+      bg: 'bg-indigo-100',
+      nombre: 'Administrador'
+    },
+    superadmin: { 
+      icon: UserRoundStar, 
+      color: 'text-amber-600', 
+      bg: 'bg-amber-100',
+      nombre: 'Super Administrador'
+    },
+    // Personal operativo
+    policia: { 
+      icon: Badge, 
+      color: 'text-blue-600', 
+      bg: 'bg-blue-100',
+      nombre: 'Policía'
+    },
+    ambulancia: { 
+      icon: Ambulance, 
+      color: 'text-green-600', 
+      bg: 'bg-green-100',
+      nombre: 'Ambulancia'
+    }
+  };
+
+  const config = iconos[rol];
+  
+  if (config) {
+    const IconComponent = config.icon;
+    return {
+      contenido: <IconComponent size={size} className={config.color} />,
+      bgColor: config.bg,
+      esIcono: true,
+      nombreMostrar: config.nombre
+    };
+  }
+  
+  // Fallback: inicial del nombre
+  return {
+    contenido: null,
+    bgColor: 'bg-gray-100',
+    esIcono: false,
+    nombreMostrar: rol
+  };
+};
+
+// Mapeo de roles a entidades para badges (mantener para compatibilidad)
 const rolToEntidad = {
   admin: 'ADMIN',
   superadmin: 'SUPERADMIN',
@@ -68,7 +147,6 @@ const rolToEntidad = {
 
 const PersonalList = () => {
   const navigate = useNavigate();
-  // ✅ Eliminada variable no usada 'user'
   const [personal, setPersonal] = useState([]);
   const [personalOriginal, setPersonalOriginal] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -80,17 +158,12 @@ const PersonalList = () => {
     onConfirm: null
   });
   
-  // ✅ REF para AbortController
   const abortControllerRef = useRef(null);
-  
-  // Obtener permisos según rol
   const rolPersonalPermitido = authService.getRolPersonalPermitido();
   
-  // ✅ CORREGIDO: usar las funciones correctamente
   const puedeEditarPersonal = (rol) => authService.puedeEditarPersonal(rol);
   const puedeEliminarPersonal = (rol) => authService.puedeEliminarPersonal(rol);
   
-  // ✅ NUEVO: Verificar si puede crear personal
   const puedeCrearPersonal = () => {
     const currentUserRol = authService.getCurrentUser()?.rol;
     if (currentUserRol === 'superadmin') return true;
@@ -118,7 +191,6 @@ const PersonalList = () => {
   
   const searchTerm = useDebounce(filtros.search, 500);
 
-  // ✅ Función para filtrar datos (sin cambios)
   const filtrarDatos = useCallback((datos) => {
     return datos.filter(item => {
       if (filtros.search) {
@@ -145,17 +217,13 @@ const PersonalList = () => {
     });
   }, [filtros.search, filtros.rol, filtros.activo, filtros.disponible]);
 
-  // ✅ Función para cargar personal con AbortController
   const cargarPersonal = useCallback(async () => {
-    // Cancelar petición anterior si existe
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       console.log('🛑 Petición anterior cancelada en PersonalList');
     }
     
-    // Crear nuevo AbortController
     abortControllerRef.current = new AbortController();
-    
     setLoading(true);
     try {
       const params = { signal: abortControllerRef.current.signal };
@@ -197,7 +265,6 @@ const PersonalList = () => {
         total_paginas: totalPaginas
       });
     } catch (error) {
-      // ✅ Ignorar errores de cancelación
       if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
         console.error("Error:", error);
         toast.error("Error al cargar personal");
@@ -207,7 +274,6 @@ const PersonalList = () => {
     }
   }, [rolPersonalPermitido, filtros.limite, filtros.pagina, filtrarDatos]);
 
-  // ✅ Efecto con limpieza
   useEffect(() => {
     cargarPersonal();
     
@@ -238,7 +304,6 @@ const PersonalList = () => {
     });
   };
 
-  // ✅ Efecto para aplicar filtros locales
   useEffect(() => {
     if (personalOriginal.length) {
       const datosFiltrados = filtrarDatos(personalOriginal);
@@ -285,7 +350,7 @@ const PersonalList = () => {
         try {
           await personalService.eliminarPersonal(id);
           setModalInfo({ show: false, tipo: '', titulo: '', mensaje: '', onConfirm: null });
-          await cargarPersonal(); // ✅ Recargar después de eliminar
+          await cargarPersonal();
           toast.success(`Personal "${nombreCompleto}" eliminado correctamente`);
         } catch (error) {
           console.error("Error eliminando:", error);
@@ -332,7 +397,7 @@ const PersonalList = () => {
         try {
           await personalService.toggleActivo(id, nuevoEstado);
           setModalInfo({ show: false, tipo: '', titulo: '', mensaje: '', onConfirm: null });
-          await cargarPersonal(); // ✅ Recargar después de cambiar estado
+          await cargarPersonal();
           toast.success(`Personal "${nombreCompleto}" ${accion}do correctamente`);
         } catch (error) {
           console.error(`Error al ${accion}:`, error);
@@ -487,102 +552,114 @@ const PersonalList = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {personal.map((persona) => (
-                      <tr key={persona.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                              <span className="text-blue-600 font-medium">
-                                {persona.nombreCompleto?.charAt(0).toUpperCase()}
-                              </span>
+                    {personal.map((persona) => {
+                      const iconoConfig = getIconoPorRol(persona.rol);
+                      return (
+                        <tr key={persona.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${iconoConfig.bgColor}`}>
+                                {iconoConfig.esIcono ? (
+                                  iconoConfig.contenido
+                                ) : (
+                                  <span className="text-gray-600 font-medium text-sm">
+                                    {persona.nombreCompleto?.charAt(0).toUpperCase() || '?'}
+                                  </span>
+                                )}
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium text-gray-800 truncate max-w-[150px]">
+                                  {persona.nombreCompleto}
+                                </p>
+                                <p className="text-xs text-gray-400 truncate max-w-[150px]">
+                                  {iconoConfig.nombreMostrar}
+                                </p>
+                              </div>
                             </div>
-                            <span className="text-sm font-medium text-gray-800 truncate max-w-[150px]">
-                              {persona.nombreCompleto}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="space-y-1">
-                            <p className="text-sm text-gray-600 flex items-center gap-2">
-                              <Mail size={14} className="text-gray-400" />
-                              <span className="truncate max-w-[150px]">{persona.email}</span>
-                            </p>
-                            {persona.telefono && (
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="space-y-1">
                               <p className="text-sm text-gray-600 flex items-center gap-2">
-                                <Phone size={14} className="text-gray-400" />
-                                {persona.telefono}
+                                <Mail size={14} className="text-gray-400" />
+                                <span className="truncate max-w-[150px]">{persona.email}</span>
                               </p>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <BadgeIcono 
-                            entidad={rolToEntidad[persona.rol] || 'ADMIN'} 
-                            texto={persona.rol === 'policia' ? 'Policía' :
-                                   persona.rol === 'ambulancia' ? 'Ambulancia' :
-                                   persona.rol === 'admin' ? 'Admin' :
-                                   persona.rol === 'superadmin' ? 'Superadmin' : persona.rol}
-                            size={12}
-                          />
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{persona.placa}</td>
-                        <td className="px-4 py-3">
-                          <span className={`px-2 py-1 rounded-full text-xs ${
-                            persona.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                          }`}>
-                            {persona.estadoTexto}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={`px-2 py-1 rounded-full text-xs ${
-                            !persona.activo ? 'bg-gray-100 text-gray-700' :
-                            persona.disponible ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                          }`}>
-                            {persona.disponibleTexto}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            {puedeEditarPersonal(persona.rol) && (
+                              {persona.telefono && (
+                                <p className="text-sm text-gray-600 flex items-center gap-2">
+                                  <Phone size={14} className="text-gray-400" />
+                                  {persona.telefono}
+                                </p>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <BadgeIcono 
+                              entidad={rolToEntidad[persona.rol] || 'ADMIN'} 
+                              texto={persona.rol === 'policia' ? 'Policía' :
+                                     persona.rol === 'ambulancia' ? 'Ambulancia' :
+                                     persona.rol === 'admin' ? 'Admin' :
+                                     persona.rol === 'superadmin' ? 'Superadmin' : persona.rol}
+                              size={12}
+                            />
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-600">{persona.placa}</td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-1 rounded-full text-xs ${
+                              persona.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                            }`}>
+                              {persona.estadoTexto}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-1 rounded-full text-xs ${
+                              !persona.activo ? 'bg-gray-100 text-gray-700' :
+                              persona.disponible ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                            }`}>
+                              {persona.disponibleTexto}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              {puedeEditarPersonal(persona.rol) && (
+                                <button
+                                  onClick={() => handleToggleActivo(persona.id, persona.nombreCompleto, persona.activo, persona.disponible, persona.rol)}
+                                  className={`p-1.5 rounded-lg transition-colors ${
+                                    persona.activo ? 'hover:bg-yellow-50 text-yellow-600' : 'hover:bg-green-50 text-green-600'
+                                  }`}
+                                  title={persona.activo ? 'Desactivar' : 'Activar'}
+                                >
+                                  <Power size={16} />
+                                </button>
+                              )}
                               <button
-                                onClick={() => handleToggleActivo(persona.id, persona.nombreCompleto, persona.activo, persona.disponible, persona.rol)}
-                                className={`p-1.5 rounded-lg transition-colors ${
-                                  persona.activo ? 'hover:bg-yellow-50 text-yellow-600' : 'hover:bg-green-50 text-green-600'
-                                }`}
-                                title={persona.activo ? 'Desactivar' : 'Activar'}
-                              >
-                                <Power size={16} />
-                              </button>
-                            )}
-                            <button
-                              onClick={() => navigate(`/admin/personal/${persona.id}`)}
-                              className="p-1.5 hover:bg-gray-100 rounded-lg"
-                              title="Ver detalles"
-                            >
-                              <Eye size={16} className="text-gray-500" />
-                            </button>
-                            {puedeEditarPersonal(persona.rol) && (
-                              <button
-                                onClick={() => navigate(`/admin/personal/editar/${persona.id}`)}
+                                onClick={() => navigate(`/admin/personal/${persona.id}`)}
                                 className="p-1.5 hover:bg-gray-100 rounded-lg"
-                                title="Editar"
+                                title="Ver detalles"
                               >
-                                <Edit size={16} className="text-gray-500" />
+                                <Eye size={16} className="text-gray-500" />
                               </button>
-                            )}
-                            {puedeEliminarPersonal(persona.rol) && (
-                              <button
-                                onClick={() => handleEliminar(persona.id, persona.nombreCompleto, persona.disponible, persona.rol)}
-                                className="p-1.5 hover:bg-red-50 rounded-lg"
-                                title="Eliminar"
-                              >
-                                <Trash2 size={16} className="text-red-500" />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                              {puedeEditarPersonal(persona.rol) && (
+                                <button
+                                  onClick={() => navigate(`/admin/personal/editar/${persona.id}`)}
+                                  className="p-1.5 hover:bg-gray-100 rounded-lg"
+                                  title="Editar"
+                                >
+                                  <Edit size={16} className="text-gray-500" />
+                                </button>
+                              )}
+                              {puedeEliminarPersonal(persona.rol) && (
+                                <button
+                                  onClick={() => handleEliminar(persona.id, persona.nombreCompleto, persona.disponible, persona.rol)}
+                                  className="p-1.5 hover:bg-red-50 rounded-lg"
+                                  title="Eliminar"
+                                >
+                                  <Trash2 size={16} className="text-red-500" />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -618,7 +695,7 @@ const PersonalList = () => {
         </div>
       </div>
 
-      {/* Modal Genérico (sin cambios) */}
+      {/* Modal Genérico */}
       {modalInfo.show && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full animate-fadeIn">
