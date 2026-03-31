@@ -1,19 +1,20 @@
 // src/pages/admin/audit/AuditLogs.jsx
+// VERSIÓN SIN BOTONES DE EXPORTACIÓN
+
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FileText, Search, Filter, ChevronLeft, ChevronRight,
   Eye, Calendar, User, AlertTriangle, Info,
   Shield, X, Loader, Clock, Activity, TrendingUp, TrendingDown,
-  RefreshCw, FileSpreadsheet, FilePieChart, Copy, Check,
-  Plus, Trash2, Edit2, Bell
+  RefreshCw, Copy, Check,
+  Plus, Trash2, Edit2, Bell, AlertCircle
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 import auditService from '../../../services/admin/audit.service';
 import { useDebounce } from '../../../hooks/useDebounce';
-import reportesService from '../../../services/admin/reportes.service';
 import useAuthStore from '../../../store/authStore';
 
 // =====================================================
@@ -62,7 +63,6 @@ const formatValue = (value) => {
 const CambiosVisual = ({ beforeData, afterData }) => {
   if (!beforeData && !afterData) return null;
   
-  // Si solo hay datos después (creación)
   if (!beforeData && afterData) {
     const camposImportantes = ['nombre', 'email', 'rol', 'tipo', 'codigo', 'placa'];
     const datosMostrar = Object.entries(afterData)
@@ -72,9 +72,7 @@ const CambiosVisual = ({ beforeData, afterData }) => {
     return (
       <div className="bg-green-50 rounded-xl p-4 border border-green-200">
         <div className="flex items-center gap-2 mb-3">
-          <div className="p-1.5 bg-green-100 rounded-lg">
-            <Plus size={14} className="text-green-600" />
-          </div>
+          <div className="p-1.5 bg-green-100 rounded-lg"><Plus size={14} className="text-green-600" /></div>
           <span className="text-sm font-semibold text-green-700">Registro creado</span>
         </div>
         <div className="space-y-2">
@@ -89,7 +87,6 @@ const CambiosVisual = ({ beforeData, afterData }) => {
     );
   }
   
-  // Si solo hay datos antes (eliminación)
   if (beforeData && !afterData) {
     const camposImportantes = ['nombre', 'email', 'rol', 'tipo', 'codigo', 'placa'];
     const datosMostrar = Object.entries(beforeData)
@@ -99,9 +96,7 @@ const CambiosVisual = ({ beforeData, afterData }) => {
     return (
       <div className="bg-red-50 rounded-xl p-4 border border-red-200">
         <div className="flex items-center gap-2 mb-3">
-          <div className="p-1.5 bg-red-100 rounded-lg">
-            <Trash2 size={14} className="text-red-600" />
-          </div>
+          <div className="p-1.5 bg-red-100 rounded-lg"><Trash2 size={14} className="text-red-600" /></div>
           <span className="text-sm font-semibold text-red-700">Registro eliminado</span>
         </div>
         <div className="space-y-2">
@@ -116,7 +111,6 @@ const CambiosVisual = ({ beforeData, afterData }) => {
     );
   }
   
-  // Comparar cambios entre before y after
   const cambios = [];
   const todasLasKeys = new Set([...Object.keys(beforeData), ...Object.keys(afterData)]);
   const camposIgnorar = ['id', 'creado_en', 'actualizado_en', 'fecha_eliminacion', 'creado_por', 'actualizado_por'];
@@ -127,11 +121,7 @@ const CambiosVisual = ({ beforeData, afterData }) => {
     const after = afterData[key];
     
     if (JSON.stringify(before) !== JSON.stringify(after)) {
-      cambios.push({
-        campo: key,
-        antes: before,
-        despues: after
-      });
+      cambios.push({ campo: key, antes: before, despues: after });
     }
   }
   
@@ -142,26 +132,12 @@ const CambiosVisual = ({ beforeData, afterData }) => {
       {cambios.map(({ campo, antes, despues }) => (
         <div key={campo} className="bg-amber-50 rounded-xl p-3 border border-amber-200">
           <div className="flex items-center gap-2 mb-2">
-            <div className="p-1 bg-amber-100 rounded-lg">
-              <Edit2 size={12} className="text-amber-600" />
-            </div>
-            <span className="text-xs font-semibold text-amber-700 uppercase tracking-wider">
-              {campo.replace(/_/g, ' ')}
-            </span>
+            <div className="p-1 bg-amber-100 rounded-lg"><Edit2 size={12} className="text-amber-600" /></div>
+            <span className="text-xs font-semibold text-amber-700 uppercase tracking-wider">{campo.replace(/_/g, ' ')}</span>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Valor anterior</p>
-              <p className="text-sm text-gray-600 line-through decoration-red-400">
-                {formatValue(antes)}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Nuevo valor</p>
-              <p className="text-sm text-gray-800 font-medium text-green-700">
-                {formatValue(despues)}
-              </p>
-            </div>
+            <div><p className="text-xs text-gray-500 mb-1">Valor anterior</p><p className="text-sm text-gray-600 line-through decoration-red-400">{formatValue(antes)}</p></div>
+            <div><p className="text-xs text-gray-500 mb-1">Nuevo valor</p><p className="text-sm text-gray-800 font-medium text-green-700">{formatValue(despues)}</p></div>
           </div>
         </div>
       ))}
@@ -186,9 +162,7 @@ const StatCard = ({ title, value, icon: Icon, color, subtitle, tendencia }) => {
   return (
     <div className="bg-white rounded-xl shadow-lg shadow-slate-200/50 p-4 hover:shadow-xl transition-all">
       <div className="flex items-start justify-between mb-2">
-        <div className={`p-2 bg-gradient-to-r ${colors[color]} rounded-lg shadow-lg`}>
-          <Icon size={18} className="text-white" />
-        </div>
+        <div className={`p-2 bg-gradient-to-r ${colors[color]} rounded-lg shadow-lg`}><Icon size={18} className="text-white" /></div>
         {tendencia !== undefined && (
           <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
             tendencia > 0 ? 'text-green-600 bg-green-50' : tendencia < 0 ? 'text-red-600 bg-red-50' : 'text-gray-600 bg-gray-50'
@@ -212,8 +186,8 @@ const AuditLogs = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const [logs, setLogs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [exportando, setExportando] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [ultimaActualizacion, setUltimaActualizacion] = useState(null);
   const [paginacion, setPaginacion] = useState({
     total: 0,
     pagina: 1,
@@ -225,7 +199,6 @@ const AuditLogs = () => {
   const [estadisticas, setEstadisticas] = useState(null);
   const [copied, setCopied] = useState(false);
 
-  // Filtros
   const [filtros, setFiltros] = useState({
     fecha_desde: '',
     fecha_hasta: '',
@@ -234,28 +207,23 @@ const AuditLogs = () => {
     severidad: ''
   });
 
-  // Refs para AbortControllers
   const abortControllerRef = useRef(null);
-  const pollingAbortControllerRef = useRef(null);
-  const pollingIntervalRef = useRef(null);
-  
-  const debouncedUsuario = useDebounce(filtros.usuario_email, 500);
-  const debouncedAccion = useDebounce(filtros.accion, 500);
+  const debouncedUsuario = useDebounce(filtros.usuario_email, 1000);
+  const debouncedAccion = useDebounce(filtros.accion, 1000);
 
-  // Formatear fecha
   const formatearFecha = (fecha) => {
     if (!fecha) return 'N/A';
     return format(new Date(fecha), "dd/MM/yyyy HH:mm:ss", { locale: es });
   };
 
-  // ✅ Función para cargar logs (con AbortController)
-  const cargarLogs = useCallback(async (pagina = 1) => {
+  // ✅ Función para cargar logs (SIN POLLING, solo cuando el usuario lo solicita)
+  const cargarLogs = useCallback(async (pagina = 1, mostrarLoading = true) => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
 
     abortControllerRef.current = new AbortController();
-    setLoading(true);
+    if (mostrarLoading) setLoading(true);
 
     try {
       const params = {
@@ -276,89 +244,36 @@ const AuditLogs = () => {
           total: response.paginacion.total,
           total_paginas: response.paginacion.total_paginas
         });
+        setUltimaActualizacion(new Date());
       }
     } catch (error) {
       if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
         console.error('Error cargando logs:', error);
-        toast.error('Error al cargar logs');
+        if (mostrarLoading) toast.error('Error al cargar logs');
       }
     } finally {
-      setLoading(false);
+      if (mostrarLoading) setLoading(false);
     }
   }, [filtros, paginacion.limite]);
 
-  // ✅ Función para recargar en segundo plano (polling)
-  const recargarEnSegundoPlano = useCallback(async () => {
-    if (pollingAbortControllerRef.current) {
-      pollingAbortControllerRef.current.abort();
-    }
-
-    pollingAbortControllerRef.current = new AbortController();
-
-    try {
-      const params = {
-        page: paginacion.pagina,
-        limit: paginacion.limite,
-        signal: pollingAbortControllerRef.current.signal,
-        ...filtros
-      };
-
-      const response = await auditService.obtenerLogs(params);
-      
-      if (response.success && !pollingAbortControllerRef.current.signal.aborted) {
-        // Verificar si hay nuevos logs
-        const nuevosLogs = response.data;
-        const hayNuevos = JSON.stringify(logs) !== JSON.stringify(nuevosLogs);
-        
-        if (hayNuevos) {
-          setLogs(nuevosLogs);
-          setEstadisticas(response.estadisticas);
-          setPaginacion({
-            ...paginacion,
-            total: response.paginacion.total,
-            total_paginas: response.paginacion.total_paginas
-          });
-          // Notificación sutil de nuevos registros
-          toast.success('Nuevos registros de auditoría', {
-            icon: <Bell size={14} />,
-            duration: 3000
-          });
-        }
-      }
-    } catch (error) {
-      if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
-        console.debug('Error en polling:', error);
-      }
-    }
-  }, [filtros, paginacion.pagina, paginacion.limite, logs]);
-
-  // ✅ Iniciar polling automático
+  // ✅ Cargar solo al montar el componente (UNA SOLA VEZ)
   useEffect(() => {
     cargarLogs(1);
     
-    // Iniciar polling cada 10 segundos (solo si no hay modal abierto)
-    pollingIntervalRef.current = setInterval(() => {
-      if (!modalOpen && !loading) {
-        recargarEnSegundoPlano();
-      }
-    }, 10000);
-    
     return () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-      }
-      if (pollingAbortControllerRef.current) {
-        pollingAbortControllerRef.current.abort();
-      }
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
     };
-  }, [cargarLogs, recargarEnSegundoPlano, modalOpen, loading]);
+  }, []); // ✅ Dependencias vacías - SOLO AL MONTAR
 
-  // Aplicar filtros cuando cambian
+  // ✅ Aplicar filtros cuando cambian (DEBOUNCE + CARGA MANUAL)
   useEffect(() => {
-    cargarLogs(1);
+    if (debouncedUsuario !== undefined || debouncedAccion !== undefined || 
+        filtros.fecha_desde !== undefined || filtros.fecha_hasta !== undefined || 
+        filtros.severidad !== undefined) {
+      cargarLogs(1);
+    }
   }, [debouncedUsuario, debouncedAccion, filtros.fecha_desde, filtros.fecha_hasta, filtros.severidad]);
 
   const handleVerDetalle = async (id) => {
@@ -387,30 +302,9 @@ const AuditLogs = () => {
     cargarLogs(nuevaPagina);
   };
 
-  const exportarExcel = async () => {
-    setExportando(true);
-    try {
-      toast.loading('Generando reporte de Excel...', { id: 'export' });
-      await reportesService.generarExcelPersonalizado(logs, 'audit_logs', filtros, user);
-      toast.success('Reporte generado correctamente', { id: 'export' });
-    } catch (error) {
-      toast.error('Error al generar reporte', { id: 'export' });
-    } finally {
-      setExportando(false);
-    }
-  };
-
-  const exportarPDF = async () => {
-    setExportando(true);
-    try {
-      toast.loading('Generando reporte PDF...', { id: 'export' });
-      await reportesService.generarPDFPersonalizado(logs, 'audit_logs', filtros, user);
-      toast.success('Reporte PDF generado', { id: 'export' });
-    } catch (error) {
-      toast.error('Error al generar PDF', { id: 'export' });
-    } finally {
-      setExportando(false);
-    }
+  const handleActualizar = () => {
+    cargarLogs(paginacion.pagina);
+    toast.success('Datos actualizados', { icon: <RefreshCw size={14} />, duration: 2000 });
   };
 
   const handleCopyJson = (data) => {
@@ -434,35 +328,21 @@ const AuditLogs = () => {
             </div>
             <div>
               <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Auditoría</h1>
-              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
-                Registro de actividades del sistema
-              </p>
+              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Registro de actividades del sistema</p>
+              {ultimaActualizacion && (
+                <p className="text-xs text-gray-400 mt-1">Última actualización: {ultimaActualizacion.toLocaleTimeString()}</p>
+              )}
             </div>
           </div>
           <div className="flex gap-2">
             <button
-              onClick={() => cargarLogs(paginacion.pagina)}
+              onClick={handleActualizar}
               disabled={loading}
-              className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 text-sm shadow-sm disabled:opacity-50"
+              className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-sm shadow-md hover:from-blue-700 hover:to-indigo-700 transition-all disabled:opacity-50"
+              title="Actualizar datos manualmente"
             >
               <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
               Actualizar
-            </button>
-            <button
-              onClick={exportarExcel}
-              disabled={exportando || logs.length === 0}
-              className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl text-sm shadow-md disabled:opacity-50"
-            >
-              <FileSpreadsheet size={14} />
-              <span className="hidden sm:inline">Excel</span>
-            </button>
-            <button
-              onClick={exportarPDF}
-              disabled={exportando || logs.length === 0}
-              className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl text-sm shadow-md disabled:opacity-50"
-            >
-              <FilePieChart size={14} />
-              <span className="hidden sm:inline">PDF</span>
             </button>
             <button
               onClick={() => navigate('/admin/dashboard')}
@@ -477,30 +357,10 @@ const AuditLogs = () => {
         {/* Estadísticas rápidas */}
         {estadisticas && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-            <StatCard
-              title="Total registros"
-              value={estadisticas.total}
-              icon={FileText}
-              color="blue"
-            />
-            <StatCard
-              title="Últimas 24h"
-              value={estadisticas.ultimas24h}
-              icon={Clock}
-              color="green"
-            />
-            <StatCard
-              title="Últimos 7 días"
-              value={estadisticas.ultimos7dias}
-              icon={Activity}
-              color="indigo"
-            />
-            <StatCard
-              title="Críticos"
-              value={estadisticas.porSeveridad?.find(s => s.severidad === 'critical')?.count || 0}
-              icon={AlertTriangle}
-              color="red"
-            />
+            <StatCard title="Total registros" value={estadisticas.total} icon={FileText} color="blue" />
+            <StatCard title="Últimas 24h" value={estadisticas.ultimas24h} icon={Clock} color="green" />
+            <StatCard title="Últimos 7 días" value={estadisticas.ultimos7dias} icon={Activity} color="indigo" />
+            <StatCard title="Críticos" value={estadisticas.porSeveridad?.find(s => s.severidad === 'critical')?.count || 0} icon={AlertTriangle} color="red" />
           </div>
         )}
 
@@ -510,56 +370,27 @@ const AuditLogs = () => {
             <Filter size={18} className="text-gray-600" />
             <h2 className="text-sm font-semibold text-gray-700">Filtros</h2>
             {(filtros.fecha_desde || filtros.fecha_hasta || filtros.usuario_email || filtros.accion || filtros.severidad) && (
-              <button onClick={limpiarFiltros} className="ml-auto text-xs text-blue-600 hover:text-blue-800">
-                Limpiar todo
-              </button>
+              <button onClick={limpiarFiltros} className="ml-auto text-xs text-blue-600 hover:text-blue-800">Limpiar todo</button>
             )}
           </div>
-
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             <div className="relative">
               <Calendar size={14} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-              <input
-                type="date"
-                value={filtros.fecha_desde}
-                onChange={(e) => setFiltros(prev => ({ ...prev, fecha_desde: e.target.value }))}
-                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
-              />
+              <input type="date" value={filtros.fecha_desde} onChange={(e) => setFiltros(prev => ({ ...prev, fecha_desde: e.target.value }))} className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white" />
             </div>
             <div className="relative">
               <Calendar size={14} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-              <input
-                type="date"
-                value={filtros.fecha_hasta}
-                onChange={(e) => setFiltros(prev => ({ ...prev, fecha_hasta: e.target.value }))}
-                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
-              />
+              <input type="date" value={filtros.fecha_hasta} onChange={(e) => setFiltros(prev => ({ ...prev, fecha_hasta: e.target.value }))} className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white" />
             </div>
             <div className="relative">
               <User size={14} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Usuario"
-                value={filtros.usuario_email}
-                onChange={(e) => setFiltros(prev => ({ ...prev, usuario_email: e.target.value }))}
-                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
-              />
+              <input type="text" placeholder="Usuario" value={filtros.usuario_email} onChange={(e) => setFiltros(prev => ({ ...prev, usuario_email: e.target.value }))} className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white" />
             </div>
             <div className="relative">
               <Search size={14} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Acción"
-                value={filtros.accion}
-                onChange={(e) => setFiltros(prev => ({ ...prev, accion: e.target.value }))}
-                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
-              />
+              <input type="text" placeholder="Acción" value={filtros.accion} onChange={(e) => setFiltros(prev => ({ ...prev, accion: e.target.value }))} className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white" />
             </div>
-            <select
-              value={filtros.severidad}
-              onChange={(e) => setFiltros(prev => ({ ...prev, severidad: e.target.value }))}
-              className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-blue-500"
-            >
+            <select value={filtros.severidad} onChange={(e) => setFiltros(prev => ({ ...prev, severidad: e.target.value }))} className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-blue-500">
               <option value="">Todas las severidades</option>
               <option value="info">Info</option>
               <option value="warning">Warning</option>
@@ -567,27 +398,25 @@ const AuditLogs = () => {
               <option value="forensic">Forensic</option>
             </select>
           </div>
+          <div className="mt-3 flex items-center justify-between text-xs text-gray-400">
+            <div className="flex items-center gap-1">
+              <AlertCircle size={12} />
+              <span>Los datos se actualizan manualmente. Usa el botón "Actualizar" para ver nuevos registros.</span>
+            </div>
+          </div>
         </div>
 
         {/* Tabla */}
         <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100">
           {loading ? (
-            <div className="p-12 text-center">
-              <Loader size={32} className="animate-spin text-blue-600 mx-auto" />
-              <p className="mt-3 text-gray-500">Cargando registros...</p>
-            </div>
+            <div className="p-12 text-center"><Loader size={32} className="animate-spin text-blue-600 mx-auto" /><p className="mt-3 text-gray-500">Cargando registros...</p></div>
           ) : logs.length === 0 ? (
             <div className="p-12 text-center">
               <FileText size={48} className="text-gray-300 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-800 mb-2">No hay registros</h3>
               <p className="text-sm text-gray-500">No se encontraron logs con los filtros aplicados</p>
               {(filtros.fecha_desde || filtros.fecha_hasta || filtros.usuario_email || filtros.accion || filtros.severidad) && (
-                <button
-                  onClick={limpiarFiltros}
-                  className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
-                >
-                  Limpiar filtros
-                </button>
+                <button onClick={limpiarFiltros} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">Limpiar filtros</button>
               )}
             </div>
           ) : (
@@ -610,76 +439,24 @@ const AuditLogs = () => {
                       const severityStyle = severityColors[log.severidad] || severityColors.info;
                       return (
                         <tr key={log.id} className="hover:bg-gray-50 transition-colors">
-                          <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
-                            {formatearFecha(log.creado_en)}
-                          </td>
-                          <td className="px-4 py-3">
-                            <div>
-                              <p className="text-sm font-medium text-gray-800">{log.usuario_email || 'Anónimo'}</p>
-                              {log.usuario_rol && (
-                                <p className="text-xs text-gray-400">{log.usuario_rol}</p>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <p className="text-sm text-gray-700 max-w-[200px] truncate" title={log.accion}>
-                              {log.accion}
-                            </p>
-                            {log.accion_descripcion && (
-                              <p className="text-xs text-gray-400 truncate max-w-[200px]">
-                                {log.accion_descripcion}
-                              </p>
-                            )}
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${severityStyle.bg} ${severityStyle.text}`}>
-                              <SeverityIcon size={10} />
-                              {log.severidad?.toUpperCase()}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-sm font-mono text-gray-500">
-                            {log.ip_address || '-'}
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <button
-                              onClick={() => handleVerDetalle(log.id)}
-                              className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
-                              title="Ver detalles"
-                            >
-                              <Eye size={16} className="text-gray-500" />
-                            </button>
-                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{formatearFecha(log.creado_en)}</td>
+                          <td className="px-4 py-3"><div><p className="text-sm font-medium text-gray-800">{log.usuario_email || 'Anónimo'}</p>{log.usuario_rol && <p className="text-xs text-gray-400">{log.usuario_rol}</p>}</div></td>
+                          <td className="px-4 py-3"><p className="text-sm text-gray-700 max-w-[200px] truncate" title={log.accion}>{log.accion}</p>{log.accion_descripcion && <p className="text-xs text-gray-400 truncate max-w-[200px]">{log.accion_descripcion}</p>}</td>
+                          <td className="px-4 py-3"><span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${severityStyle.bg} ${severityStyle.text}`}><SeverityIcon size={10} />{log.severidad?.toUpperCase()}</span></td>
+                          <td className="px-4 py-3 text-sm font-mono text-gray-500">{log.ip_address || '-'}</td>
+                          <td className="px-4 py-3 text-center"><button onClick={() => handleVerDetalle(log.id)} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors" title="Ver detalles"><Eye size={16} className="text-gray-500" /></button></td>
                         </tr>
                       );
                     })}
                   </tbody>
                 </table>
               </div>
-
-              {/* Paginación */}
               <div className="px-4 py-4 border-t flex flex-col sm:flex-row items-center justify-between gap-3">
-                <p className="text-sm text-gray-500">
-                  Mostrando <span className="font-medium">{inicio}</span> a <span className="font-medium">{fin}</span> de{' '}
-                  <span className="font-medium">{paginacion.total}</span> registros
-                </p>
+                <p className="text-sm text-gray-500">Mostrando <span className="font-medium">{inicio}</span> a <span className="font-medium">{fin}</span> de <span className="font-medium">{paginacion.total}</span> registros</p>
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => cambiarPagina(paginacion.pagina - 1)}
-                    disabled={paginacion.pagina === 1}
-                    className="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
-                  >
-                    Anterior
-                  </button>
-                  <span className="px-3 py-1.5 text-sm text-gray-600">
-                    Página {paginacion.pagina} de {paginacion.total_paginas}
-                  </span>
-                  <button
-                    onClick={() => cambiarPagina(paginacion.pagina + 1)}
-                    disabled={paginacion.pagina === paginacion.total_paginas}
-                    className="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
-                  >
-                    Siguiente
-                  </button>
+                  <button onClick={() => cambiarPagina(paginacion.pagina - 1)} disabled={paginacion.pagina === 1} className="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50">Anterior</button>
+                  <span className="px-3 py-1.5 text-sm text-gray-600">Página {paginacion.pagina} de {paginacion.total_paginas}</span>
+                  <button onClick={() => cambiarPagina(paginacion.pagina + 1)} disabled={paginacion.pagina === paginacion.total_paginas} className="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50">Siguiente</button>
                 </div>
               </div>
             </>
@@ -694,102 +471,22 @@ const AuditLogs = () => {
             <div className="flex items-center justify-between p-5 border-b bg-gradient-to-r from-gray-50 to-white">
               <div className="flex items-center gap-3">
                 <div className={`p-2 rounded-lg ${severityColors[selectedLog.severidad]?.bg || 'bg-gray-100'}`}>
-                  {(() => {
-                    const Icon = severityIcons[selectedLog.severidad] || FileText;
-                    return <Icon size={18} className={severityColors[selectedLog.severidad]?.text || 'text-gray-600'} />;
-                  })()}
+                  {(() => { const Icon = severityIcons[selectedLog.severidad] || FileText; return <Icon size={18} className={severityColors[selectedLog.severidad]?.text || 'text-gray-600'} />; })()}
                 </div>
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-800">Detalle de auditoría</h2>
-                  <p className="text-xs text-gray-500">ID: #{selectedLog.id}</p>
-                </div>
+                <div><h2 className="text-lg font-semibold text-gray-800">Detalle de auditoría</h2><p className="text-xs text-gray-500">ID: #{selectedLog.id}</p></div>
               </div>
-              <button
-                onClick={() => setModalOpen(false)}
-                className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <X size={18} className="text-gray-500" />
-              </button>
+              <button onClick={() => setModalOpen(false)} className="p-1.5 hover:bg-gray-100 rounded-lg"><X size={18} className="text-gray-500" /></button>
             </div>
-
             <div className="p-6 overflow-y-auto max-h-[calc(85vh-80px)] space-y-5">
-              {/* Información básica */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
-                  <label className="text-xs text-gray-500 flex items-center gap-1">
-                    <Clock size={12} /> Fecha y hora
-                  </label>
-                  <p className="text-sm font-medium text-gray-800 mt-1">{formatearFecha(selectedLog.creado_en)}</p>
-                </div>
-                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
-                  <label className="text-xs text-gray-500 flex items-center gap-1">
-                    <User size={12} /> Usuario
-                  </label>
-                  <p className="text-sm font-medium text-gray-800 mt-1">{selectedLog.usuario_email || 'Anónimo'}</p>
-                  {selectedLog.usuario_rol && (
-                    <p className="text-xs text-gray-400 mt-0.5">Rol: {selectedLog.usuario_rol}</p>
-                  )}
-                </div>
-                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
-                  <label className="text-xs text-gray-500 flex items-center gap-1">
-                    <Activity size={12} /> IP / Dispositivo
-                  </label>
-                  <p className="text-sm font-mono text-gray-800 mt-1">{selectedLog.ip_address || '-'}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">{selectedLog.dispositivo_tipo || '-'}</p>
-                </div>
-                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
-                  <label className="text-xs text-gray-500 flex items-center gap-1">
-                    <Shield size={12} /> Severidad
-                  </label>
-                  <div className="mt-1">
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${severityColors[selectedLog.severidad]?.bg} ${severityColors[selectedLog.severidad]?.text}`}>
-                      {selectedLog.severidad?.toUpperCase()}
-                    </span>
-                  </div>
-                </div>
+                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100"><label className="text-xs text-gray-500 flex items-center gap-1"><Clock size={12} /> Fecha y hora</label><p className="text-sm font-medium text-gray-800 mt-1">{formatearFecha(selectedLog.creado_en)}</p></div>
+                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100"><label className="text-xs text-gray-500 flex items-center gap-1"><User size={12} /> Usuario</label><p className="text-sm font-medium text-gray-800 mt-1">{selectedLog.usuario_email || 'Anónimo'}</p>{selectedLog.usuario_rol && <p className="text-xs text-gray-400 mt-0.5">Rol: {selectedLog.usuario_rol}</p>}</div>
+                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100"><label className="text-xs text-gray-500 flex items-center gap-1"><Activity size={12} /> IP / Dispositivo</label><p className="text-sm font-mono text-gray-800 mt-1">{selectedLog.ip_address || '-'}</p><p className="text-xs text-gray-400 mt-0.5">{selectedLog.dispositivo_tipo || '-'}</p></div>
+                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100"><label className="text-xs text-gray-500 flex items-center gap-1"><Shield size={12} /> Severidad</label><div className="mt-1"><span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${severityColors[selectedLog.severidad]?.bg} ${severityColors[selectedLog.severidad]?.text}`}>{selectedLog.severidad?.toUpperCase()}</span></div></div>
               </div>
-
-              {/* Acción */}
-              <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                <label className="text-xs text-gray-500 flex items-center gap-1 mb-2">
-                  <FileText size={12} /> Acción
-                </label>
-                <p className="text-sm font-mono text-gray-800 bg-white p-2 rounded-lg border border-gray-200 break-all">
-                  {selectedLog.accion}
-                </p>
-                {selectedLog.accion_descripcion && (
-                  <p className="text-sm text-gray-600 mt-2">{selectedLog.accion_descripcion}</p>
-                )}
-                {selectedLog.recurso_ruta && (
-                  <p className="text-xs text-gray-400 mt-2 font-mono">Ruta: {selectedLog.recurso_ruta}</p>
-                )}
-              </div>
-
-              {/* Cambios en datos - Versión legible en lenguaje natural */}
-              {(selectedLog.before_data || selectedLog.after_data) && (
-                <div className="border-t pt-4">
-                  <label className="text-xs font-semibold text-gray-600 mb-3 block">
-                    Cambios realizados
-                  </label>
-                  <CambiosVisual 
-                    beforeData={selectedLog.before_data} 
-                    afterData={selectedLog.after_data} 
-                  />
-                </div>
-              )}
-
-              {/* Error (si existe) */}
-              {selectedLog.error_mensaje && (
-                <div className="bg-red-50 rounded-xl p-4 border border-red-200">
-                  <label className="text-xs text-red-600 flex items-center gap-1 mb-2">
-                    <AlertTriangle size={12} /> Error
-                  </label>
-                  <p className="text-sm text-red-700">{selectedLog.error_mensaje}</p>
-                  {selectedLog.status_code && (
-                    <p className="text-xs text-red-500 mt-1">Código: {selectedLog.status_code}</p>
-                  )}
-                </div>
-              )}
+              <div className="bg-gray-50 rounded-xl p-4 border border-gray-100"><label className="text-xs text-gray-500 flex items-center gap-1 mb-2"><FileText size={12} /> Acción</label><p className="text-sm font-mono text-gray-800 bg-white p-2 rounded-lg border border-gray-200 break-all">{selectedLog.accion}</p>{selectedLog.accion_descripcion && <p className="text-sm text-gray-600 mt-2">{selectedLog.accion_descripcion}</p>}{selectedLog.recurso_ruta && <p className="text-xs text-gray-400 mt-2 font-mono">Ruta: {selectedLog.recurso_ruta}</p>}</div>
+              {(selectedLog.before_data || selectedLog.after_data) && (<div className="border-t pt-4"><label className="text-xs font-semibold text-gray-600 mb-3 block">Cambios realizados</label><CambiosVisual beforeData={selectedLog.before_data} afterData={selectedLog.after_data} /></div>)}
+              {selectedLog.error_mensaje && (<div className="bg-red-50 rounded-xl p-4 border border-red-200"><label className="text-xs text-red-600 flex items-center gap-1 mb-2"><AlertTriangle size={12} /> Error</label><p className="text-sm text-red-700">{selectedLog.error_mensaje}</p>{selectedLog.status_code && <p className="text-xs text-red-500 mt-1">Código: {selectedLog.status_code}</p>}</div>)}
             </div>
           </div>
         </div>

@@ -55,7 +55,7 @@ const formatearNombreCompleto = (persona) => {
     .join(' ');
 };
 
-// ✅ FUNCIÓN CON ICONOS SEGÚN TU PROPUESTA (TODOS EXISTEN)
+// ✅ FUNCIÓN CON ICONOS SEGÚN ROL
 const getIconoPorRol = (rol, size = 18) => {
   const iconos = {
     // Operadores
@@ -123,7 +123,6 @@ const getIconoPorRol = (rol, size = 18) => {
     };
   }
   
-  // Fallback: inicial del nombre
   return {
     contenido: null,
     bgColor: 'bg-gray-100',
@@ -132,7 +131,23 @@ const getIconoPorRol = (rol, size = 18) => {
   };
 };
 
-// Mapeo de roles a entidades para badges
+// ✅ COMPONENTE BADGE CON ICONO (para la celda "Rol")
+const BadgeRolConIcono = ({ rol, texto, size = 12 }) => {
+  const iconoConfig = getIconoPorRol(rol, 12);
+  
+  if (!iconoConfig.esIcono) {
+    return <BadgeIcono entidad={rolToEntidad[rol] || 'ADMIN'} texto={texto} size={size} />;
+  }
+  
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${iconoConfig.bgColor} ${iconoConfig.color.replace('text-', '')}`}>
+      {iconoConfig.contenido}
+      <span className={iconoConfig.color}>{texto}</span>
+    </span>
+  );
+};
+
+// Mapeo de roles a entidades para badges (fallback)
 const rolToEntidad = {
   admin: 'ADMIN',
   superadmin: 'SUPERADMIN',
@@ -553,14 +568,23 @@ const PersonalList = () => {
                   <tbody className="divide-y">
                     {personal.map((persona) => {
                       const iconoConfig = getIconoPorRol(persona.rol);
+                      // Texto legible para el rol
+                      const textoRol = 
+                        persona.rol === 'policia' ? 'Policía' :
+                        persona.rol === 'ambulancia' ? 'Ambulancia' :
+                        persona.rol === 'admin' ? 'Admin' :
+                        persona.rol === 'superadmin' ? 'Superadmin' :
+                        persona.rol === 'operador_policial' ? 'Op. Policial' :
+                        persona.rol === 'operador_medico' ? 'Op. Médico' :
+                        persona.rol === 'operador_tecnico' ? 'Op. Técnico' :
+                        persona.rol === 'operador_general' ? 'Op. General' : persona.rol;
+                      
                       return (
                         <tr key={persona.id} className="hover:bg-gray-50">
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
                               <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${iconoConfig.bgColor}`}>
-                                {iconoConfig.esIcono ? (
-                                  iconoConfig.contenido
-                                ) : (
+                                {iconoConfig.esIcono ? iconoConfig.contenido : (
                                   <span className="text-gray-600 font-medium text-sm">
                                     {persona.nombreCompleto?.charAt(0).toUpperCase() || '?'}
                                   </span>
@@ -590,15 +614,14 @@ const PersonalList = () => {
                               )}
                             </div>
                           </td>
+                          {/* ✅ CELDA "ROL" CON EL MISMO ICONO QUE LA CELDA "PERSONAL" */}
                           <td className="px-4 py-3">
-                            <BadgeIcono 
-                              entidad={rolToEntidad[persona.rol] || 'ADMIN'} 
-                              texto={persona.rol === 'policia' ? 'Policía' :
-                                     persona.rol === 'ambulancia' ? 'Ambulancia' :
-                                     persona.rol === 'admin' ? 'Admin' :
-                                     persona.rol === 'superadmin' ? 'Superadmin' : persona.rol}
-                              size={12}
-                            />
+                            <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${iconoConfig.bgColor}`}>
+                              {iconoConfig.esIcono && iconoConfig.contenido}
+                              <span className={iconoConfig.esIcono ? iconoConfig.color : 'text-gray-700'}>
+                                {textoRol}
+                              </span>
+                            </span>
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-600">{persona.placa}</td>
                           <td className="px-4 py-3">
