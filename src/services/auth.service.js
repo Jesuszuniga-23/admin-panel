@@ -221,7 +221,7 @@ class AuthService {
   getRolPersonalPermitido() {
     const user = this.getCurrentUser();
     if (!user) return null;
-    if (user.rol === 'operador_policial') return 'policia';
+    if (user.rol === 'operador_policial') return 'patrulla';
     if (user.rol === 'operador_medico') return 'ambulancia';
     return null;
   }
