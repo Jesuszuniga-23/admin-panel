@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { useNavigate, useParams } } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   User, Mail, Phone, Shield, Hash, Calendar, Clock,
   ChevronLeft, Edit, Power, Trash2, Smartphone,
