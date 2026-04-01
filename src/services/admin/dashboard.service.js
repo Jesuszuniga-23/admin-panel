@@ -92,7 +92,7 @@ class DashboardService {
         disponibles: unidadesData.filter(u => u.estado === 'disponible').length,
         ocupadas: unidadesData.filter(u => u.estado === 'ocupada').length,
         porTipo: {
-          policia: unidadesData.filter(u => u.tipo === 'policia').length,
+          policia: unidadesData.filter(u => u.tipo === 'patrulla').length,
           ambulancia: unidadesData.filter(u => u.tipo === 'ambulancia').length
         }
       };

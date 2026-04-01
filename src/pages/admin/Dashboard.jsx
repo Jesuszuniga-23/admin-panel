@@ -17,7 +17,7 @@ const rolToEntidad = {
   admin: 'ADMIN',
   superadmin: 'SUPERADMIN',
   policia: 'POLICIA',
-  ambulancia: 'PERSONAL_AMBULANCIA',
+  paramedico: 'PARAMEDICO',
   operador_tecnico: 'OPERADOR_TECNICO',
   operador_policial: 'OPERADOR_POLICIAL',
   operador_medico: 'OPERADOR_MEDICO',
@@ -50,8 +50,8 @@ const formatearNombre = (nombre) => {
 
 // Valores por defecto
 const defaultData = {
-  personal: { total: 0, activos: 0, inactivos: 0, disponibles: 0, noDisponibles: 0, porRol: { policia: 0, ambulancia: 0, admin: 0, superadmin: 0 } },
-  unidades: { total: 0, activas: 0, inactivas: 0, disponibles: 0, ocupadas: 0, porTipo: { policia: 0, ambulancia: 0 } },
+  personal: { total: 0, activos: 0, inactivos: 0, disponibles: 0, noDisponibles: 0, porRol: { policia: 0, paramedico: 0, admin: 0, superadmin: 0 } },
+  unidades: { total: 0, activas: 0, inactivas: 0, disponibles: 0, ocupadas: 0, porTipo: { patrulla: 0, ambulancia: 0 } },
   alertas: { expiradas: 0, cerradasManual: 0, totalAlertas: 0, activas: 0, enProceso: 0, cerradasTotales: 0 },
   periodoAnterior: {
     personal: { total: 0 },
@@ -163,7 +163,7 @@ const Dashboard = () => {
 
   // ✅ Colores dinámicos según rol del usuario
   const getColorsByRol = useCallback(() => {
-    if (rolPersonalPermitido === 'policia') {
+    if (rolPersonalPermitido === 'patrulla') {
       return {
         personal: 'blue',
         unidades: 'indigo',
@@ -206,12 +206,12 @@ const Dashboard = () => {
     if (rolPersonalPermitido === 'policia') {
       return [{ name: 'Policía', value: stats?.personal?.porRol?.policia || 0 }];
     }
-    if (rolPersonalPermitido === 'ambulancia') {
-      return [{ name: 'Ambulancia', value: stats?.personal?.porRol?.ambulancia || 0 }];
+    if (rolPersonalPermitido === 'paramedico') {
+      return [{ name: 'Paramédico', value: stats?.personal?.porRol?.paramedico || 0 }];
     }
     return [
       { name: 'Policía', value: stats?.personal?.porRol?.policia || 0 },
-      { name: 'Ambulancia', value: stats?.personal?.porRol?.ambulancia || 0 },
+      { name: 'Paramédico', value: stats?.personal?.porRol?.paramedico || 0 },
       { name: 'Admin', value: stats?.personal?.porRol?.admin || 0 },
       { name: 'Super Admin', value: stats?.personal?.porRol?.superadmin || 0 }
     ];
@@ -395,7 +395,8 @@ const Dashboard = () => {
           <div className="bg-white rounded-xl md:rounded-2xl shadow-lg shadow-slate-200/50 p-4 md:p-6">
             <h2 className="text-base md:text-lg font-semibold text-slate-800 mb-4 md:mb-6">
               Distribución de Personal
-              {rolPersonalPermitido && ` (${rolPersonalPermitido === 'policia' ? 'Solo Policía' : 'Solo Ambulancia'})`}
+              {rolPersonalPermitido === 'policia' && ' (Solo Policía)'}
+              {rolPersonalPermitido === 'paramedico' && ' (Solo Paramédico)'}
             </h2>
             <div className="h-36 md:h-48">
               <ResponsiveContainer width="100%" height="100%">
@@ -531,7 +532,8 @@ const Dashboard = () => {
           <div className="bg-white rounded-xl md:rounded-2xl shadow-lg shadow-slate-200/50 p-4 md:p-6">
             <h2 className="text-base md:text-lg font-semibold text-slate-800 mb-3 md:mb-4">
               Personal Reciente
-              {rolPersonalPermitido && ` (${rolPersonalPermitido === 'policia' ? 'Solo Policía' : 'Solo Ambulancia'})`}
+              {rolPersonalPermitido === 'policia' && ' (Solo Policía)'}
+              {rolPersonalPermitido === 'paramedico' && ' (Solo Paramédico)'}
             </h2>
             {actividadReciente.personal && actividadReciente.personal.length > 0 ? (
               <div className="space-y-2 md:space-y-3">
@@ -569,21 +571,21 @@ const Dashboard = () => {
             {actividadReciente.unidades && actividadReciente.unidades.length > 0 ? (
               <div className="space-y-2 md:space-y-3">
                 {actividadReciente.unidades
-                  .filter(u => !rolPersonalPermitido || u.tipo === rolPersonalPermitido)
+                  .filter(u => !rolPersonalPermitido || u.tipo === (rolPersonalPermitido === 'patrulla' ? 'patrulla' : 'ambulancia'))
                   .map((u) => (
                     <div key={u.id} className="flex items-center justify-between p-2 md:p-3 bg-slate-50 rounded-lg md:rounded-xl hover:bg-slate-100 transition-colors">
                       <div className="flex items-center gap-2 md:gap-3 min-w-0">
                         <div className={`w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl flex items-center justify-center flex-shrink-0 ${
-                          u.tipo === 'policia' ? 'bg-blue-100' : 'bg-emerald-100'
+                          u.tipo === 'patrulla' ? 'bg-blue-100' : 'bg-emerald-100'
                         }`}>
                           <IconoEntidad 
-                            entidad={u.tipo === 'policia' ? 'PATRULLA' : 'AMBULANCIA'} 
+                            entidad={u.tipo === 'patrulla' ? 'PATRULLA' : 'AMBULANCIA'} 
                             size={16} 
                           />
                         </div>
                         <div className="min-w-0">
                           <p className="text-xs md:text-sm font-medium text-slate-800 truncate">{u.codigo}</p>
-                          <p className="text-xs text-slate-400 capitalize truncate">{u.tipo}</p>
+                          <p className="text-xs text-slate-400 capitalize truncate">{u.tipo === 'patrulla' ? 'Patrulla' : 'Ambulancia'}</p>
                         </div>
                       </div>
                       <span className={`text-xs px-1.5 md:px-2 py-0.5 md:py-1 rounded-full whitespace-nowrap ${
