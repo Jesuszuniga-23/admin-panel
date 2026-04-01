@@ -1,4 +1,3 @@
-// src/pages/admin/personal/PersonalDetail.jsx
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
@@ -23,7 +22,7 @@ const getIconoPorRol = (rol, size = 32) => {
     admin: { icon: Crown, color: 'text-indigo-600', bg: 'bg-indigo-100' },
     superadmin: { icon: Star, color: 'text-amber-600', bg: 'bg-amber-100' },
     policia: { icon: ShieldCheck, color: 'text-blue-600', bg: 'bg-blue-100' },
-    ambulancia: { icon: ShieldPlus, color: 'text-green-600', bg: 'bg-green-100' }
+    paramedico: { icon: ShieldPlus, color: 'text-green-600', bg: 'bg-green-100' }
   };
 
   const config = iconos[rol];
@@ -45,7 +44,7 @@ const rolToEntidad = {
   admin: 'ADMIN',
   superadmin: 'SUPERADMIN',
   policia: 'POLICIA',
-  ambulancia: 'PERSONAL_AMBULANCIA',
+  paramedico: 'PARAMEDICO',
   operador_tecnico: 'OPERADOR_TECNICO',
   operador_policial: 'OPERADOR_POLICIAL',
   operador_medico: 'OPERADOR_MEDICO',
@@ -57,7 +56,7 @@ const rolTexto = {
   admin: 'Administrador',
   superadmin: 'Super Administrador',
   policia: 'Policía',
-  ambulancia: 'Ambulancia',
+  paramedico: 'Paramédico',
   operador_tecnico: 'Operador Técnico',
   operador_policial: 'Operador Policial',
   operador_medico: 'Operador Médico',
@@ -269,7 +268,7 @@ const PersonalDetail = () => {
         {/* Cabecera con avatar - Icono personalizado según rol */}
         <div className={`bg-gradient-to-r ${
           personal.rol === 'policia' ? 'from-blue-600 to-blue-700' :
-          personal.rol === 'ambulancia' ? 'from-green-600 to-emerald-700' :
+          personal.rol === 'paramedico' ? 'from-green-600 to-emerald-700' :
           personal.rol === 'admin' ? 'from-purple-600 to-indigo-700' :
           personal.rol === 'superadmin' ? 'from-red-600 to-rose-700' :
           personal.rol === 'operador_tecnico' ? 'from-cyan-600 to-teal-700' :

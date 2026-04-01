@@ -1,4 +1,3 @@
-// src/pages/admin/personal/PersonalList.jsx
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -103,11 +102,11 @@ const getIconoPorRol = (rol, size = 18) => {
       bg: 'bg-blue-100',
       nombre: 'Policía'
     },
-    ambulancia: { 
+    paramedico: { 
       icon: ShieldPlus, 
       color: 'text-green-600', 
       bg: 'bg-green-100',
-      nombre: 'Ambulancia'
+      nombre: 'Paramédico'
     }
   };
 
@@ -152,7 +151,7 @@ const rolToEntidad = {
   admin: 'ADMIN',
   superadmin: 'SUPERADMIN',
   policia: 'POLICIA',
-  ambulancia: 'PERSONAL_AMBULANCIA',
+  paramedico: 'PARAMEDICO',
   operador_tecnico: 'OPERADOR_TECNICO',
   operador_policial: 'OPERADOR_POLICIAL',
   operador_medico: 'OPERADOR_MEDICO',
@@ -439,7 +438,7 @@ const PersonalList = () => {
               <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Personal</h1>
               <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
                 Gestión de personal operativo y administrativo
-                {rolPersonalPermitido && ` (${rolPersonalPermitido === 'policia' ? 'Solo Policía' : 'Solo Ambulancia'})`}
+                {rolPersonalPermitido && ` (${rolPersonalPermitido === 'policia' ? 'Solo Policía' : 'Solo Paramédico'})`}
               </p>
             </div>
           </div>
@@ -491,7 +490,7 @@ const PersonalList = () => {
               <option value="admin">Admin</option>
               <option value="superadmin">Superadmin</option>
               <option value="policia">Policía</option>
-              <option value="ambulancia">Ambulancia</option>
+              <option value="paramedico">Paramédico</option>
             </select>
 
             <select
@@ -571,7 +570,7 @@ const PersonalList = () => {
                       // Texto legible para el rol
                       const textoRol = 
                         persona.rol === 'policia' ? 'Policía' :
-                        persona.rol === 'ambulancia' ? 'Ambulancia' :
+                        persona.rol === 'paramedico' ? 'Paramédico' :
                         persona.rol === 'admin' ? 'Admin' :
                         persona.rol === 'superadmin' ? 'Superadmin' :
                         persona.rol === 'operador_policial' ? 'Op. Policial' :

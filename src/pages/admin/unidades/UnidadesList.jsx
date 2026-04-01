@@ -20,7 +20,7 @@ const capitalizar = (texto) => {
 };
 
 const tipoToEntidad = {
-  policia: 'PATRULLA',
+  patrulla: 'PATRULLA',
   ambulancia: 'AMBULANCIA'
 };
 
@@ -144,7 +144,7 @@ const UnidadesList = () => {
   const tipoUnidadPermitido = authService.getRolPersonalPermitido();
   
   const puedeCrearUnidades = useCallback(() => {
-    const puedeCrearPolicia = authService.puedeCrearUnidad('policia');
+    const puedeCrearPolicia = authService.puedeCrearUnidad('patrulla');
     const puedeCrearAmbulancia = authService.puedeCrearUnidad('ambulancia');
     return puedeCrearPolicia || puedeCrearAmbulancia;
   }, []);
@@ -561,7 +561,7 @@ const UnidadesList = () => {
             disabled={!!tipoUnidadPermitido}
           >
             <option value="">Todos los tipos</option>
-            <option value="policia">Policía</option>
+            <option value="patrulla">Patrulla</option>
             <option value="ambulancia">Ambulancia</option>
           </select>
 
@@ -650,7 +650,7 @@ const UnidadesList = () => {
                       <td className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 lg:py-4">
                         <BadgeIcono 
                           entidad={tipoToEntidad[unidad.tipo] || 'PATRULLA'}
-                          texto={unidad.tipo === 'policia' ? 'Policía' : 'Ambulancia'}
+                          texto={unidad.tipo === 'patrulla' ? 'Patrulla' : 'Ambulancia'}
                           size={12}
                         />
                       </td>

@@ -254,7 +254,7 @@ class AuthService {
     const permisos = {
       superadmin: true,
       admin: false,
-      operador_policial: tipoUnidad === 'policia',
+      operador_policial: tipoUnidad === 'patrulla',
       operador_medico: tipoUnidad === 'ambulancia',
       operador_tecnico: true,
       operador_general: false
@@ -294,7 +294,7 @@ class AuthService {
     
     if (rolUsuario === 'superadmin') return true;
     if (rolUsuario === 'admin') return false;
-    if (rolUsuario === 'operador_policial') return tipoUnidad === 'policia';
+    if (rolUsuario === 'operador_policial') return tipoUnidad === 'patrulla';
     if (rolUsuario === 'operador_medico') return tipoUnidad === 'ambulancia';
     if (rolUsuario === 'operador_tecnico') return true;
     return false;

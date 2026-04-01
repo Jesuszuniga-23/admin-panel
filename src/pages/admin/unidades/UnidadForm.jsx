@@ -1,4 +1,3 @@
-// src/pages/admin/unidades/UnidadForm.jsx
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
@@ -16,7 +15,7 @@ import useAuthStore from '../../../store/authStore';
 
 // Mapeo de tipos a entidades para iconos consistentes
 const tipoToEntidad = {
-  policia: 'PATRULLA',
+  patrulla: 'PATRULLA',
   ambulancia: 'AMBULANCIA'
 };
 
@@ -83,7 +82,7 @@ const UnidadForm = () => {
     
     return {
       codigo: '',
-      tipo: tipoUnidadPermitido || 'policia',
+      tipo: tipoUnidadPermitido || 'patrulla',
       descripcion: '',
       estado: 'disponible',
       activa: true
@@ -297,7 +296,7 @@ const UnidadForm = () => {
 
       const loadedData = {
         codigo: response.data.codigo || '',
-        tipo: response.data.tipo || 'policia',
+        tipo: response.data.tipo || 'patrulla',
         descripcion: response.data.descripcion || '',
         estado: response.data.estado || 'disponible',
         activa: response.data.activa ?? true
@@ -409,7 +408,7 @@ const UnidadForm = () => {
 
   const getTipoPreview = () => {
     const entidad = tipoToEntidad[formData.tipo] || 'PATRULLA';
-    const texto = formData.tipo === 'policia' ? 'Policía' : 'Ambulancia';
+    const texto = formData.tipo === 'patrulla' ? 'Patrulla' : 'Ambulancia';
     return { entidad, texto };
   };
 
@@ -428,7 +427,7 @@ const UnidadForm = () => {
     
     // Verificar permisos según el tipo de unidad
     if (!isEditing && !authService.puedeCrearUnidad(formData.tipo)) {
-      toast.error(`No tienes permisos para crear unidades de tipo ${formData.tipo === 'policia' ? 'Policía' : 'Ambulancia'}`);
+      toast.error(`No tienes permisos para crear unidades de tipo ${formData.tipo === 'patrulla' ? 'Patrulla' : 'Ambulancia'}`);
       setLoading(false);
       return;
     }
@@ -646,7 +645,7 @@ const UnidadForm = () => {
                               : 'border-gray-200 focus:ring-blue-500 focus:border-blue-500 bg-white'
                         }`}
                       >
-                        <option value="policia">Policía</option>
+                        <option value="patrulla">Patrulla</option>
                         <option value="ambulancia">Ambulancia</option>
                       </select>
                     </div>

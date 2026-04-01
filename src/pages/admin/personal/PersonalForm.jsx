@@ -1,4 +1,3 @@
-// src/pages/admin/personal/PersonalForm.jsx
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
@@ -24,7 +23,7 @@ const getIconoPorRolPreview = (rol, size = 20) => {
     admin: { icon: Crown, color: 'text-indigo-600', bg: 'bg-indigo-100' },
     superadmin: { icon: Star, color: 'text-amber-600', bg: 'bg-amber-100' },
     policia: { icon: ShieldCheck, color: 'text-blue-600', bg: 'bg-blue-100' },
-    ambulancia: { icon: ShieldPlus, color: 'text-green-600', bg: 'bg-green-100' }
+    paramedico: { icon: ShieldPlus, color: 'text-green-600', bg: 'bg-green-100' }
   };
 
   const config = iconos[rol];
@@ -46,7 +45,7 @@ const rolToEntidad = {
   admin: 'ADMIN',
   superadmin: 'SUPERADMIN',
   policia: 'POLICIA',
-  ambulancia: 'PERSONAL_AMBULANCIA',
+  paramedico: 'PARAMEDICO',
   operador_tecnico: 'OPERADOR_TECNICO',
   operador_policial: 'OPERADOR_POLICIAL',
   operador_medico: 'OPERADOR_MEDICO',
@@ -58,7 +57,7 @@ const rolTexto = {
   admin: 'Administrador',
   superadmin: 'Super Administrador',
   policia: 'Policía',
-  ambulancia: 'Ambulancia',
+  paramedico: 'Paramédico',
   operador_tecnico: 'Operador Técnico',
   operador_policial: 'Operador Policial',
   operador_medico: 'Operador Médico',
@@ -68,9 +67,9 @@ const rolTexto = {
 // Roles disponibles según el rol del usuario
 const rolesDisponiblesPorUsuario = {
   admin: ['admin', 'operador_tecnico', 'operador_general'],
-  superadmin: ['policia', 'ambulancia', 'admin', 'superadmin', 'operador_tecnico', 'operador_policial', 'operador_medico', 'operador_general'],
+  superadmin: ['policia', 'paramedico', 'admin', 'superadmin', 'operador_tecnico', 'operador_policial', 'operador_medico', 'operador_general'],
   operador_policial: ['policia'],
-  operador_medico: ['ambulancia'],
+  operador_medico: ['paramedico'],
   operador_tecnico: [],
   operador_general: []
 };

@@ -1,8 +1,7 @@
-// src/pages/admin/Dashboard.jsx
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard, Bell, Users, Truck,
+  LayoutDashboard, Bell, Users, Truck, BookUser,
   AlertTriangle, Activity, Clock, User, Phone,
   ChevronRight, AlertCircle, CheckCircle, XCircle,
   TrendingUp, TrendingDown, Minus
@@ -309,7 +308,6 @@ const Dashboard = () => {
         {/* KPIs principales */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
           {stats?.kpis && Object.entries(stats.kpis).map(([key, data]) => {
-            // ✅ Títulos con mayúscula inicial
             const titulo = 
               key === 'personal' ? 'Personal' :
               key === 'unidades' ? 'Unidades' :
@@ -433,22 +431,32 @@ const Dashboard = () => {
         {/* Stats Cards - Personal y Unidades (detalle operativo) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8">
           {/* Personal Activo */}
-          <StatCard
-            icon={<Users size={20} className="text-white" />}
-            title="Personal Activo"
-            value={stats?.personal?.activos || 0}
-            subtitle={`${stats?.personal?.disponibles || 0} disponibles`}
-            color={coloresPorRol.personal}
-          />
+          <div className="bg-white rounded-xl md:rounded-2xl shadow-lg shadow-slate-200/50 p-4 md:p-6 hover:shadow-xl transition-all">
+            <div className="flex items-start justify-between mb-2 md:mb-4">
+              <div className="bg-gradient-to-br from-blue-500 to-indigo-600 p-2 sm:p-2.5 md:p-3 rounded-lg sm:rounded-xl shadow-lg shadow-blue-200">
+                <Users size={20} className="sm:w-5 sm:h-5 md:w-6 md:h-6 text-white" />
+              </div>
+              <div className="text-right">
+                <p className="text-lg md:text-2xl font-bold text-slate-800">{stats?.personal?.activos || 0}</p>
+                <p className="text-xs text-slate-400 truncate max-w-[80px] md:max-w-none">{stats?.personal?.disponibles || 0} disponibles</p>
+              </div>
+            </div>
+            <p className="text-xs md:text-sm text-slate-500 truncate">Personal Activo</p>
+          </div>
           
           {/* Unidades Activas */}
-          <StatCard
-            icon={<Truck size={20} className="text-white" />}
-            title="Unidades Activas"
-            value={stats?.unidades?.activas || 0}
-            subtitle={`${stats?.unidades?.disponibles || 0} disponibles`}
-            color={coloresPorRol.unidades}
-          />
+          <div className="bg-white rounded-xl md:rounded-2xl shadow-lg shadow-slate-200/50 p-4 md:p-6 hover:shadow-xl transition-all">
+            <div className="flex items-start justify-between mb-2 md:mb-4">
+              <div className="bg-gradient-to-br from-purple-500 to-indigo-600 p-2 sm:p-2.5 md:p-3 rounded-lg sm:rounded-xl shadow-lg shadow-purple-200">
+                <Truck size={20} className="sm:w-5 sm:h-5 md:w-6 md:h-6 text-white" />
+              </div>
+              <div className="text-right">
+                <p className="text-lg md:text-2xl font-bold text-slate-800">{stats?.unidades?.activas || 0}</p>
+                <p className="text-xs text-slate-400 truncate max-w-[80px] md:max-w-none">{stats?.unidades?.disponibles || 0} disponibles</p>
+              </div>
+            </div>
+            <p className="text-xs md:text-sm text-slate-500 truncate">Unidades Activas</p>
+          </div>
           
           {/* Alertas Activas */}
           <StatCard
@@ -503,13 +511,18 @@ const Dashboard = () => {
           />
           
           {/* Personal Total */}
-          <StatCard
-            icon={<Users size={20} className="text-white" />}
-            title="Personal Total"
-            value={stats?.personal?.total || 0}
-            subtitle="Registrados"
-            color={coloresPorRol.neutral}
-          />
+          <div className="bg-white rounded-xl md:rounded-2xl shadow-lg shadow-slate-200/50 p-4 md:p-6 hover:shadow-xl transition-all">
+            <div className="flex items-start justify-between mb-2 md:mb-4">
+              <div className="bg-gradient-to-br from-teal-500 to-emerald-600 p-2 sm:p-2.5 md:p-3 rounded-lg sm:rounded-xl shadow-lg shadow-teal-200">
+                <BookUser size={20} className="sm:w-5 sm:h-5 md:w-6 md:h-6 text-white" />
+              </div>
+              <div className="text-right">
+                <p className="text-lg md:text-2xl font-bold text-slate-800">{stats?.personal?.total || 0}</p>
+                <p className="text-xs text-slate-400 truncate max-w-[80px] md:max-w-none">Registrados</p>
+              </div>
+            </div>
+            <p className="text-xs md:text-sm text-slate-500 truncate">Personal Total</p>
+          </div>
         </div>
 
         {/* Actividad Reciente */}

@@ -4,7 +4,8 @@ import {
   AlertTriangle, Clock, MapPin, User, Calendar,
   ChevronLeft, RefreshCw, Truck, XCircle, CheckCircle,
   Loader, AlertCircle, Phone, Shield, X, Bell, BellRing,
-  Mail, MapPinned, Navigation, Copy, Eye, Filter, Search, Heart
+  Mail, MapPinned, Navigation, Copy, Eye, Filter, Search, Heart,
+  ShieldCheck, Ambulance, Users, UserCheck, MessageSquare, Send
 } from 'lucide-react';
 import reasignacionService from '../../../services/admin/reasignacion.service';
 import alertasService from '../../../services/admin/alertas.service';
@@ -59,7 +60,6 @@ const ReasignacionesPendientes = () => {
     try {
       const params = { signal: abortControllerRef.current.signal };
       
-      // ✅ Enviar filtro al backend si corresponde
       if (tipoAlertaPermitido) {
         params.tipo = tipoAlertaPermitido;
       } else if (filtroTipo !== 'todos') {
@@ -140,7 +140,6 @@ const ReasignacionesPendientes = () => {
     };
   }, [cargarPendientes]);
 
-  // ✅ Cuando cambia el filtro, recargar desde backend
   useEffect(() => {
     if (filtroTipo && !tipoAlertaPermitido) {
       cargarPendientes();
@@ -376,7 +375,7 @@ const ReasignacionesPendientes = () => {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">UBICACIÓN</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">FECHA</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">ACCIONES</th>
-                  </tr>
+                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {alertasFiltradas.map((alerta) => (
@@ -462,137 +461,254 @@ const ReasignacionesPendientes = () => {
           </div>
         )}
         
-        {/* Modal de Reasignación */}
+        {/* Modal de Reasignación MEJORADO */}
         {mostrarModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fadeIn">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full mx-4 p-6 max-h-[80vh] overflow-y-auto">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-bold text-gray-800">Reasignar Alerta #{alertaSeleccionada?.id}</h3>
-                <button
-                  onClick={() => setMostrarModal(false)}
-                  className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <X size={20} className="text-gray-500" />
-                </button>
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full mx-4 overflow-hidden">
+              {/* Header con gradiente */}
+              <div className={`bg-gradient-to-r ${alertaSeleccionada?.tipo === 'panico' ? 'from-red-600 to-rose-700' : 'from-green-600 to-emerald-700'} px-6 py-4`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                      {alertaSeleccionada?.tipo === 'panico' ? (
+                        <AlertTriangle size={20} className="text-white" />
+                      ) : (
+                        <Heart size={20} className="text-white" />
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-white">
+                        Reasignar Alerta #{alertaSeleccionada?.id}
+                      </h3>
+                      <p className="text-xs text-white/80 mt-0.5">
+                        {alertaSeleccionada?.tipo === 'panico' ? 'Alerta de Pánico' : 'Alerta Médica'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setMostrarModal(false)}
+                    className="p-1 hover:bg-white/20 rounded-lg transition-colors"
+                  >
+                    <X size={20} className="text-white" />
+                  </button>
+                </div>
               </div>
 
-              {unidadesDisponibles.length === 0 ? (
-                <div className="text-center py-8">
-                  <Truck size={48} className="text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-500">No hay unidades disponibles para reasignar</p>
-                  <p className="text-xs text-gray-400 mt-2">
-                    {tipoAlertaPermitido === 'panico' 
-                      ? 'No hay unidades policiales con personal disponible' 
-                      : tipoAlertaPermitido === 'medica'
-                        ? 'No hay unidades médicas con personal disponible'
-                        : 'No hay unidades con personal disponible'}
-                  </p>
-                </div>
-              ) : (
-                <>
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Seleccionar unidad
-                    </label>
-                    <select
-                      value={unidadSeleccionada}
-                      onChange={(e) => setUnidadSeleccionada(e.target.value)}
-                      className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">-- Selecciona una unidad --</option>
-                      {unidadesDisponibles.map((u) => (
-                        <option key={u.id} value={u.id}>
-                          {u.codigo} - {u.tipo === 'policia' ? '🚔 Policía' : '🚑 Ambulancia'} 
-                          ({u.personal_disponible?.map(p => p.nombre).join(', ') || 'Personal disponible'})
-                        </option>
-                      ))}
-                    </select>
+              <div className="p-6">
+                {unidadesDisponibles.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Truck size={32} className="text-gray-400" />
+                    </div>
+                    <h4 className="text-lg font-semibold text-gray-800 mb-2">No hay unidades disponibles</h4>
+                    <p className="text-sm text-gray-500">
+                      {tipoAlertaPermitido === 'panico' 
+                        ? 'No hay patrullas con personal disponible' 
+                        : tipoAlertaPermitido === 'medica'
+                          ? 'No hay ambulancias con personal disponible'
+                          : 'No hay unidades con personal disponible'}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-2">
+                      Espera a que alguna unidad esté disponible
+                    </p>
                   </div>
-
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Motivo de reasignación (opcional)
-                    </label>
-                    <textarea
-                      value={motivoReasignacion}
-                      onChange={(e) => setMotivoReasignacion(e.target.value)}
-                      placeholder="Ej: Unidad anterior no disponible, cambio de prioridad..."
-                      className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[80px]"
-                    />
-                  </div>
-
-                  <div className="flex gap-3 mt-6">
-                    <button
-                      onClick={handleReasignar}
-                      disabled={procesando || !unidadSeleccionada}
-                      className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                    >
-                      {procesando ? (
-                        <Loader size={18} className="animate-spin" />
-                      ) : (
-                        <Truck size={18} />
+                ) : (
+                  <>
+                    {/* Selección de unidad */}
+                    <div className="mb-6">
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        <div className="flex items-center gap-2">
+                          <Truck size={16} className="text-blue-600" />
+                          <span>Seleccionar unidad</span>
+                        </div>
+                      </label>
+                      <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto border border-gray-200 rounded-xl p-2">
+                        {unidadesDisponibles.map((u) => (
+                          <button
+                            key={u.id}
+                            onClick={() => setUnidadSeleccionada(u.id)}
+                            className={`flex items-center justify-between p-3 rounded-xl transition-all text-left ${
+                              unidadSeleccionada === u.id
+                                ? 'bg-blue-50 border-2 border-blue-500 shadow-md'
+                                : 'bg-gray-50 border-2 border-transparent hover:bg-gray-100'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                                u.tipo === 'patrulla' ? 'bg-blue-100' : 'bg-green-100'
+                              }`}>
+                                {u.tipo === 'patrulla' ? (
+                                  <ShieldCheck size={20} className="text-blue-600" />
+                                ) : (
+                                  <Ambulance size={20} className="text-green-600" />
+                                )}
+                              </div>
+                              <div>
+                                <p className="font-semibold text-gray-800">{u.codigo}</p>
+                                <p className="text-xs text-gray-500">
+                                  {u.tipo === 'patrulla' ? 'Patrulla' : 'Ambulancia'}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 text-xs text-gray-400">
+                              <Users size={12} />
+                              <span>{u.personal_disponible?.length || 0} disponible(s)</span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                      {unidadSeleccionada && (
+                        <p className="text-xs text-green-600 mt-2 flex items-center gap-1">
+                          <CheckCircle size={12} />
+                          Unidad seleccionada
+                        </p>
                       )}
-                      {procesando ? 'Reasignando...' : 'Confirmar Reasignación'}
-                    </button>
-                    <button
-                      onClick={() => setMostrarModal(false)}
-                      disabled={procesando}
-                      className="px-4 py-2 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
-                    >
-                      Cancelar
-                    </button>
-                  </div>
-                </>
-              )}
+                    </div>
+
+                    {/* Motivo de reasignación */}
+                    <div className="mb-6">
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        <div className="flex items-center gap-2">
+                          <MessageSquare size={16} className="text-purple-600" />
+                          <span>Motivo de reasignación</span>
+                          <span className="text-xs text-gray-400 font-normal">(opcional)</span>
+                        </div>
+                      </label>
+                      <textarea
+                        value={motivoReasignacion}
+                        onChange={(e) => setMotivoReasignacion(e.target.value)}
+                        placeholder="Ej: Unidad anterior no disponible, cambio de prioridad, unidad más cercana..."
+                        className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[100px] resize-none transition-all"
+                      />
+                    </div>
+
+                    {/* Información de la alerta */}
+                    <div className="bg-gray-50 rounded-xl p-4 mb-6">
+                      <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Información de la alerta</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="flex items-center gap-2">
+                          <Clock size={14} className="text-gray-400" />
+                          <span className="text-sm text-gray-600">
+                            Espera: <span className="font-semibold">{alertaSeleccionada?.minutos_espera} min</span>
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <User size={14} className="text-gray-400" />
+                          <span className="text-sm text-gray-600 truncate">
+                            {alertaSeleccionada?.ciudadano?.nombre || 'Desconocido'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Botones de acción */}
+                    <div className="flex gap-3">
+                      <button
+                        onClick={handleReasignar}
+                        disabled={procesando || !unidadSeleccionada}
+                        className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2 font-medium shadow-lg shadow-blue-200"
+                      >
+                        {procesando ? (
+                          <Loader size={18} className="animate-spin" />
+                        ) : (
+                          <Send size={18} />
+                        )}
+                        {procesando ? 'Reasignando...' : 'Confirmar Reasignación'}
+                      </button>
+                      <button
+                        onClick={() => setMostrarModal(false)}
+                        disabled={procesando}
+                        className="px-5 py-3 border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-all font-medium"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         )}
 
         {/* Modal de Cierre Manual */}
         {mostrarModalCierre && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fadeIn">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-bold text-gray-800">Cerrar Alerta #{alertaSeleccionada?.id}</h3>
-                <button
-                  onClick={() => setMostrarModalCierre(false)}
-                  className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <X size={20} className="text-gray-500" />
-                </button>
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+              {/* Header con gradiente */}
+              <div className={`bg-gradient-to-r ${alertaSeleccionada?.tipo === 'panico' ? 'from-red-600 to-rose-700' : 'from-green-600 to-emerald-700'} px-6 py-4`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                      <XCircle size={20} className="text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-white">
+                        Cerrar Alerta #{alertaSeleccionada?.id}
+                      </h3>
+                      <p className="text-xs text-white/80 mt-0.5">
+                        Cierre manual de alerta
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setMostrarModalCierre(false)}
+                    className="p-1 hover:bg-white/20 rounded-lg transition-colors"
+                  >
+                    <X size={20} className="text-white" />
+                  </button>
+                </div>
               </div>
 
-              <p className="text-sm text-gray-600 mb-4">
-                ¿Estás seguro de cerrar esta alerta manualmente?
-              </p>
+              <div className="p-6">
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle size={18} className="text-amber-600 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-amber-800">¿Estás seguro de cerrar esta alerta manualmente?</p>
+                      <p className="text-xs text-amber-700 mt-1">
+                        Esta acción cerrará la alerta sin que haya sido atendida.
+                      </p>
+                    </div>
+                  </div>
+                </div>
 
-              <textarea
-                value={motivoCierre}
-                onChange={(e) => setMotivoCierre(e.target.value)}
-                placeholder="Motivo del cierre..."
-                className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[100px] mb-4"
-              />
+                <div className="mb-6">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    <div className="flex items-center gap-2">
+                      <MessageSquare size={16} className="text-purple-600" />
+                      <span>Motivo del cierre</span>
+                      <span className="text-red-500 text-xs">*</span>
+                    </div>
+                  </label>
+                  <textarea
+                    value={motivoCierre}
+                    onChange={(e) => setMotivoCierre(e.target.value)}
+                    placeholder="Ej: Alerta duplicada, falsa alarma, error del sistema..."
+                    className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[100px] resize-none transition-all"
+                  />
+                </div>
 
-              <div className="flex gap-3">
-                <button
-                  onClick={handleCerrarManual}
-                  disabled={procesando || !motivoCierre.trim()}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {procesando ? (
-                    <Loader size={18} className="animate-spin" />
-                  ) : (
-                    <XCircle size={18} />
-                  )}
-                  {procesando ? 'Cerrando...' : 'Confirmar Cierre'}
-                </button>
-                <button
-                  onClick={() => setMostrarModalCierre(false)}
-                  disabled={procesando}
-                  className="px-4 py-2 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
-                >
-                  Cancelar
-                </button>
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleCerrarManual}
+                    disabled={procesando || !motivoCierre.trim()}
+                    className="flex-1 px-4 py-3 bg-gradient-to-r from-red-600 to-rose-600 text-white rounded-xl hover:from-red-700 hover:to-rose-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2 font-medium shadow-lg shadow-red-200"
+                  >
+                    {procesando ? (
+                      <Loader size={18} className="animate-spin" />
+                    ) : (
+                      <CheckCircle size={18} />
+                    )}
+                    {procesando ? 'Cerrando...' : 'Confirmar Cierre'}
+                  </button>
+                  <button
+                    onClick={() => setMostrarModalCierre(false)}
+                    disabled={procesando}
+                    className="px-5 py-3 border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-all font-medium"
+                  >
+                    Cancelar
+                  </button>
+                </div>
               </div>
             </div>
           </div>

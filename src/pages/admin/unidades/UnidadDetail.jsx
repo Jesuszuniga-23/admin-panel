@@ -17,7 +17,7 @@ import useAuthStore from '../../../store/authStore';
 
 // Mapeo de tipos a entidades para iconos consistentes
 const tipoToEntidad = {
-  policia: 'PATRULLA',
+  patrulla: 'PATRULLA',
   ambulancia: 'AMBULANCIA'
 };
 
@@ -609,7 +609,7 @@ const UnidadDetail = () => {
       <div className="bg-white rounded-xl shadow overflow-hidden">
         {/* Cabecera con gradiente según tipo */}
         <div className={`bg-gradient-to-r ${
-          unidad.tipo === 'policia'
+          unidad.tipo === 'patrulla'
             ? 'from-blue-600 to-blue-700'
             : 'from-green-600 to-emerald-700'
         } px-6 py-8`}>
@@ -618,7 +618,7 @@ const UnidadDetail = () => {
               <IconoEntidad 
                 entidad={tipoToEntidad[unidad.tipo] || 'PATRULLA'} 
                 size={36}
-                color={unidad.tipo === 'policia' ? 'text-blue-600' : 'text-green-600'}
+                color={unidad.tipo === 'patrulla' ? 'text-blue-600' : 'text-green-600'}
               />
             </div>
             <div>
@@ -633,12 +633,12 @@ const UnidadDetail = () => {
           {/* Información básica */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
             <InfoItem
-              icon={unidad.tipo === 'policia' ? Shield : Ambulance}
+              icon={unidad.tipo === 'patrulla' ? Shield : Ambulance}
               label="Tipo de unidad"
               value={
                 <BadgeIcono 
                   entidad={tipoToEntidad[unidad.tipo] || 'PATRULLA'}
-                  texto={unidad.tipo === 'policia' ? 'Policía' : 'Ambulancia'}
+                  texto={unidad.tipo === 'patrulla' ? 'Patrulla' : 'Ambulancia'}
                   size={12}
                 />
               }
@@ -703,7 +703,7 @@ const UnidadDetail = () => {
                       <option value="">Seleccionar...</option>
                       {personalDisponible.map(p => (
                         <option key={p.id} value={p.id}>
-                          {p.nombre} - {p.rol === 'policia' ? 'Policía' : p.rol === 'ambulancia' ? 'Ambulancia' : p.rol} ({p.placa})
+                          {p.nombre} - {p.rol === 'policia' ? 'Policía' : p.rol === 'paramedico' ? 'Paramédico' : p.rol} ({p.placa})
                         </option>
                       ))}
                     </select>
@@ -734,15 +734,14 @@ const UnidadDetail = () => {
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
                         <IconoEntidad 
-                          entidad={persona.rol === 'policia' ? 'POLICIA' : persona.rol === 'ambulancia' ? 'PERSONAL_AMBULANCIA' : 'ADMIN'}
-                          size={14}
+                         entidad={persona.rol === 'policia' ? 'POLICIA' : persona.rol === 'paramedico' ? 'PARAMEDICO' : 'ADMIN'}                          size={14}
                         />
                       </div>
                       <div>
                         <p className="font-medium text-gray-800">{persona.nombre}</p>
                         <p className="text-xs text-gray-500 flex items-center gap-1">
                           {persona.rol === 'policia' ? 'Policía' :
-                           persona.rol === 'ambulancia' ? 'Ambulancia' : persona.rol} • {persona.placa}
+                           persona.rol === 'paramedico' ? 'Paramédico' : persona.rol} • {persona.placa}
                         </p>
                       </div>
                     </div>
