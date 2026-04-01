@@ -18,7 +18,6 @@ class AuthService {
         config.signal = options.signal;
       }
       
-      // ✅ Usar endpoint correcto
       const response = await axiosInstance.post(ENDPOINTS.AUTH.GOOGLE_ADMIN_LOGIN, {
         idToken: token
       }, config);
@@ -218,11 +217,21 @@ class AuthService {
     return null;
   }
 
+  // ✅ CORREGIDO: Para PERSONAL (roles de la tabla personal)
   getRolPersonalPermitido() {
     const user = this.getCurrentUser();
     if (!user) return null;
-    if (user.rol === 'operador_policial') return 'patrulla';
-    if (user.rol === 'operador_medico') return 'ambulancia';
+    if (user.rol === 'operador_policial') return 'policia';      // ✅ Rol de personal
+    if (user.rol === 'operador_medico') return 'paramedico';    // ✅ Rol de personal
+    return null;
+  }
+
+  // ✅ NUEVO: Para UNIDADES (tipos de la tabla unidades)
+  getTipoUnidadPermitido() {
+    const user = this.getCurrentUser();
+    if (!user) return null;
+    if (user.rol === 'operador_policial') return 'patrulla';    // ✅ Tipo de unidad
+    if (user.rol === 'operador_medico') return 'ambulancia';    // ✅ Tipo de unidad
     return null;
   }
 
@@ -236,7 +245,7 @@ class AuthService {
       superadmin: true,
       admin: ['admin', 'operador_tecnico', 'operador_general'],
       operador_policial: ['policia'],
-      operador_medico: ['ambulancia'],
+      operador_medico: ['paramedico'],           // ✅ CORREGIDO
       operador_tecnico: [],
       operador_general: []
     };
@@ -273,10 +282,10 @@ class AuthService {
     
     if (rolUsuario === 'superadmin') return true;
     if (rolUsuario === 'admin') {
-      return rolPersonal !== 'superadmin' && rolPersonal !== 'policia' && rolPersonal !== 'ambulancia';
+      return rolPersonal !== 'superadmin' && rolPersonal !== 'policia' && rolPersonal !== 'paramedico';  // ✅ CORREGIDO
     }
     if (rolUsuario === 'operador_policial') return rolPersonal === 'policia';
-    if (rolUsuario === 'operador_medico') return rolPersonal === 'ambulancia';
+    if (rolUsuario === 'operador_medico') return rolPersonal === 'paramedico';  // ✅ CORREGIDO
     if (rolUsuario === 'operador_tecnico') return false;
     if (rolUsuario === 'operador_general') return false;
     return false;

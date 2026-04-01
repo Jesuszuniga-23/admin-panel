@@ -53,8 +53,7 @@ const UnidadForm = () => {
   const storageKey = isEditing ? `unidad_form_edit_${id}` : 'unidad_form_new';
 
   // Obtener permisos según rol
-  const tipoUnidadPermitido = authService.getRolPersonalPermitido(); // 'policia' o 'ambulancia'
-
+const tipoUnidadPermitido = authService.getTipoUnidadPermitido();
   const [loading, setLoading] = useState(false);
   const [cargandoDatos, setCargandoDatos] = useState(isEditing);
   const [campoError, setCampoError] = useState('');

@@ -141,7 +141,7 @@ const UnidadesList = () => {
   
   const abortControllerRef = useRef(null);
   
-  const tipoUnidadPermitido = authService.getRolPersonalPermitido();
+const tipoUnidadPermitido = authService.getTipoUnidadPermitido();
   
   const puedeCrearUnidades = useCallback(() => {
     const puedeCrearPolicia = authService.puedeCrearUnidad('patrulla');
