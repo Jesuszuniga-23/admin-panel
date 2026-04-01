@@ -1,9 +1,7 @@
-// src/services/admin/unidad.service.js
 import axiosInstance from '../api/axiosConfig';
 import { ENDPOINTS } from '../api/endpoints';
 
 class UnidadService {
-  // LISTAR UNIDADES
   async listarUnidades(filtros = {}) {
     try {
       const params = new URLSearchParams();
@@ -17,7 +15,6 @@ class UnidadService {
       const url = `${ENDPOINTS.UNIDADES.LIST}?${params.toString()}`;
       console.log("📡 Listando unidades:", url);
       
-      // ✅ Configurar la petición con signal si existe
       const config = {};
       if (filtros.signal) {
         config.signal = filtros.signal;
@@ -26,7 +23,6 @@ class UnidadService {
       const response = await axiosInstance.get(url, config);
       return response.data;
     } catch (error) {
-      // ✅ Propagar error de cancelación (tanto AbortError como ERR_CANCELED)
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
@@ -35,7 +31,6 @@ class UnidadService {
     }
   }
 
-  // OBTENER UNIDAD POR ID
   async obtenerUnidad(id, filtros = {}) {
     try {
       const url = ENDPOINTS.UNIDADES.GET(id);
@@ -49,7 +44,6 @@ class UnidadService {
       const response = await axiosInstance.get(url, config);
       return response.data;
     } catch (error) {
-      // ✅ Propagar error de cancelación
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
@@ -58,7 +52,6 @@ class UnidadService {
     }
   }
 
-  // CREAR UNIDAD
   async crearUnidad(datos, filtros = {}) {
     try {
       console.log("📝 Creando unidad:", datos);
@@ -71,7 +64,6 @@ class UnidadService {
       const response = await axiosInstance.post(ENDPOINTS.UNIDADES.CREATE, datos, config);
       return response.data;
     } catch (error) {
-      // ✅ Propagar error de cancelación
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
@@ -80,7 +72,6 @@ class UnidadService {
     }
   }
 
-  // ACTUALIZAR UNIDAD
   async actualizarUnidad(id, datos, filtros = {}) {
     try {
       console.log("📡 Actualizando unidad:", id, datos);
@@ -93,7 +84,6 @@ class UnidadService {
       const response = await axiosInstance.put(ENDPOINTS.UNIDADES.UPDATE(id), datos, config);
       return response.data;
     } catch (error) {
-      // ✅ Propagar error de cancelación
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
@@ -102,7 +92,6 @@ class UnidadService {
     }
   }
 
-  // ELIMINAR UNIDAD (SOFT DELETE)
   async eliminarUnidad(id, filtros = {}) {
     try {
       console.log("🗑️ Eliminando unidad:", id);
@@ -115,7 +104,6 @@ class UnidadService {
       const response = await axiosInstance.delete(ENDPOINTS.UNIDADES.DELETE(id), config);
       return response.data;
     } catch (error) {
-      // ✅ Propagar error de cancelación
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
@@ -124,7 +112,6 @@ class UnidadService {
     }
   }
 
-  // ACTIVAR/DESACTIVAR UNIDAD
   async toggleActiva(id, activa, filtros = {}) {
     try {
       const config = {};
@@ -135,7 +122,6 @@ class UnidadService {
       const response = await axiosInstance.patch(ENDPOINTS.UNIDADES.TOGGLE_ACTIVA(id), { activa }, config);
       return response.data;
     } catch (error) {
-      // ✅ Propagar error de cancelación
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
@@ -144,7 +130,6 @@ class UnidadService {
     }
   }
 
-  // RESTAURAR UNIDAD ELIMINADA
   async restaurarUnidad(id, filtros = {}) {
     try {
       const config = {};
@@ -155,7 +140,6 @@ class UnidadService {
       const response = await axiosInstance.post(ENDPOINTS.UNIDADES.RESTAURAR(id), {}, config);
       return response.data;
     } catch (error) {
-      // ✅ Propagar error de cancelación
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
@@ -164,7 +148,6 @@ class UnidadService {
     }
   }
 
-  // ASIGNAR PERSONAL A UNIDAD
   async asignarPersonal(unidadId, personalId, filtros = {}) {
     try {
       const config = {};
@@ -175,7 +158,6 @@ class UnidadService {
       const response = await axiosInstance.post(ENDPOINTS.UNIDADES.ASIGNAR(unidadId), { personal_id: personalId }, config);
       return response.data;
     } catch (error) {
-      // ✅ Propagar error de cancelación
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
@@ -184,7 +166,6 @@ class UnidadService {
     }
   }
 
-  // REMOVER PERSONAL DE UNIDAD
   async removerPersonal(unidadId, personalId, filtros = {}) {
     try {
       const config = {};
@@ -195,7 +176,6 @@ class UnidadService {
       const response = await axiosInstance.post(ENDPOINTS.UNIDADES.REMOVER(unidadId), { personal_id: personalId }, config);
       return response.data;
     } catch (error) {
-      // ✅ Propagar error de cancelación
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
@@ -204,7 +184,6 @@ class UnidadService {
     }
   }
 
-  // OBTENER PERSONAL DISPONIBLE PARA ASIGNAR
   async personalDisponible(unidadId, tipo, filtros = {}) {
     try {
       const url = tipo
@@ -219,7 +198,6 @@ class UnidadService {
       const response = await axiosInstance.get(url, config);
       return response.data;
     } catch (error) {
-      // ✅ Propagar error de cancelación
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }

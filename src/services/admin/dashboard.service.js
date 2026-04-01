@@ -1,4 +1,3 @@
-// src/services/admin/dashboard.service.js
 import axiosInstance from '../api/axiosConfig';
 import personalService from './personal.service';
 import unidadService from './unidad.service';
@@ -8,15 +7,14 @@ import authService from '../../services/auth.service';
 
 class DashboardService {
   
-  // ✅ NUEVO: Obtener dashboard completo en UNA sola petición
+  // ✅ Obtener dashboard completo en UNA sola petición
   async obtenerDashboardCompleto(options = {}) {
     try {
       const response = await axiosInstance.get('/admin/dashboard/completo', {
-        signal: options.signal  // Para AbortController
+        signal: options.signal
       });
       return response.data;
     } catch (error) {
-      // ✅ Manejar cancelación
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         console.log('📡 Petición cancelada en obtenerDashboardCompleto');
         return { success: false, aborted: true };
@@ -26,23 +24,18 @@ class DashboardService {
     }
   }
 
-  // =====================================================
-  // MÉTODOS EXISTENTES (con soporte para signal)
-  // =====================================================
-  
   async obtenerEstadisticas(filtros = {}, options = {}) {
     try {
       console.log("Cargando estadísticas del dashboard...");
       
       const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
       const rolPersonalPermitido = authService.getRolPersonalPermitido();
-      const tipoUnidadPermitido = rolPersonalPermitido;
+      const tipoUnidadPermitido = authService.getTipoUnidadPermitido();
       
       const personalParams = rolPersonalPermitido ? { rol: rolPersonalPermitido } : {};
       const alertasParams = tipoAlertaPermitido ? { tipo: tipoAlertaPermitido } : {};
       const unidadParams = tipoUnidadPermitido ? { tipo: tipoUnidadPermitido } : {};
       
-      // ✅ Agregar signal a los parámetros
       const signal = options.signal;
       
       const [
@@ -79,7 +72,7 @@ class DashboardService {
         noDisponibles: personalData.filter(p => !p.disponible).length,
         porRol: {
           policia: personalData.filter(p => p.rol === 'policia').length,
-          ambulancia: personalData.filter(p => p.rol === 'ambulancia').length,
+          paramedico: personalData.filter(p => p.rol === 'paramedico').length,
           admin: personalData.filter(p => p.rol === 'admin').length,
           superadmin: personalData.filter(p => p.rol === 'superadmin').length
         }
@@ -92,7 +85,7 @@ class DashboardService {
         disponibles: unidadesData.filter(u => u.estado === 'disponible').length,
         ocupadas: unidadesData.filter(u => u.estado === 'ocupada').length,
         porTipo: {
-          policia: unidadesData.filter(u => u.tipo === 'patrulla').length,
+          patrulla: unidadesData.filter(u => u.tipo === 'patrulla').length,
           ambulancia: unidadesData.filter(u => u.tipo === 'ambulancia').length
         }
       };
@@ -171,7 +164,6 @@ class DashboardService {
       };
 
     } catch (error) {
-      // ✅ Manejar cancelación
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         console.log('📡 Petición cancelada en obtenerEstadisticas');
         return { success: false, aborted: true };
@@ -189,7 +181,6 @@ class DashboardService {
       const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
       const alertasParams = tipoAlertaPermitido ? { tipo: tipoAlertaPermitido } : {};
       
-      // ✅ Agregar signal a los parámetros
       const signal = options.signal;
       
       const [expiradasRes, cerradasRes] = await Promise.allSettled([
@@ -224,7 +215,6 @@ class DashboardService {
       return horas;
 
     } catch (error) {
-      // ✅ Manejar cancelación
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         console.log('📡 Petición cancelada en obtenerAlertasPorHora');
         return [];
@@ -238,13 +228,12 @@ class DashboardService {
     try {
       const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
       const rolPersonalPermitido = authService.getRolPersonalPermitido();
-      const tipoUnidadPermitido = rolPersonalPermitido;
+      const tipoUnidadPermitido = authService.getTipoUnidadPermitido();
       
       const personalParams = rolPersonalPermitido ? { rol: rolPersonalPermitido } : {};
       const alertasParams = tipoAlertaPermitido ? { tipo: tipoAlertaPermitido } : {};
       const unidadParams = tipoUnidadPermitido ? { tipo: tipoUnidadPermitido } : {};
       
-      // ✅ Agregar signal a los parámetros
       const signal = options.signal;
       
       const [personalRes, unidadesRes, alertasActivasRes, alertasProcesoRes] = await Promise.allSettled([
@@ -266,7 +255,6 @@ class DashboardService {
       };
 
     } catch (error) {
-      // ✅ Manejar cancelación
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         console.log('📡 Petición cancelada en obtenerActividadReciente');
         return { personal: [], unidades: [], alertas: [] };

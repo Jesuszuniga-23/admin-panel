@@ -1,9 +1,7 @@
-// src/services/admin/personal.service.js
 import axiosInstance from '../api/axiosConfig';
 import { ENDPOINTS } from '../api/endpoints';
 
 class PersonalService {
-  // LISTAR PERSONAL
   async listarPersonal(filtros = {}) {
     try {
       const params = new URLSearchParams();
@@ -20,7 +18,6 @@ class PersonalService {
       const url = `${ENDPOINTS.PERSONAL.LIST}?${params.toString()}`;
       console.log("📡 Listando personal:", url);
       
-      // ✅ Configurar la petición con signal si existe
       const config = {};
       if (filtros.signal) {
         config.signal = filtros.signal;
@@ -30,7 +27,6 @@ class PersonalService {
       console.log("✅ Personal recibido:", response.data);
       return response.data;
     } catch (error) {
-      // ✅ Propagar error de cancelación (tanto AbortError como ERR_CANCELED)
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
@@ -39,7 +35,6 @@ class PersonalService {
     }
   }
 
-  // OBTENER PERSONAL POR ID
   async obtenerPersonal(id, filtros = {}) {
     try {
       const url = ENDPOINTS.PERSONAL.GET(id);
@@ -54,7 +49,6 @@ class PersonalService {
       console.log("✅ Personal obtenido:", response.data);
       return response.data;
     } catch (error) {
-      // ✅ Propagar error de cancelación
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
@@ -63,7 +57,6 @@ class PersonalService {
     }
   }
 
-  // CREAR PERSONAL
   async crearPersonal(datos, filtros = {}) {
     try {
       console.log("📝 Creando personal:", datos);
@@ -77,7 +70,6 @@ class PersonalService {
       console.log("✅ Personal creado:", response.data);
       return response.data;
     } catch (error) {
-      // ✅ Propagar error de cancelación
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
@@ -86,7 +78,6 @@ class PersonalService {
     }
   }
 
-  // ACTUALIZAR PERSONAL
   async actualizarPersonal(id, datos, filtros = {}) {
     try {
       const config = {};
@@ -97,7 +88,6 @@ class PersonalService {
       const response = await axiosInstance.put(ENDPOINTS.PERSONAL.UPDATE(id), datos, config);
       return response.data;
     } catch (error) {
-      // ✅ Propagar error de cancelación
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
@@ -106,7 +96,6 @@ class PersonalService {
     }
   }
 
-  // ELIMINAR PERSONAL (SOFT DELETE)
   async eliminarPersonal(id, filtros = {}) {
     try {
       console.log("🗑️ Eliminando personal:", id);
@@ -120,7 +109,6 @@ class PersonalService {
       console.log("✅ Personal eliminado:", response.data);
       return response.data;
     } catch (error) {
-      // ✅ Propagar error de cancelación
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
@@ -129,7 +117,6 @@ class PersonalService {
     }
   }
 
-  // ACTIVAR/DESACTIVAR PERSONAL
   async toggleActivo(id, activo, filtros = {}) {
     try {
       console.log("🔄 Cambiando estado personal:", id, activo);
@@ -143,7 +130,6 @@ class PersonalService {
       console.log("✅ Estado cambiado:", response.data);
       return response.data;
     } catch (error) {
-      // ✅ Propagar error de cancelación
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }
@@ -152,7 +138,6 @@ class PersonalService {
     }
   }
 
-  // RESTAURAR PERSONAL ELIMINADO
   async restaurarPersonal(id, filtros = {}) {
     try {
       console.log("♻️ Restaurando personal:", id);
@@ -166,7 +151,6 @@ class PersonalService {
       console.log("✅ Personal restaurado:", response.data);
       return response.data;
     } catch (error) {
-      // ✅ Propagar error de cancelación
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         throw error;
       }

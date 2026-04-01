@@ -1,4 +1,3 @@
-// src/pages/admin/unidades/UnidadesList.jsx
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -141,12 +140,12 @@ const UnidadesList = () => {
   
   const abortControllerRef = useRef(null);
   
-const tipoUnidadPermitido = authService.getTipoUnidadPermitido();
+  const tipoUnidadPermitido = authService.getTipoUnidadPermitido();
   
   const puedeCrearUnidades = useCallback(() => {
-    const puedeCrearPolicia = authService.puedeCrearUnidad('patrulla');
+    const puedeCrearPatrulla = authService.puedeCrearUnidad('patrulla');
     const puedeCrearAmbulancia = authService.puedeCrearUnidad('ambulancia');
-    return puedeCrearPolicia || puedeCrearAmbulancia;
+    return puedeCrearPatrulla || puedeCrearAmbulancia;
   }, []);
   
   const puedeGestionarUnidad = useCallback((unidad) => {
@@ -490,7 +489,7 @@ const tipoUnidadPermitido = authService.getTipoUnidadPermitido();
             <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Unidades</h1>
             <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
               Gestión de unidades operativas
-              {tipoUnidadPermitido && ` (${tipoUnidadPermitido === 'policia' ? 'Solo Policía' : 'Solo Ambulancia'})`}
+              {tipoUnidadPermitido && ` (${tipoUnidadPermitido === 'patrulla' ? 'Solo Patrullas' : 'Solo Ambulancias'})`}
             </p>
           </div>
         </div>
@@ -607,7 +606,7 @@ const tipoUnidadPermitido = authService.getTipoUnidadPermitido();
             <h3 className="text-sm sm:text-base font-medium text-gray-800 mb-1 sm:mb-2">No hay unidades registradas</h3>
             <p className="text-xs sm:text-sm text-gray-500 mb-3 sm:mb-4">
               {tipoUnidadPermitido 
-                ? `No hay unidades de tipo ${tipoUnidadPermitido === 'policia' ? 'Policía' : 'Ambulancia'} registradas`
+                ? `No hay unidades de tipo ${tipoUnidadPermitido === 'patrulla' ? 'Patrulla' : 'Ambulancia'} registradas`
                 : 'Comienza creando una nueva unidad'}
             </p>
             {puedeCrearUnidades() && !tipoUnidadPermitido && (
@@ -631,7 +630,7 @@ const tipoUnidadPermitido = authService.getTipoUnidadPermitido();
                     <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
                     <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase">Personal</th>
                     <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
-                   </tr>
+                    </tr>
                 </thead>
                 <tbody className="divide-y">
                   {unidades.map((unidad) => (
