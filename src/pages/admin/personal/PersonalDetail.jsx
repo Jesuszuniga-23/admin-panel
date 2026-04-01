@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } } from 'react-router-dom';
 import {
   User, Mail, Phone, Shield, Hash, Calendar, Clock,
   ChevronLeft, Edit, Power, Trash2, Smartphone,
@@ -12,17 +12,20 @@ import IconoEntidad, { BadgeIcono } from '../../../components/ui/IconoEntidad';
 import authService from '../../../services/auth.service';
 import useAuthStore from '../../../store/authStore';
 
-// ✅ Mapeo de roles a iconos personalizados
+// ✅ MAPEO DE ROLES A ICONOS (IDÉNTICO A PersonalList)
 const getIconoPorRol = (rol, size = 32) => {
   const iconos = {
-    operador_policial: { icon: ShieldUser, color: 'text-blue-600', bg: 'bg-blue-100' },
-    operador_medico: { icon: HandHeart, color: 'text-green-600', bg: 'bg-green-100' },
-    operador_tecnico: { icon: UserCog, color: 'text-purple-600', bg: 'bg-purple-100' },
-    operador_general: { icon: UserMinus, color: 'text-gray-600', bg: 'bg-gray-100' },
-    admin: { icon: Crown, color: 'text-indigo-600', bg: 'bg-indigo-100' },
-    superadmin: { icon: Star, color: 'text-amber-600', bg: 'bg-amber-100' },
-    policia: { icon: ShieldCheck, color: 'text-blue-600', bg: 'bg-blue-100' },
-    paramedico: { icon: ShieldPlus, color: 'text-green-600', bg: 'bg-green-100' }
+    // Operadores
+    operador_policial: { icon: ShieldUser, color: 'text-blue-600', bg: 'bg-blue-100', nombre: 'Operador Policial' },
+    operador_medico: { icon: HandHeart, color: 'text-green-600', bg: 'bg-green-100', nombre: 'Operador Médico' },
+    operador_tecnico: { icon: UserCog, color: 'text-purple-600', bg: 'bg-purple-100', nombre: 'Operador Técnico' },
+    operador_general: { icon: UserMinus, color: 'text-gray-600', bg: 'bg-gray-100', nombre: 'Operador General' },
+    // Administrativos
+    admin: { icon: Crown, color: 'text-indigo-600', bg: 'bg-indigo-100', nombre: 'Administrador' },
+    superadmin: { icon: Star, color: 'text-amber-600', bg: 'bg-amber-100', nombre: 'Super Administrador' },
+    // Personal operativo
+    policia: { icon: ShieldCheck, color: 'text-blue-600', bg: 'bg-blue-100', nombre: 'Policía' },
+    paramedico: { icon: ShieldPlus, color: 'text-green-600', bg: 'bg-green-100', nombre: 'Paramédico' }
   };
 
   const config = iconos[rol];
@@ -30,12 +33,16 @@ const getIconoPorRol = (rol, size = 32) => {
     const IconComponent = config.icon;
     return {
       icono: <IconComponent size={size} className={config.color} />,
-      bgColor: config.bg
+      bgColor: config.bg,
+      color: config.color,
+      nombre: config.nombre
     };
   }
   return {
     icono: <User size={size} className="text-gray-400" />,
-    bgColor: 'bg-gray-100'
+    bgColor: 'bg-gray-100',
+    color: 'text-gray-400',
+    nombre: rol
   };
 };
 
@@ -225,6 +232,18 @@ const PersonalDetail = () => {
   }
 
   const iconoConfig = getIconoPorRol(personal.rol, 32);
+  
+  // Determinar gradiente según rol (coincide con la lógica de PersonalList)
+  const getGradienteRol = () => {
+    if (personal.rol === 'policia') return 'from-blue-600 to-blue-700';
+    if (personal.rol === 'paramedico') return 'from-green-600 to-emerald-700';
+    if (personal.rol === 'admin') return 'from-purple-600 to-indigo-700';
+    if (personal.rol === 'superadmin') return 'from-red-600 to-rose-700';
+    if (personal.rol === 'operador_tecnico') return 'from-cyan-600 to-teal-700';
+    if (personal.rol === 'operador_policial') return 'from-indigo-600 to-blue-700';
+    if (personal.rol === 'operador_medico') return 'from-emerald-600 to-green-700';
+    return 'from-gray-600 to-gray-700';
+  };
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -265,17 +284,8 @@ const PersonalDetail = () => {
 
       {/* Tarjeta principal */}
       <div className="bg-white rounded-xl shadow overflow-hidden">
-        {/* Cabecera con avatar - Icono personalizado según rol */}
-        <div className={`bg-gradient-to-r ${
-          personal.rol === 'policia' ? 'from-blue-600 to-blue-700' :
-          personal.rol === 'paramedico' ? 'from-green-600 to-emerald-700' :
-          personal.rol === 'admin' ? 'from-purple-600 to-indigo-700' :
-          personal.rol === 'superadmin' ? 'from-red-600 to-rose-700' :
-          personal.rol === 'operador_tecnico' ? 'from-cyan-600 to-teal-700' :
-          personal.rol === 'operador_policial' ? 'from-indigo-600 to-blue-700' :
-          personal.rol === 'operador_medico' ? 'from-emerald-600 to-green-700' :
-          'from-gray-600 to-gray-700'
-        } px-6 py-8`}>
+        {/* Cabecera con avatar - Gradiente según rol */}
+        <div className={`bg-gradient-to-r ${getGradienteRol()} px-6 py-8`}>
           <div className="flex items-center gap-6">
             <div className={`w-20 h-20 ${iconoConfig.bgColor} rounded-full flex items-center justify-center shadow-lg`}>
               {iconoConfig.icono}
