@@ -189,7 +189,12 @@ const UnidadesList = () => {
 
   const { value: searchTerm } = useDebounce(filtros.search, 500);
 
-  // ✅ CORRECCIÓN CRÍTICA: Aplicar filtro de seguridad con prioridad
+  // ✅ RESETEAR PÁGINA CUANDO CAMBIAN LOS FILTROS
+  useEffect(() => {
+    setFiltros(prev => ({ ...prev, pagina: 1 }));
+  }, [filtros.tipo, filtros.estado, searchTerm]);
+
+  // ✅ CORRECCIÓN CRÍTICA: Cargar unidades con paginación correcta
   const cargarUnidades = useCallback(async () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -227,15 +232,18 @@ const UnidadesList = () => {
       console.log('🔍 [UnidadesList] filtrosActivos enviados:', filtrosActivos);
 
       const response = await unidadService.listarUnidades(filtrosActivos);
+      
+      // ✅ USAR CORRECTAMENTE LA PAGINACIÓN DEL BACKEND
       setUnidades(response.data || []);
-      setPaginacion(response.paginacion || {
-        total: response.data?.length || 0,
-        pagina: filtros.pagina,
-        limite: filtros.limite,
-        total_paginas: 1
+      setPaginacion({
+        total: response.paginacion?.total || response.data?.length || 0,
+        pagina: response.paginacion?.pagina || filtros.pagina,
+        limite: response.paginacion?.limite || filtros.limite,
+        total_paginas: response.paginacion?.total_paginas || Math.ceil((response.data?.length || 0) / filtros.limite)
       });
 
       console.log('📊 [UnidadesList] Total de registros:', response.paginacion?.total || response.data?.length || 0);
+      console.log('📊 [UnidadesList] Total páginas:', response.paginacion?.total_paginas || 1);
 
     } catch (error) {
       if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
@@ -251,7 +259,7 @@ const UnidadesList = () => {
     } finally {
       setLoading(false);
     }
-  }, [filtros.tipo, filtros.estado, searchTerm, filtros.pagina, filtros.limite, tipoUnidadPermitido]);  // ✅ CIERRE CORRECTO
+  }, [filtros.tipo, filtros.estado, searchTerm, filtros.pagina, filtros.limite, tipoUnidadPermitido]);
 
   useEffect(() => {
     cargarUnidades();
@@ -782,6 +790,5 @@ const UnidadesList = () => {
     </div>
   );
 };
-
 
 export default UnidadesList;
