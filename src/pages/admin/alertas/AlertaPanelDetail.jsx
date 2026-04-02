@@ -7,7 +7,8 @@ import {
   Clock, Truck, User, Calendar, MapPinned,
   UserCircle, PhoneCall, MailIcon, Loader,
   AlertCircle, Info, ChevronRight, Copy,
-  Navigation, ExternalLink, Clipboard, Check, ChevronLeft 
+  Navigation, ExternalLink, Clipboard, Check, ChevronLeft,
+  FileText, MessageSquare, Eye
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import alertasPanelService from '../../../services/admin/alertasPanel.service';
@@ -89,7 +90,6 @@ const AlertaPanelDetail = () => {
   const abortControllerRef = useRef(null);
   const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
 
-  // ✅ CORRECCIÓN #2: Cargar alerta con validación de permisos
   const cargarAlerta = useCallback(async () => {
     if (!id) return;
     
@@ -109,7 +109,7 @@ const AlertaPanelDetail = () => {
       if (response.data) {
         const alertaData = response.data;
         
-        // ✅ VERIFICAR PERMISO DEL USUARIO
+        // Verificar permiso del usuario
         if (tipoAlertaPermitido && alertaData.tipo !== tipoAlertaPermitido) {
           setError('No tienes permiso para ver esta alerta');
           toast.error('No tienes permiso para ver esta alerta');
@@ -124,6 +124,9 @@ const AlertaPanelDetail = () => {
             nombre: formatearNombre(alertaData.ciudadano.nombre)
           } : null
         };
+        console.log('🔍 [DEBUG] Alerta cargada:', alertaFormateada);
+        console.log('🔍 [DEBUG] Reporte:', alertaFormateada.reporte);
+        console.log('🔍 [DEBUG] Fotos:', alertaFormateada.reporte?.fotos);
         setAlerta(alertaFormateada);
       } else {
         setError('Alerta no encontrada');
@@ -145,7 +148,6 @@ const AlertaPanelDetail = () => {
     const state = location.state;
     if (state?.datosCompletos) {
       const alertaData = state.datosCompletos;
-      // ✅ VERIFICAR PERMISO DEL USUARIO para datos de estado
       if (tipoAlertaPermitido && alertaData.tipo !== tipoAlertaPermitido) {
         setError('No tienes permiso para ver esta alerta');
         toast.error('No tienes permiso para ver esta alerta');
@@ -308,7 +310,6 @@ const AlertaPanelDetail = () => {
                     />
                   )}
                   
-                  {/* ✅ CORRECCIÓN #1: Tipo de unidad correcto */}
                   {alerta.unidad && (
                     <InfoCard
                       icon={Truck}
@@ -364,6 +365,61 @@ const AlertaPanelDetail = () => {
                         <p className="text-xs font-semibold text-amber-700 uppercase tracking-wider">Motivo de reasignación</p>
                         <p className="text-sm text-amber-800 mt-1">{alerta.motivo_reasignacion}</p>
                       </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ✅ SECCIÓN DE REPORTE DE ATENCIÓN - AGREGADA */}
+                {alerta.reporte && (
+                  <div className="border-t border-gray-100 pt-6 mt-6">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                      <FileText size={20} className="text-blue-600" />
+                      Reporte de atención
+                    </h3>
+                    <div className="p-5 bg-gray-50 rounded-xl border border-gray-200">
+                      <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
+                        {alerta.reporte.descripcion || 'Sin reporte'}
+                      </p>
+                      {alerta.reporte.fotos && alerta.reporte.fotos.length > 0 && (
+                        <div className="mt-4">
+                          <p className="text-xs font-medium text-gray-500 mb-2">Fotos del incidente:</p>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                            {alerta.reporte.fotos.map((foto, idx) => (
+                              <a
+                                key={idx}
+                                href={foto.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="relative group"
+                              >
+                                <img
+                                  src={foto.url}
+                                  alt={`Foto ${idx + 1}`}
+                                  className="w-full h-32 object-cover rounded-lg border border-gray-200 hover:shadow-md transition-shadow"
+                                />
+                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+                                  <Eye size={24} className="text-white" />
+                                </div>
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* ✅ SECCIÓN DE MOTIVO DE CIERRE MANUAL - AGREGADA */}
+                {alerta.motivo_cierre_manual && (
+                  <div className="border-t border-gray-100 pt-6 mt-6">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                      <MessageSquare size={20} className="text-amber-600" />
+                      Motivo de cierre manual
+                    </h3>
+                    <div className="p-5 bg-amber-50 rounded-xl border border-amber-200">
+                      <p className="text-gray-700 leading-relaxed">
+                        {alerta.motivo_cierre_manual}
+                      </p>
                     </div>
                   </div>
                 )}

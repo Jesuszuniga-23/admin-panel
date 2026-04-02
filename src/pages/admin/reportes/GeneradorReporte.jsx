@@ -38,8 +38,10 @@ const GeneradorReporte = () => {
   const { tipo } = useParams();
   const { user } = useAuthStore();
   
+  // ✅ OBTENER TODOS LOS FILTROS DE SEGURIDAD
   const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
   const rolPersonalPermitido = authService.getRolPersonalPermitido();
+  const tipoUnidadPermitido = authService.getTipoUnidadPermitido();
   
   const [cargando, setCargando] = useState(true);
   const [exportando, setExportando] = useState(false);
@@ -53,6 +55,9 @@ const GeneradorReporte = () => {
     }
     if (tipo === 'alertas' && tipoAlertaPermitido) {
       return tipoAlertaPermitido;
+    }
+    if (tipo === 'unidades' && tipoUnidadPermitido) {
+      return tipoUnidadPermitido;
     }
     return 'todos';
   };
@@ -86,7 +91,7 @@ const GeneradorReporte = () => {
         { key: 'creado_en', label: 'Fecha Registro' }
       ],
       filtrosDisponibles: [
-        { tipo: 'rol', opciones: rolPersonalPermitido ? [rolPersonalPermitido] : ['policia', 'paramedico', 'admin', 'superadmin'] },
+        { tipo: 'rol', opciones: rolPersonalPermitido ? [rolPersonalPermitido] : ['policia', 'paramedico', 'admin', 'superadmin', 'operador_tecnico', 'operador_policial', 'operador_medico', 'operador_general'] },
         { tipo: 'estado', opciones: ['activo', 'inactivo'] }
       ],
       metricas: ['Total', 'Activos', 'Inactivos', 'Disponibles', 'Ocupados']
@@ -106,7 +111,7 @@ const GeneradorReporte = () => {
         { key: 'creado_en', label: 'Fecha Registro' }
       ],
       filtrosDisponibles: [
-        { tipo: 'tipo', opciones: ['patrulla', 'ambulancia'] },
+        { tipo: 'tipo', opciones: tipoUnidadPermitido ? [tipoUnidadPermitido] : ['patrulla', 'ambulancia'] },
         { tipo: 'estado', opciones: ['disponible', 'ocupada', 'inactiva'] }
       ],
       metricas: ['Total', 'Activas', 'Inactivas', 'Disponibles', 'Ocupadas']
@@ -138,6 +143,7 @@ const GeneradorReporte = () => {
 
   const info = config[tipo] || config.personal;
 
+  // ✅ CORRECCIÓN: Cargar datos con filtros de seguridad
   const cargarDatos = useCallback(async () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -150,34 +156,48 @@ const GeneradorReporte = () => {
     setCargando(true);
     try {
       let data = [];
-      let params = { signal };
+      let params = { signal, limite: 1000 };
       
       if (filtros.fechaInicio) params.desde = filtros.fechaInicio;
       if (filtros.fechaFin) params.hasta = filtros.fechaFin;
       
+      // ✅ APLICAR FILTROS DE SEGURIDAD SEGÚN EL TIPO
       if (tipo === 'personal' && rolPersonalPermitido) {
         params.rol = rolPersonalPermitido;
+        console.log(`📊 Aplicando filtro de personal: ${rolPersonalPermitido}`);
+      }
+      if (tipo === 'unidades' && tipoUnidadPermitido) {
+        params.tipo = tipoUnidadPermitido;
+        console.log(`📊 Aplicando filtro de unidades: ${tipoUnidadPermitido}`);
       }
       if (tipo === 'alertas' && tipoAlertaPermitido) {
         params.tipo = tipoAlertaPermitido;
+        console.log(`📊 Aplicando filtro de alertas: ${tipoAlertaPermitido}`);
       }
       
       if (tipo === 'personal') {
-        const res = await personalService.listarPersonal({ limite: 1000, ...params });
+        const res = await personalService.listarPersonal(params);
         data = res.data || [];
+        console.log(`📊 Personal cargado: ${data.length}`);
       } else if (tipo === 'unidades') {
-        const res = await unidadService.listarUnidades({ limite: 1000, ...params });
+        const res = await unidadService.listarUnidades(params);
         data = res.data || [];
+        console.log(`📊 Unidades cargadas: ${data.length}`);
       } else if (tipo === 'alertas') {
         const [exp, cer] = await Promise.all([
-          alertasService.obtenerExpiradas({ limite: 1000, ...params }).catch(() => ({ data: [] })),
-          alertasService.obtenerCerradasManual({ limite: 1000, ...params }).catch(() => ({ data: [] }))
+          alertasService.obtenerExpiradas(params).catch(() => ({ data: [] })),
+          alertasService.obtenerCerradasManual(params).catch(() => ({ data: [] }))
         ]);
         data = [...(exp.data || []), ...(cer.data || [])];
+        console.log(`📊 Alertas cargadas: ${data.length}`);
       }
 
       setDatos(data);
-      toast.success(`${data.length} registros cargados`);
+      if (data.length === 0) {
+        toast.info(`No se encontraron registros para ${info.titulo.toLowerCase()}`);
+      } else {
+        toast.success(`${data.length} registros cargados`);
+      }
     } catch (error) {
       if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
         console.error('Error cargando datos:', error);
@@ -186,7 +206,7 @@ const GeneradorReporte = () => {
     } finally {
       setCargando(false);
     }
-  }, [tipo, filtros.fechaInicio, filtros.fechaFin, rolPersonalPermitido, tipoAlertaPermitido]);
+  }, [tipo, filtros.fechaInicio, filtros.fechaFin, rolPersonalPermitido, tipoAlertaPermitido, tipoUnidadPermitido, info.titulo]);
 
   useEffect(() => {
     cargarDatos();
@@ -307,7 +327,11 @@ const GeneradorReporte = () => {
         policia: datosFiltrados.filter(d => d.rol === 'policia').length,
         paramedico: datosFiltrados.filter(d => d.rol === 'paramedico').length,
         admin: datosFiltrados.filter(d => d.rol === 'admin').length,
-        superadmin: datosFiltrados.filter(d => d.rol === 'superadmin').length
+        superadmin: datosFiltrados.filter(d => d.rol === 'superadmin').length,
+        operador_tecnico: datosFiltrados.filter(d => d.rol === 'operador_tecnico').length,
+        operador_policial: datosFiltrados.filter(d => d.rol === 'operador_policial').length,
+        operador_medico: datosFiltrados.filter(d => d.rol === 'operador_medico').length,
+        operador_general: datosFiltrados.filter(d => d.rol === 'operador_general').length
       };
     } else if (tipo === 'unidades') {
       stats.total = datosFiltrados.length;
@@ -349,6 +373,10 @@ const GeneradorReporte = () => {
   };
 
   const exportarExcel = async () => {
+    if (datosFiltrados.length === 0) {
+      toast.error('No hay datos para exportar');
+      return;
+    }
     setExportando(true);
     try {
       await reportesService.generarExcelPersonalizado(datosFiltrados, tipo, filtros, user, estadisticas);
@@ -362,6 +390,10 @@ const GeneradorReporte = () => {
   };
 
   const exportarPDF = async () => {
+    if (datosFiltrados.length === 0) {
+      toast.error('No hay datos para exportar');
+      return;
+    }
     setExportando(true);
     try {
       await reportesService.generarPDFPersonalizado(datosFiltrados, tipo, filtros, user, estadisticas);
@@ -456,6 +488,7 @@ const GeneradorReporte = () => {
             <p className="text-sm text-gray-500 mt-1">
               {datosFiltrados.length} registros encontrados
               {tipo === 'personal' && rolPersonalPermitido && ` (${rolPersonalPermitido === 'policia' ? 'Solo Policía' : 'Solo Paramédico'})`}
+              {tipo === 'unidades' && tipoUnidadPermitido && ` (${tipoUnidadPermitido === 'patrulla' ? 'Solo Patrullas' : 'Solo Ambulancias'})`}
               {tipo === 'alertas' && tipoAlertaPermitido && ` (${tipoAlertaPermitido === 'panico' ? 'Solo Pánico' : 'Solo Médicas'})`}
             </p>
           </div>
@@ -471,7 +504,7 @@ const GeneradorReporte = () => {
           </button>
           <button
             onClick={exportarExcel}
-            disabled={exportando}
+            disabled={exportando || datosFiltrados.length === 0}
             className="px-3 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 transition-colors flex items-center gap-2 text-sm shadow-md disabled:opacity-50"
           >
             {exportando ? <Loader size={16} className="animate-spin" /> : <FileSpreadsheet size={16} />}
@@ -479,7 +512,7 @@ const GeneradorReporte = () => {
           </button>
           <button
             onClick={exportarPDF}
-            disabled={exportando}
+            disabled={exportando || datosFiltrados.length === 0}
             className="px-3 py-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg hover:from-red-700 hover:to-red-800 transition-colors flex items-center gap-2 text-sm shadow-md disabled:opacity-50"
           >
             {exportando ? <Loader size={16} className="animate-spin" /> : <FilePieChart size={16} />}
@@ -535,7 +568,9 @@ const GeneradorReporte = () => {
             <select
               value={filtros.tipo}
               onChange={(e) => setFiltros(prev => ({ ...prev, tipo: e.target.value }))}
-              disabled={(tipo === 'personal' && rolPersonalPermitido) || (tipo === 'alertas' && tipoAlertaPermitido)}
+              disabled={(tipo === 'personal' && rolPersonalPermitido) || 
+                       (tipo === 'unidades' && tipoUnidadPermitido) ||
+                       (tipo === 'alertas' && tipoAlertaPermitido)}
               className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white disabled:bg-gray-100"
             >
               <option value="todos">Todos</option>
@@ -707,7 +742,7 @@ const GeneradorReporte = () => {
           <div className="flex gap-2 w-full sm:w-auto">
             <button
               onClick={exportarExcel}
-              disabled={exportando}
+              disabled={exportando || datosFiltrados.length === 0}
               className="flex-1 sm:flex-none text-sm bg-white text-green-600 px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors font-medium disabled:opacity-50"
             >
               {exportando ? <Loader size={16} className="inline mr-2 animate-spin" /> : <FileSpreadsheet size={16} className="inline mr-2" />}
@@ -715,7 +750,7 @@ const GeneradorReporte = () => {
             </button>
             <button
               onClick={exportarPDF}
-              disabled={exportando}
+              disabled={exportando || datosFiltrados.length === 0}
               className="flex-1 sm:flex-none text-sm bg-white text-red-600 px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors font-medium disabled:opacity-50"
             >
               {exportando ? <Loader size={16} className="inline mr-2 animate-spin" /> : <FilePieChart size={16} className="inline mr-2" />}

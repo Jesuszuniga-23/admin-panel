@@ -154,11 +154,12 @@ const PersonalList = () => {
   
   const abortControllerRef = useRef(null);
   const rolPersonalPermitido = authService.getRolPersonalPermitido();
+  const currentUser = authService.getCurrentUser(); // ✅ AGREGADO para el select de roles
   
   const puedeEditarPersonal = (rol) => authService.puedeEditarPersonal(rol);
   const puedeEliminarPersonal = (rol) => authService.puedeEliminarPersonal(rol);
   
-  // ✅ CORREGIDO: Función puedeCrearPersonal usando authService
+  // Función puedeCrearPersonal usando authService
   const puedeCrearPersonal = () => {
     const user = authService.getCurrentUser();
     if (!user) return false;
@@ -219,7 +220,7 @@ const PersonalList = () => {
     });
   }, [filtros.search, filtros.rol, filtros.activo, filtros.disponible]);
 
-  // ✅ CORRECCIÓN: Enviar filtro de seguridad como filtroRol
+  // Enviar filtro de seguridad como filtroRol
   const cargarPersonal = useCallback(async () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -234,7 +235,7 @@ const PersonalList = () => {
         limite: 1000
       };
       
-      // ✅ Enviar filtro de seguridad como filtroRol (el backend lo aplica con prioridad)
+      // Enviar filtro de seguridad como filtroRol (el backend lo aplica con prioridad)
       if (rolPersonalPermitido) {
         params.filtroRol = { rol: rolPersonalPermitido };
       }
@@ -475,22 +476,43 @@ const PersonalList = () => {
               )}
             </div>
 
-            {/* Select de roles - todos los roles disponibles para filtro visual */}
+            {/* ✅ SELECT DE ROLES CORREGIDO - AHORA FUNCIONA PARA OPERADORES */}
             <select
               value={filtros.rol}
               onChange={(e) => setFiltros(prev => ({ ...prev, rol: e.target.value, pagina: 1 }))}
               className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-              disabled={!!rolPersonalPermitido}
             >
               <option value="">Todos los roles</option>
-              <option value="admin">Admin</option>
-              <option value="superadmin">Superadmin</option>
-              <option value="policia">Policía</option>
-              <option value="paramedico">Paramédico</option>
-              <option value="operador_policial">Operador Policial</option>
-              <option value="operador_medico">Operador Médico</option>
-              <option value="operador_tecnico">Operador Técnico</option>
-              <option value="operador_general">Operador General</option>
+              
+              {/* Admin y superadmin ven todos los roles */}
+              {(!rolPersonalPermitido || currentUser?.rol === 'admin' || currentUser?.rol === 'superadmin') && (
+                <>
+                  <option value="admin">Admin</option>
+                  <option value="superadmin">Superadmin</option>
+                  <option value="operador_policial">Operador Policial</option>
+                  <option value="operador_medico">Operador Médico</option>
+                  <option value="operador_tecnico">Operador Técnico</option>
+                  <option value="operador_general">Operador General</option>
+                  <option value="policia">Policía</option>
+                  <option value="paramedico">Paramédico</option>
+                </>
+              )}
+              
+              {/* Operador policial solo ve sus roles */}
+              {rolPersonalPermitido === 'policia' && (
+                <>
+                  <option value="policia">Policía</option>
+                  <option value="operador_policial">Operador Policial</option>
+                </>
+              )}
+              
+              {/* Operador médico solo ve sus roles */}
+              {rolPersonalPermitido === 'paramedico' && (
+                <>
+                  <option value="paramedico">Paramédico</option>
+                  <option value="operador_medico">Operador Médico</option>
+                </>
+              )}
             </select>
 
             <select
