@@ -258,6 +258,11 @@ class AuthService {
     if (!user) return false;
     
     const rolUsuario = user.rol;
+    // ✅ Validar que el tipoUnidad sea válido
+    if (!['patrulla', 'ambulancia'].includes(tipoUnidad)) {
+        console.warn(`⚠️ Tipo de unidad inválido: ${tipoUnidad}`);
+        return false;
+    }
     
     const permisos = {
       superadmin: true,
@@ -299,6 +304,11 @@ class AuthService {
     if (!user) return false;
     
     const rolUsuario = user.rol;
+    // ✅ Validar que el tipoUnidad sea válido
+    if (!['patrulla', 'ambulancia'].includes(tipoUnidad)) {
+        console.warn(`⚠️ Tipo de unidad inválido: ${tipoUnidad}`);
+        return false;
+    }
     
     if (rolUsuario === 'superadmin') return true;
     if (rolUsuario === 'admin') return false;

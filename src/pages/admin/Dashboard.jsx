@@ -154,23 +154,25 @@ const Dashboard = () => {
   const [actividadReciente, setActividadReciente] = useState({ personal: [], unidades: [], alertas: [] });
   const navigate = useNavigate();
   
+  // ✅ OBTENER FILTROS CORRECTOS
   const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
   const rolPersonalPermitido = authService.getRolPersonalPermitido();
+  const tipoUnidadPermitido = authService.getTipoUnidadPermitido();  // ✅ AGREGADO
 
   // ✅ Determinar qué tarjetas mostrar según rol
   const mostrarTarjetaPanico = !tipoAlertaPermitido || tipoAlertaPermitido === 'panico';
   const mostrarTarjetaMedica = !tipoAlertaPermitido || tipoAlertaPermitido === 'medica';
 
-  // ✅ Colores dinámicos según rol del usuario
+  // ✅ CORREGIDO: Colores dinámicos según TIPO DE UNIDAD
   const getColorsByRol = useCallback(() => {
-    if (rolPersonalPermitido === 'patrulla') {
+    if (tipoUnidadPermitido === 'patrulla') {
       return {
         personal: 'blue',
         unidades: 'indigo',
         neutral: 'blue'
       };
     }
-    if (rolPersonalPermitido === 'ambulancia') {
+    if (tipoUnidadPermitido === 'ambulancia') {
       return {
         personal: 'green',
         unidades: 'emerald',
@@ -182,7 +184,7 @@ const Dashboard = () => {
       unidades: 'gray',
       neutral: 'gray'
     };
-  }, [rolPersonalPermitido]);
+  }, [tipoUnidadPermitido]);
 
   const coloresPorRol = getColorsByRol();
 
@@ -565,13 +567,17 @@ const Dashboard = () => {
             )}
           </div>
 
-          {/* Unidades Recientes */}
+          {/* ✅ CORREGIDO: Unidades Recientes - Filtro con tipoUnidadPermitido */}
           <div className="bg-white rounded-xl md:rounded-2xl shadow-lg shadow-slate-200/50 p-4 md:p-6">
-            <h2 className="text-base md:text-lg font-semibold text-slate-800 mb-3 md:mb-4">Unidades Recientes</h2>
+            <h2 className="text-base md:text-lg font-semibold text-slate-800 mb-3 md:mb-4">
+              Unidades Recientes
+              {tipoUnidadPermitido === 'patrulla' && ' (Solo Patrullas)'}
+              {tipoUnidadPermitido === 'ambulancia' && ' (Solo Ambulancias)'}
+            </h2>
             {actividadReciente.unidades && actividadReciente.unidades.length > 0 ? (
               <div className="space-y-2 md:space-y-3">
                 {actividadReciente.unidades
-                  .filter(u => !rolPersonalPermitido || u.tipo === (rolPersonalPermitido === 'patrulla' ? 'patrulla' : 'ambulancia'))
+                  .filter(u => !tipoUnidadPermitido || u.tipo === tipoUnidadPermitido)
                   .map((u) => (
                     <div key={u.id} className="flex items-center justify-between p-2 md:p-3 bg-slate-50 rounded-lg md:rounded-xl hover:bg-slate-100 transition-colors">
                       <div className="flex items-center gap-2 md:gap-3 min-w-0">

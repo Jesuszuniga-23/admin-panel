@@ -46,7 +46,6 @@ const formatearNombre = (nombre) => {
 
 const AlertasCerradasManual = () => {
   const navigate = useNavigate();
-  // ✅ Eliminada variable no usada 'user'
   
   // Obtener tipo de alerta permitido según rol
   const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
@@ -54,9 +53,9 @@ const AlertasCerradasManual = () => {
   const [todasLasAlertas, setTodasLasAlertas] = useState([]);
   const [alertas, setAlertas] = useState([]);
   const [cargando, setCargando] = useState(true);
-  const [detalleLoading, setDetalleLoading] = useState(false); // ✅ Estado separado
+  const [detalleLoading, setDetalleLoading] = useState(false);
   
-  // ✅ REF para AbortControllers
+  // REF para AbortControllers
   const abortControllerRef = useRef(null);
   const detalleAbortControllerRef = useRef(null);
   
@@ -103,7 +102,7 @@ const AlertasCerradasManual = () => {
     total_paginas: 0
   });
 
-  // ✅ Función para cargar alertas con AbortController
+  // ✅ CORRECCIÓN #1: Usar tipoFiltro para filtro de seguridad
   const cargarTodasLasAlertas = useCallback(async () => {
     // Cancelar petición anterior si existe
     if (abortControllerRef.current) {
@@ -116,16 +115,17 @@ const AlertasCerradasManual = () => {
     
     setCargando(true);
     try {
-      const params = {};
+      const params = { 
+        limite: 1000,
+        signal: abortControllerRef.current.signal 
+      };
+      
+      // ✅ APLICAR FILTRO DE SEGURIDAD como tipoFiltro
       if (tipoAlertaPermitido) {
-        params.tipo = tipoAlertaPermitido;
+        params.tipoFiltro = tipoAlertaPermitido;
       }
       
-      const resultado = await alertasService.obtenerCerradasManual({ 
-        limite: 1000, 
-        ...params,
-        signal: abortControllerRef.current.signal 
-      });
+      const resultado = await alertasService.obtenerCerradasManual(params);
       
       const alertasFormateadas = (resultado.data || []).map(alerta => ({
         ...alerta,
@@ -242,7 +242,7 @@ const AlertasCerradasManual = () => {
     });
   };
 
-  // ✅ Manejar clic en alerta con AbortController
+  // Manejar clic en alerta con AbortController
   const handleRowClick = useCallback(async (alerta) => {
     // Cancelar petición de detalle anterior si existe
     if (detalleAbortControllerRef.current) {
@@ -324,6 +324,7 @@ const AlertasCerradasManual = () => {
   };
 
   const formatearFecha = (fecha) => {
+    if (!fecha) return '—';
     return new Date(fecha).toLocaleString('es-MX', {
       day: '2-digit',
       month: '2-digit',
@@ -485,7 +486,7 @@ const AlertasCerradasManual = () => {
                       <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-slate-500 uppercase">CERRADO POR</th>
                       <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-slate-500 uppercase">MOTIVO</th>
                       <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-slate-500 uppercase">FECHA</th>
-                      </tr>
+                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {alertas.map((alerta) => (
@@ -505,7 +506,7 @@ const AlertasCerradasManual = () => {
                             </span>
                           </div>
                         </td>
-                         <td className="px-3 md:px-6 py-2 md:py-3">
+                        <td className="px-3 md:px-6 py-2 md:py-3">
                           {alerta.lat && alerta.lng ? (
                             <BotonMapa
                               onClick={(e) => abrirMapaModal(e, alerta)}
@@ -537,7 +538,6 @@ const AlertasCerradasManual = () => {
                             </span>
                           </div>
                         </td>
-                       
                       </tr>
                     ))}
                   </tbody>

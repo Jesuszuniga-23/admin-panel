@@ -89,6 +89,7 @@ const AlertaPanelDetail = () => {
   const abortControllerRef = useRef(null);
   const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
 
+  // ✅ CORRECCIÓN #2: Cargar alerta con validación de permisos
   const cargarAlerta = useCallback(async () => {
     if (!id) return;
     
@@ -106,11 +107,21 @@ const AlertaPanelDetail = () => {
       });
 
       if (response.data) {
+        const alertaData = response.data;
+        
+        // ✅ VERIFICAR PERMISO DEL USUARIO
+        if (tipoAlertaPermitido && alertaData.tipo !== tipoAlertaPermitido) {
+          setError('No tienes permiso para ver esta alerta');
+          toast.error('No tienes permiso para ver esta alerta');
+          setLoading(false);
+          return;
+        }
+        
         const alertaFormateada = {
-          ...response.data,
-          ciudadano: response.data.ciudadano ? {
-            ...response.data.ciudadano,
-            nombre: formatearNombre(response.data.ciudadano.nombre)
+          ...alertaData,
+          ciudadano: alertaData.ciudadano ? {
+            ...alertaData.ciudadano,
+            nombre: formatearNombre(alertaData.ciudadano.nombre)
           } : null
         };
         setAlerta(alertaFormateada);
@@ -128,13 +139,21 @@ const AlertaPanelDetail = () => {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, tipoAlertaPermitido]);
 
   useEffect(() => {
     const state = location.state;
     if (state?.datosCompletos) {
-      setAlerta(state.datosCompletos);
-      setLoading(false);
+      const alertaData = state.datosCompletos;
+      // ✅ VERIFICAR PERMISO DEL USUARIO para datos de estado
+      if (tipoAlertaPermitido && alertaData.tipo !== tipoAlertaPermitido) {
+        setError('No tienes permiso para ver esta alerta');
+        toast.error('No tienes permiso para ver esta alerta');
+        setLoading(false);
+      } else {
+        setAlerta(alertaData);
+        setLoading(false);
+      }
     } else {
       cargarAlerta();
     }
@@ -144,7 +163,7 @@ const AlertaPanelDetail = () => {
         abortControllerRef.current.abort();
       }
     };
-  }, [id, location.state, cargarAlerta]);
+  }, [id, location.state, cargarAlerta, tipoAlertaPermitido]);
 
   const handleCopyCoordenadas = () => {
     if (alerta?.lat && alerta?.lng) {
@@ -289,11 +308,12 @@ const AlertaPanelDetail = () => {
                     />
                   )}
                   
+                  {/* ✅ CORRECCIÓN #1: Tipo de unidad correcto */}
                   {alerta.unidad && (
                     <InfoCard
                       icon={Truck}
                       label="Unidad asignada"
-                      value={`${alerta.unidad.codigo} (${alerta.unidad.tipo === 'policia' ? 'Policía' : 'Ambulancia'})`}
+                      value={`${alerta.unidad.codigo} (${alerta.unidad.tipo === 'patrulla' ? 'Patrulla' : 'Ambulancia'})`}
                       color="indigo"
                     />
                   )}

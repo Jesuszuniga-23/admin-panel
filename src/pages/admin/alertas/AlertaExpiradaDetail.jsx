@@ -13,7 +13,7 @@ import BotonUbicacion from '../../../components/ui/BotonUbicacion';
 import authService from '../../../services/auth.service';
 import { useOtp } from '../../../hooks/useOtp';
 
-// Función para normalizar texto (mantener igual)
+// Función para normalizar texto
 const normalizarTexto = (texto) => {
   if (!texto) return '';
   
@@ -45,6 +45,24 @@ const formatearNombre = (nombre) => {
     .join(' ');
 };
 
+// ✅ CORRECCIÓN #2: Función para formatear fecha con manejo de errores
+const formatearFecha = (fecha) => {
+  if (!fecha) return 'N/A';
+  try {
+    const f = new Date(fecha);
+    if (isNaN(f.getTime())) return 'Fecha inválida';
+    return f.toLocaleString('es-MX', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch (e) {
+    return 'N/A';
+  }
+};
+
 const AlertaExpiradaDetail = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -56,7 +74,7 @@ const AlertaExpiradaDetail = () => {
   const [mostrarModalOtp, setMostrarModalOtp] = useState(false);
   const [codigoOtp, setCodigoOtp] = useState('');
   
-  // ✅ REF para AbortController
+  // REF para AbortController
   const abortControllerRef = useRef(null);
   
   // Obtener tipo de alerta permitido según rol (para validar acceso)
@@ -84,7 +102,7 @@ const AlertaExpiradaDetail = () => {
     tipo: null
   });
 
-  // ✅ Función para cargar alerta con AbortController y useCallback
+  // ✅ CORRECCIÓN #1: Función cargarAlerta con validación de permisos
   const cargarAlerta = useCallback(async () => {
     if (!id) return;
     
@@ -109,6 +127,13 @@ const AlertaExpiradaDetail = () => {
       console.log("Respuesta del backend:", response);
       
       if (response.success && response.data) {
+        // ✅ VERIFICAR PERMISO DEL USUARIO
+        if (tipoAlertaPermitido && response.data.tipo !== tipoAlertaPermitido) {
+          setError(`No tienes permiso para ver alertas de tipo ${response.data.tipo === 'panico' ? 'Pánico' : 'Médica'}`);
+          setLoading(false);
+          return;
+        }
+        
         setDatosCompletos(response.data);
         
         if (response.requiere_otp) {
@@ -138,16 +163,23 @@ const AlertaExpiradaDetail = () => {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, tipoAlertaPermitido]);
 
-  // ✅ Efecto con limpieza y manejo de datos desde navegación
+  // Efecto con limpieza y manejo de datos desde navegación
   useEffect(() => {
     const state = location.state;
     if (state?.datosCompletos) {
       console.log('📦 Datos completos recibidos desde estado de navegación');
-      setDatosCompletos(state.datosCompletos);
-      setAlerta(state.datosCompletos);
-      setLoading(false);
+      const data = state.datosCompletos;
+      // ✅ VERIFICAR PERMISO DEL USUARIO para datos de estado
+      if (tipoAlertaPermitido && data.tipo !== tipoAlertaPermitido) {
+        setError(`No tienes permiso para ver alertas de tipo ${data.tipo === 'panico' ? 'Pánico' : 'Médica'}`);
+        setLoading(false);
+      } else {
+        setDatosCompletos(data);
+        setAlerta(data);
+        setLoading(false);
+      }
     } else {
       cargarAlerta();
     }
@@ -159,7 +191,7 @@ const AlertaExpiradaDetail = () => {
         console.log('🛑 Componente AlertaExpiradaDetail desmontado - petición cancelada');
       }
     };
-  }, [id, location.state, cargarAlerta]);
+  }, [id, location.state, cargarAlerta, tipoAlertaPermitido]);
 
   const handleSolicitarOtp = async () => {
     if (!id) return;
@@ -318,10 +350,11 @@ const AlertaExpiradaDetail = () => {
 
               <div className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  {/* ✅ CORRECCIÓN #2: Usar formatearFecha para fechas */}
                   <InfoCard
                     icon={Calendar}
                     label="Fecha de creación"
-                    value={new Date(alerta.fecha_creacion).toLocaleString('es-MX')}
+                    value={formatearFecha(alerta.fecha_creacion)}
                     color="blue"
                   />
                   
@@ -329,7 +362,7 @@ const AlertaExpiradaDetail = () => {
                     <InfoCard
                       icon={Clock}
                       label="Fecha de expiración"
-                      value={new Date(alerta.fecha_expiracion).toLocaleString('es-MX')}
+                      value={formatearFecha(alerta.fecha_expiracion)}
                       color="gray"
                     />
                   )}
@@ -560,7 +593,7 @@ const AlertaExpiradaDetail = () => {
   );
 };
 
-// ✅ CORREGIDO: Componente para tarjetas de información con colores fijos
+// Componente para tarjetas de información
 const InfoCard = ({ icon: Icon, label, value, color = 'blue' }) => {
   const colorStyles = {
     blue: {
@@ -592,7 +625,7 @@ const InfoCard = ({ icon: Icon, label, value, color = 'blue' }) => {
   );
 };
 
-// Componente para contactos con acción (mantener igual)
+// Componente para contactos con acción
 const ContactCard = ({ icon: Icon, label, value, action, actionIcon: ActionIcon }) => (
   <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-200">
     <div className="flex items-center gap-3">

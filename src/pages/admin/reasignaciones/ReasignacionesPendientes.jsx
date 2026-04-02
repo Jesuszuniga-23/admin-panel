@@ -48,6 +48,18 @@ const ReasignacionesPendientes = () => {
     tipo: null
   });
 
+  // ✅ CORRECCIÓN #1: Filtrar alertas cuando cambia filtroTipo
+  useEffect(() => {
+    if (tipoAlertaPermitido) {
+      // Si hay filtro de seguridad, solo mostrar ese tipo
+      setAlertasFiltradas(alertas.filter(a => a.tipo === tipoAlertaPermitido));
+    } else if (filtroTipo === 'todos') {
+      setAlertasFiltradas(alertas);
+    } else {
+      setAlertasFiltradas(alertas.filter(a => a.tipo === filtroTipo));
+    }
+  }, [alertas, filtroTipo, tipoAlertaPermitido]);
+
   const cargarPendientes = useCallback(async (silencioso = false) => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -60,16 +72,18 @@ const ReasignacionesPendientes = () => {
     try {
       const params = { signal: abortControllerRef.current.signal };
       
+      // ✅ APLICAR FILTRO DE SEGURIDAD PRIMERO
       if (tipoAlertaPermitido) {
         params.tipo = tipoAlertaPermitido;
-      } else if (filtroTipo !== 'todos') {
+      } 
+      // ✅ SOLO SI NO HAY FILTRO DE SEGURIDAD, aplicar filtro del usuario
+      else if (filtroTipo !== 'todos') {
         params.tipo = filtroTipo;
       }
       
       const response = await reasignacionService.obtenerPendientes(params);
       const nuevosAlertas = response.data || [];
       setAlertas(nuevosAlertas);
-      setAlertasFiltradas(nuevosAlertas);
       setUltimaActualizacion(new Date());
 
       if (mostrarModal && nuevosAlertas.length !== alertas.length) {
@@ -357,7 +371,7 @@ const ReasignacionesPendientes = () => {
             <CheckCircle size={48} className="text-green-500 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-gray-800 mb-2">¡Todo en orden!</h3>
             <p className="text-gray-500">
-              {filtroTipo !== 'todos' 
+              {filtroTipo !== 'todos' && !tipoAlertaPermitido
                 ? `No hay alertas de tipo ${filtroTipo === 'panico' ? 'Pánico' : 'Médica'} pendientes de reasignación`
                 : 'No hay alertas pendientes de reasignación'}
               {tipoAlertaPermitido && ` (Filtro: ${tipoAlertaPermitido === 'panico' ? 'Solo Pánico' : 'Solo Médicas'})`}
@@ -375,7 +389,7 @@ const ReasignacionesPendientes = () => {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">UBICACIÓN</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">FECHA</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">ACCIONES</th>
-                   </tr>
+                  </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {alertasFiltradas.map((alerta) => (

@@ -49,17 +49,16 @@ const AlertasActivas = () => {
   const [alertas, setAlertas] = useState([]);
   const [alertasOriginal, setAlertasOriginal] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [detalleLoading, setDetalleLoading] = useState(false); // ✅ Estado separado para detalle
+  const [detalleLoading, setDetalleLoading] = useState(false);
   
-  // ✅ REF para AbortController (principal)
+  // REF para AbortController (principal)
   const abortControllerRef = useRef(null);
   
-  // ✅ REF para AbortController de detalle
+  // REF para AbortController de detalle
   const detalleAbortControllerRef = useRef(null);
   
   // Obtener tipo de alerta permitido según rol
   const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
-  // ✅ Eliminada variable no usada 'puedeGestionar'
   
   // Estados para el modal OTP
   const [alertaSeleccionada, setAlertaSeleccionada] = useState(null);
@@ -100,7 +99,7 @@ const AlertasActivas = () => {
     total_paginas: 1
   });
 
-  // ✅ Función para cargar alertas con AbortController
+  // ✅ CORRECCIÓN #1: Usar whereExtra para filtro de seguridad
   const cargarAlertas = useCallback(async () => {
     // Cancelar petición anterior si existe
     if (abortControllerRef.current) {
@@ -113,16 +112,17 @@ const AlertasActivas = () => {
     
     setLoading(true);
     try {
-      const params = {};
+      const params = { 
+        limite: 1000,
+        signal: abortControllerRef.current.signal 
+      };
+      
+      // ✅ APLICAR FILTRO DE SEGURIDAD como whereExtra
       if (tipoAlertaPermitido) {
-        params.tipo = tipoAlertaPermitido;
+        params.whereExtra = { tipo: tipoAlertaPermitido };
       }
       
-      const response = await alertasPanelService.listarActivas({ 
-        limite: 1000, 
-        ...params,
-        signal: abortControllerRef.current.signal 
-      });
+      const response = await alertasPanelService.listarActivas(params);
       
       if (response.success) {
         const alertasFormateadas = (response.data || []).map(alerta => ({
@@ -149,11 +149,17 @@ const AlertasActivas = () => {
     }
   }, [tipoAlertaPermitido]);
 
+  // ✅ CORRECCIÓN #2: Aplicar filtro de seguridad local
   const aplicarFiltrosLocal = (datos = alertasOriginal) => {
     let datosFiltrados = datos;
 
+    // ✅ APLICAR FILTRO DE SEGURIDAD LOCAL (doble capa de seguridad)
+    if (tipoAlertaPermitido) {
+      datosFiltrados = datosFiltrados.filter(item => item.tipo === tipoAlertaPermitido);
+    }
+
     if (filtros.desde && filtros.hasta) {
-      datosFiltrados = datos.filter(item => {
+      datosFiltrados = datosFiltrados.filter(item => {
         const fechaCreacion = new Date(item.fecha_creacion);
         
         const desdeParts = filtros.desde.split('-');
@@ -212,13 +218,13 @@ const AlertasActivas = () => {
     if (alertasOriginal.length) {
       aplicarFiltrosLocal();
     }
-  }, [filtros.desde, filtros.hasta, filtros.pagina, alertasOriginal]);
+  }, [filtros.desde, filtros.hasta, filtros.pagina, alertasOriginal, tipoAlertaPermitido]);
 
-  // ✅ Cargar datos al montar y limpiar al desmontar
+  // Cargar datos al montar y limpiar al desmontar
   useEffect(() => {
     cargarAlertas();
     
-    // ✅ LIMPIAR al desmontar el componente
+    // LIMPIAR al desmontar el componente
     return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -231,7 +237,7 @@ const AlertasActivas = () => {
     };
   }, [cargarAlertas]);
 
-  // ✅ Manejar clic en alerta con AbortController
+  // Manejar clic en alerta con AbortController
   const handleRowClick = useCallback(async (alerta) => {
     // Cancelar petición de detalle anterior si existe
     if (detalleAbortControllerRef.current) {
@@ -449,7 +455,7 @@ const AlertasActivas = () => {
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">TIEMPO ESPERA</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">FECHA</th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">ACCIONES</th>
-                    </tr>
+                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {alertas.map((alerta) => (

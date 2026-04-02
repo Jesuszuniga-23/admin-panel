@@ -13,7 +13,7 @@ import IconoEntidad, { BadgeTipoAlerta, ModalMapa } from '../../../components/ui
 import BotonUbicacion from '../../../components/ui/BotonUbicacion';
 import authService from '../../../services/auth.service';
 
-// Función para normalizar texto (mantener igual)
+// Función para normalizar texto
 const normalizarTexto = (texto) => {
   if (!texto) return '';
   
@@ -42,6 +42,24 @@ const formatearNombre = (nombre) => {
     .split(' ')
     .map(palabra => palabra.charAt(0).toUpperCase() + palabra.slice(1))
     .join(' ');
+};
+
+// ✅ CORRECCIÓN #3: Función para formatear fecha con manejo de errores
+const formatearFecha = (fecha) => {
+  if (!fecha) return 'N/A';
+  try {
+    const f = new Date(fecha);
+    if (isNaN(f.getTime())) return 'Fecha inválida';
+    return f.toLocaleString('es-MX', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch (e) {
+    return 'N/A';
+  }
 };
 
 const InfoCard = ({ icon: Icon, label, value, color = 'blue' }) => {
@@ -107,7 +125,10 @@ const AlertaDetail = () => {
   const [motivoCierre, setMotivoCierre] = useState('');
   const [cerrando, setCerrando] = useState(false);
   
-  // ✅ REF para AbortController
+  // ✅ Obtener tipo de alerta permitido según rol
+  const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
+  
+  // REF para AbortController
   const abortControllerRef = useRef(null);
   
   const puedeCerrarAlerta = authService.puedeGestionarAlerta(alerta?.tipo);
@@ -121,17 +142,15 @@ const AlertaDetail = () => {
     tipo: null
   });
 
-  // ✅ Función para cargar alerta con AbortController
+  // ✅ CORRECCIÓN #1: Función cargarAlerta con validación de permisos
   const cargarAlerta = useCallback(async () => {
     if (!id) return;
     
-    // Cancelar petición anterior si existe
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       console.log('🛑 Petición anterior cancelada en AlertaDetail');
     }
     
-    // Crear nuevo AbortController
     abortControllerRef.current = new AbortController();
     
     setLoading(true);
@@ -146,6 +165,13 @@ const AlertaDetail = () => {
       console.log("Respuesta del backend:", response);
       
       if (response.success && response.data) {
+        // ✅ VERIFICAR PERMISO DEL USUARIO
+        if (tipoAlertaPermitido && response.data.tipo !== tipoAlertaPermitido) {
+          setError(`No tienes permiso para ver alertas de tipo ${response.data.tipo === 'panico' ? 'Pánico' : 'Médica'}`);
+          setLoading(false);
+          return;
+        }
+        
         const alertaFormateada = {
           ...response.data,
           ciudadano: response.data.ciudadano ? {
@@ -159,7 +185,6 @@ const AlertaDetail = () => {
         toast.error('Alerta no encontrada');
       }
     } catch (error) {
-      // ✅ Ignorar errores de cancelación
       if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
         console.error('Error cargando alerta:', error);
         const errorMsg = error.response?.data?.error || error.message || 'Error al cargar los detalles de la alerta';
@@ -169,13 +194,12 @@ const AlertaDetail = () => {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, tipoAlertaPermitido]);
 
-  // ✅ Efecto con limpieza
+  // Efecto con limpieza
   useEffect(() => {
     cargarAlerta();
     
-    // ✅ LIMPIAR al desmontar el componente
     return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -340,9 +364,6 @@ const AlertaDetail = () => {
           </div>
         </div>
 
-        {/* El resto del JSX se mantiene IGUAL */}
-        {/* ... (todo el contenido desde aquí permanece sin cambios) ... */}
-        
         {/* Contenido principal */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
@@ -371,10 +392,11 @@ const AlertaDetail = () => {
 
               <div className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  {/* ✅ CORRECCIÓN #3: Usar formatearFecha */}
                   <InfoCard
                     icon={Calendar}
                     label="Fecha de creación"
-                    value={new Date(alerta.fecha_creacion).toLocaleString('es-MX')}
+                    value={formatearFecha(alerta.fecha_creacion)}
                     color="blue"
                   />
                   
@@ -382,7 +404,7 @@ const AlertaDetail = () => {
                     <InfoCard
                       icon={Clock}
                       label="Fecha de asignación"
-                      value={new Date(alerta.fecha_asignacion).toLocaleString('es-MX')}
+                      value={formatearFecha(alerta.fecha_asignacion)}
                       color="amber"
                     />
                   )}
@@ -391,7 +413,7 @@ const AlertaDetail = () => {
                     <InfoCard
                       icon={Clock}
                       label="Fecha de expiración"
-                      value={new Date(alerta.fecha_expiracion).toLocaleString('es-MX')}
+                      value={formatearFecha(alerta.fecha_expiracion)}
                       color="amber"
                     />
                   )}
@@ -400,16 +422,17 @@ const AlertaDetail = () => {
                     <InfoCard
                       icon={CheckCircle}
                       label="Fecha de cierre"
-                      value={new Date(alerta.fecha_cierre).toLocaleString('es-MX')}
+                      value={formatearFecha(alerta.fecha_cierre)}
                       color="green"
                     />
                   )}
                   
+                  {/* ✅ CORRECCIÓN #2: Tipo de unidad correcto */}
                   {alerta.unidad && (
                     <InfoCard
                       icon={Shield}
                       label="Unidad asignada"
-                      value={`${alerta.unidad.codigo} (${alerta.unidad.tipo === 'policia' ? 'Policía' : 'Ambulancia'})`}
+                      value={`${alerta.unidad.codigo} (${alerta.unidad.tipo === 'patrulla' ? 'Patrulla' : 'Ambulancia'})`}
                       color="purple"
                     />
                   )}

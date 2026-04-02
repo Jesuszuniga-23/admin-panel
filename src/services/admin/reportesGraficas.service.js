@@ -410,7 +410,7 @@ class ReportesGraficasService {
           z.total.toString(),
           z.panico.toString(),
           z.medica.toString(),
-          `${z.porcentaje}%`,
+          z.porcentaje ? `${z.porcentaje}%` : '0%',
           z.activas.toString(),
           z.enProceso.toString(),
           z.cerradas.toString()

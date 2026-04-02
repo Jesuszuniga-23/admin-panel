@@ -1,5 +1,5 @@
 // src/pages/admin/unidades/UnidadDetail.jsx
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Truck, MapPin, Hash, Edit, Trash2, Power,
@@ -46,7 +46,7 @@ const corregirTexto = (texto) => {
   return textoCorregido;
 };
 
-// Componentes modales (sin cambios estructurales, pero se mantienen)
+// Componentes modales
 const ModalAccionNoPermitida = ({ isOpen, onClose, mensaje }) => {
   if (!isOpen) return null;
 
@@ -182,15 +182,23 @@ const UnidadDetail = () => {
   const [mostrarAsignacion, setMostrarAsignacion] = useState(false);
   const [personalSeleccionado, setPersonalSeleccionado] = useState('');
   const [cargandoPersonal, setCargandoPersonal] = useState(false);
-  const [actionLoading, setActionLoading] = useState(false); // ✅ Estado para acciones
+  const [actionLoading, setActionLoading] = useState(false);
   
-  // ✅ REF para AbortControllers
+  // Refs para AbortControllers
   const abortControllerRef = useRef(null);
   const personalAbortControllerRef = useRef(null);
   
-  // ✅ CORRECTO: Usar los nuevos métodos de permisos
-  const puedeEditarUnidad = authService.puedeEditarUnidad(unidad?.tipo);
-  const puedeEliminarUnidad = authService.puedeEliminarUnidad(unidad?.tipo);
+  // ✅ CORRECCIÓN #1: Usar useMemo para permisos (se recalcularán cuando unidad cambie)
+  const puedeEditarUnidad = useMemo(() => {
+    if (!unidad) return false;
+    return authService.puedeEditarUnidad(unidad.tipo);
+  }, [unidad]);
+
+  const puedeEliminarUnidad = useMemo(() => {
+    if (!unidad) return false;
+    return authService.puedeEliminarUnidad(unidad.tipo);
+  }, [unidad]);
+
   const puedeGestionar = puedeEditarUnidad || puedeEliminarUnidad;
   
   const [modalInfo, setModalInfo] = useState({ show: false, mensaje: '' });
@@ -207,13 +215,11 @@ const UnidadDetail = () => {
   const cargarUnidad = useCallback(async () => {
     if (!id) return;
     
-    // Cancelar petición anterior si existe
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       console.log('🛑 Petición anterior cancelada en UnidadDetail');
     }
     
-    // Crear nuevo AbortController
     abortControllerRef.current = new AbortController();
     
     try {
@@ -241,7 +247,6 @@ const UnidadDetail = () => {
       setUnidad(dataCorregida);
       setError(null);
     } catch (error) {
-      // ✅ Ignorar errores de cancelación
       if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
         console.error("Error cargando unidad:", error);
         if (error.response?.status === 429) {
@@ -258,14 +263,20 @@ const UnidadDetail = () => {
     }
   }, [id]);
 
-  // ✅ Función para cargar personal disponible con AbortController
+  // ✅ CORRECCIÓN #2: Función para cargar personal disponible con validaciones
   const cargarPersonalDisponible = useCallback(async () => {
     if (!puedeEditarUnidad) {
       toast.error('No tienes permisos para asignar personal a esta unidad');
       return;
     }
     
-    // Cancelar petición anterior si existe
+    // ✅ Validación: Verificar que unidad esté cargada
+    if (!unidad || !unidad.tipo) {
+      console.error('Unidad no cargada o sin tipo definido');
+      toast.error('No se puede cargar personal disponible: datos de unidad incompletos');
+      return;
+    }
+    
     if (personalAbortControllerRef.current) {
       personalAbortControllerRef.current.abort();
       console.log('🛑 Petición de personal anterior cancelada');
@@ -275,7 +286,8 @@ const UnidadDetail = () => {
     
     try {
       setCargandoPersonal(true);
-      const response = await unidadService.personalDisponible(id, unidad?.tipo, {
+      console.log(`🔍 Cargando personal disponible para unidad tipo: ${unidad.tipo}`);
+      const response = await unidadService.personalDisponible(id, unidad.tipo, {
         signal: personalAbortControllerRef.current.signal
       });
 
@@ -287,7 +299,6 @@ const UnidadDetail = () => {
       setPersonalDisponible(personalCorregido);
       setMostrarAsignacion(true);
     } catch (error) {
-      // ✅ Ignorar errores de cancelación
       if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
         console.error("Error cargando personal disponible:", error);
         if (error.response?.status === 429) {
@@ -301,9 +312,9 @@ const UnidadDetail = () => {
     } finally {
       setCargandoPersonal(false);
     }
-  }, [id, unidad?.tipo, puedeEditarUnidad]);
+  }, [id, unidad, puedeEditarUnidad]);
 
-  // ✅ Efecto con limpieza
+  // Efecto con limpieza
   useEffect(() => {
     cargarUnidad();
     
@@ -319,7 +330,7 @@ const UnidadDetail = () => {
     };
   }, [cargarUnidad]);
 
-  // ✅ Manejar asignar con loading
+  // Manejar asignar con loading
   const handleAsignar = async () => {
     if (!personalSeleccionado) {
       toast.error('Selecciona un personal');
@@ -349,7 +360,7 @@ const UnidadDetail = () => {
     }
   };
 
-  // ✅ Manejar remover con loading
+  // Manejar remover con loading
   const handleRemover = async (personalId, nombre) => {
     if (!puedeEditarUnidad) {
       toast.error('No tienes permisos para remover personal de esta unidad');
@@ -396,7 +407,7 @@ const UnidadDetail = () => {
     });
   };
 
-  // ✅ Manejar toggle activa con loading
+  // Manejar toggle activa con loading
   const handleToggleActiva = async () => {
     if (!puedeEditarUnidad) {
       toast.error('No tienes permisos para modificar esta unidad');
@@ -451,7 +462,7 @@ const UnidadDetail = () => {
     });
   };
 
-  // ✅ Manejar eliminar con loading
+  // Manejar eliminar con loading
   const handleEliminar = async () => {
     if (!puedeEliminarUnidad) {
       toast.error('No tienes permisos para eliminar esta unidad');
@@ -623,7 +634,6 @@ const UnidadDetail = () => {
             </div>
             <div>
               <h2 className="text-2xl font-bold text-white">{unidad.codigo}</h2>
-             
             </div>
           </div>
         </div>
@@ -734,7 +744,8 @@ const UnidadDetail = () => {
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
                         <IconoEntidad 
-                         entidad={persona.rol === 'policia' ? 'POLICIA' : persona.rol === 'paramedico' ? 'PARAMEDICO' : 'ADMIN'}                          size={14}
+                          entidad={persona.rol === 'policia' ? 'POLICIA' : persona.rol === 'paramedico' ? 'PARAMEDICO' : 'ADMIN'}                          
+                          size={14}
                         />
                       </div>
                       <div>

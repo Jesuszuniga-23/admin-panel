@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   User, Mail, Phone, Shield, Hash, Calendar, Clock,
@@ -88,8 +88,18 @@ const PersonalDetail = () => {
   const abortControllerRef = useRef(null);
   
   const rolPersonal = personal?.rol;
-  const puedeEditar = authService.puedeEditarPersonal(rolPersonal);
-  const puedeEliminar = authService.puedeEliminarPersonal(rolPersonal);
+  
+  // ✅ CORRECCIÓN #1: Usar useMemo para permisos (se recalcularán cuando rolPersonal cambie)
+  const puedeEditar = useMemo(() => {
+    if (!rolPersonal) return false;
+    return authService.puedeEditarPersonal(rolPersonal);
+  }, [rolPersonal]);
+
+  const puedeEliminar = useMemo(() => {
+    if (!rolPersonal) return false;
+    return authService.puedeEliminarPersonal(rolPersonal);
+  }, [rolPersonal]);
+  
   const esPropioUsuario = currentUser?.id === parseInt(id);
 
   const cargarPersonal = useCallback(async () => {
@@ -233,7 +243,7 @@ const PersonalDetail = () => {
 
   const iconoConfig = getIconoPorRol(personal.rol, 32);
   
-  // Determinar gradiente según rol (coincide con la lógica de PersonalList)
+  // Determinar gradiente según rol
   const getGradienteRol = () => {
     if (personal.rol === 'policia') return 'from-blue-600 to-blue-700';
     if (personal.rol === 'paramedico') return 'from-green-600 to-emerald-700';
@@ -333,19 +343,20 @@ const PersonalDetail = () => {
             </div>
           </div>
 
+          {/* ✅ CORRECCIÓN #2: Verificación robusta de dispositivos */}
           <div className="border-t pt-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
               <Smartphone size={20} />
               Dispositivos registrados
             </h3>
             
-            {personal.DeviceTokens && personal.DeviceTokens.length > 0 ? (
+            {personal.DeviceTokens && Array.isArray(personal.DeviceTokens) && personal.DeviceTokens.length > 0 ? (
               <div className="grid grid-cols-1 gap-3">
                 {personal.DeviceTokens.map((token, index) => (
                   <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div className="flex items-center gap-3">
                       <Smartphone size={16} className="text-gray-400" />
-                      <span className="text-sm text-gray-600">{token.plataforma}</span>
+                      <span className="text-sm text-gray-600">{token.plataforma || 'Desconocido'}</span>
                     </div>
                     <span className={`text-xs px-2 py-1 rounded-full ${
                       token.activo ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'

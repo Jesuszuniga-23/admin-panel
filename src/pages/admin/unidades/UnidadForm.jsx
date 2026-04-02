@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
   Truck, Save, X, ChevronLeft,
@@ -52,8 +52,9 @@ const UnidadForm = () => {
   const isEditing = !!id;
   const storageKey = isEditing ? `unidad_form_edit_${id}` : 'unidad_form_new';
 
-  // Obtener permisos según rol
-const tipoUnidadPermitido = authService.getTipoUnidadPermitido();
+  // ✅ CORRECCIÓN #1: Obtener tipo de unidad permitido correctamente
+  const tipoUnidadPermitido = authService.getTipoUnidadPermitido();
+  
   const [loading, setLoading] = useState(false);
   const [cargandoDatos, setCargandoDatos] = useState(isEditing);
   const [campoError, setCampoError] = useState('');
@@ -62,7 +63,7 @@ const tipoUnidadPermitido = authService.getTipoUnidadPermitido();
   const [codigoMensaje, setCodigoMensaje] = useState('');
   const [touched, setTouched] = useState({});
   
-  // ✅ REF para AbortControllers
+  // Refs para AbortControllers
   const abortControllerRef = useRef(null);
   const codigoAbortControllerRef = useRef(null);
   
@@ -88,9 +89,15 @@ const tipoUnidadPermitido = authService.getTipoUnidadPermitido();
     };
   });
 
-  // Verificar permisos para crear/editar unidades
-  const puedeCrearUnidad = authService.puedeCrearUnidad(formData.tipo);
-  const puedeEditarUnidad = authService.puedeEditarUnidad(formData.tipo);
+  // ✅ CORRECCIÓN #3: Usar useMemo para permisos
+  const puedeCrearUnidad = useMemo(() => {
+    return authService.puedeCrearUnidad(formData.tipo);
+  }, [formData.tipo]);
+
+  const puedeEditarUnidad = useMemo(() => {
+    return authService.puedeEditarUnidad(formData.tipo);
+  }, [formData.tipo]);
+
   const puedeGestionar = puedeCrearUnidad || puedeEditarUnidad;
 
   const codigoRef = useRef();
@@ -119,7 +126,7 @@ const tipoUnidadPermitido = authService.getTipoUnidadPermitido();
     return false;
   };
 
-  // Emitir evento de cambios sin guardar (sin cambios)
+  // Emitir evento de cambios sin guardar
   useEffect(() => {
     const emitUnsavedStatus = () => {
       const hasChanges = hasUnsavedChanges() && !isEditing;
@@ -139,7 +146,7 @@ const tipoUnidadPermitido = authService.getTipoUnidadPermitido();
     return () => clearInterval(interval);
   }, [formData, originalFormData, isEditing]);
 
-  // Escuchar eventos del sidebar (sin cambios)
+  // Escuchar eventos del sidebar
   useEffect(() => {
     const handleSaveProgress = () => {
       if (!isEditing) {
@@ -170,7 +177,7 @@ const tipoUnidadPermitido = authService.getTipoUnidadPermitido();
     };
   }, [formData, isEditing, storageKey]);
 
-  // Interceptar navegación con beforeunload (sin cambios)
+  // Interceptar navegación con beforeunload
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (hasUnsavedChanges() && !isEditing) {
@@ -184,7 +191,7 @@ const tipoUnidadPermitido = authService.getTipoUnidadPermitido();
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [formData, originalFormData, isEditing]);
 
-  // Auto-guardado cada 30 segundos (sin cambios)
+  // Auto-guardado cada 30 segundos
   useEffect(() => {
     const autoSaveInterval = setInterval(() => {
       if (hasUnsavedChanges() && !isEditing) {
@@ -206,7 +213,7 @@ const tipoUnidadPermitido = authService.getTipoUnidadPermitido();
     sessionStorage.removeItem(storageKey);
   };
 
-  // ✅ Función para validar código único con AbortController
+  // Función para validar código único con AbortController
   const validarCodigoUnico = useCallback(async (codigo) => {
     if (!codigo || codigo.length < 3) {
       setCodigoValido(false);
@@ -214,7 +221,6 @@ const tipoUnidadPermitido = authService.getTipoUnidadPermitido();
       return;
     }
 
-    // Cancelar petición anterior si existe
     if (codigoAbortControllerRef.current) {
       codigoAbortControllerRef.current.abort();
       console.log('🛑 Petición de validación anterior cancelada');
@@ -256,7 +262,6 @@ const tipoUnidadPermitido = authService.getTipoUnidadPermitido();
         );
       }
     } catch (error) {
-      // ✅ Ignorar errores de cancelación
       if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
         console.error('Error verificando código:', error);
         setCodigoValido(false);
@@ -273,11 +278,10 @@ const tipoUnidadPermitido = authService.getTipoUnidadPermitido();
     }
   }, [isEditing, id]);
 
-  // ✅ Función para cargar unidad con AbortController
+  // Función para cargar unidad con AbortController
   const cargarUnidad = useCallback(async () => {
     if (!id) return;
     
-    // Cancelar petición anterior si existe
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       console.log('🛑 Petición anterior cancelada en UnidadForm');
@@ -304,7 +308,6 @@ const tipoUnidadPermitido = authService.getTipoUnidadPermitido();
       setFormData(loadedData);
       setOriginalFormData(JSON.parse(JSON.stringify(loadedData)));
     } catch (error) {
-      // ✅ Ignorar errores de cancelación
       if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
         console.error('Error cargando unidad:', error);
         toast.error('Error al cargar los datos');
@@ -315,18 +318,16 @@ const tipoUnidadPermitido = authService.getTipoUnidadPermitido();
     }
   }, [id, navigate]);
 
-  // ✅ Efecto con limpieza
+  // Efecto con limpieza
   useEffect(() => {
     if (isEditing) {
       cargarUnidad();
     }
     
     return () => {
-      // Limpiar debounce timeout
       if (debounceTimeout.current) {
         clearTimeout(debounceTimeout.current);
       }
-      // Cancelar peticiones pendientes
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
         console.log('🛑 Petición de unidad cancelada al desmontar');
@@ -424,7 +425,6 @@ const tipoUnidadPermitido = authService.getTipoUnidadPermitido();
     e.preventDefault();
     setLoading(true);
     
-    // Verificar permisos según el tipo de unidad
     if (!isEditing && !authService.puedeCrearUnidad(formData.tipo)) {
       toast.error(`No tienes permisos para crear unidades de tipo ${formData.tipo === 'patrulla' ? 'Patrulla' : 'Ambulancia'}`);
       setLoading(false);
@@ -524,7 +524,7 @@ const tipoUnidadPermitido = authService.getTipoUnidadPermitido();
               </h1>
               <p className="text-sm text-gray-500 mt-1">
                 {isEditing ? `Editando unidad: ${formData.codigo}` : 'Ingresa los datos de la nueva unidad'}
-                {tipoUnidadPermitido && ` (Tipo: ${tipoUnidadPermitido === 'policia' ? 'Policía' : 'Ambulancia'})`}
+                {tipoUnidadPermitido && ` (Tipo: ${tipoUnidadPermitido === 'patrulla' ? 'Patrulla' : 'Ambulancia'})`}
               </p>
             </div>
           </div>
@@ -546,7 +546,7 @@ const tipoUnidadPermitido = authService.getTipoUnidadPermitido();
 
         {!isEditing && <ProgressBar completed={calcularProgreso()} total={3} />}
 
-        {/* Formulario - el resto del JSX se mantiene igual */}
+        {/* Formulario */}
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-200">
           <div className="h-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-600"></div>
           
@@ -656,9 +656,10 @@ const tipoUnidadPermitido = authService.getTipoUnidadPermitido();
                         <Info size={12} /> El tipo no se puede modificar
                       </p>
                     )}
+                    {/* ✅ CORRECCIÓN #2: Mensaje correcto para tipo de unidad */}
                     {tipoUnidadPermitido && !isEditing && (
                       <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
-                        <Info size={12} /> Solo puedes crear unidades de tipo {tipoUnidadPermitido === 'policia' ? 'Policía' : 'Ambulancia'}
+                        <Info size={12} /> Solo puedes crear unidades de tipo {tipoUnidadPermitido === 'patrulla' ? 'Patrulla' : 'Ambulancia'}
                       </p>
                     )}
                   </div>

@@ -62,13 +62,13 @@ const AlertasCerradas = () => {
   const [alertas, setAlertas] = useState([]);
   const [alertasOriginal, setAlertasOriginal] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [detalleLoading, setDetalleLoading] = useState(false); // ✅ Estado separado
+  const [detalleLoading, setDetalleLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [tipoFiltro, setTipoFiltro] = useState('todos');
   const [tiempoMinimo, setTiempoMinimo] = useState('');
   const [tiempoMaximo, setTiempoMaximo] = useState('');
   
-  // ✅ REF para AbortControllers
+  // REF para AbortControllers
   const abortControllerRef = useRef(null);
   const detalleAbortControllerRef = useRef(null);
   
@@ -114,29 +114,28 @@ const AlertasCerradas = () => {
     total_paginas: 1
   });
 
-  // ✅ Función para cargar alertas con AbortController
+  // ✅ CORRECCIÓN #1: Usar whereExtra para filtro de seguridad
   const cargarAlertas = useCallback(async () => {
-    // Cancelar petición anterior si existe
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       console.log('🛑 Petición anterior cancelada en AlertasCerradas');
     }
     
-    // Crear nuevo AbortController
     abortControllerRef.current = new AbortController();
     
     setLoading(true);
     try {
-      const params = {};
+      const params = { 
+        limite: 1000,
+        signal: abortControllerRef.current.signal 
+      };
+      
+      // ✅ APLICAR FILTRO DE SEGURIDAD como whereExtra
       if (tipoAlertaPermitido) {
-        params.tipo = tipoAlertaPermitido;
+        params.whereExtra = { tipo: tipoAlertaPermitido };
       }
       
-      const response = await alertasPanelService.obtenerCerradas({ 
-        limite: 1000, 
-        ...params,
-        signal: abortControllerRef.current.signal 
-      });
+      const response = await alertasPanelService.obtenerCerradas(params);
 
       if (response.success) {
         const alertasFormateadas = (response.data || []).map(alerta => ({
@@ -154,7 +153,6 @@ const AlertasCerradas = () => {
         setAlertas([]);
       }
     } catch (error) {
-      // ✅ Ignorar errores de cancelación
       if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
         console.error('Error:', error);
         toast.error('Error al cargar alertas');
@@ -258,7 +256,7 @@ const AlertasCerradas = () => {
     }
   }, [filtros.desde, filtros.hasta, filtros.pagina, searchTerm, tipoFiltro, tiempoMinimo, tiempoMaximo]);
 
-  // ✅ Efecto con limpieza
+  // Efecto con limpieza
   useEffect(() => {
     cargarAlertas();
     
@@ -274,15 +272,13 @@ const AlertasCerradas = () => {
     };
   }, [cargarAlertas]);
 
-  // ✅ Manejar clic en alerta con AbortController
+  // Manejar clic en alerta con AbortController
   const handleRowClick = useCallback(async (alerta) => {
-    // Cancelar petición de detalle anterior si existe
     if (detalleAbortControllerRef.current) {
       detalleAbortControllerRef.current.abort();
       console.log('🛑 Petición de detalle anterior cancelada');
     }
     
-    // Crear nuevo AbortController para detalle
     detalleAbortControllerRef.current = new AbortController();
     
     setDetalleLoading(true);
@@ -304,7 +300,6 @@ const AlertasCerradas = () => {
         toast.error('Error al cargar la alerta');
       }
     } catch (error) {
-      // ✅ Ignorar errores de cancelación
       if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
         console.error('Error al cargar detalle:', error);
         toast.error('Error al cargar la alerta');
@@ -542,8 +537,7 @@ const AlertasCerradas = () => {
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">UBICACIÓN</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">TIEMPO ATENCIÓN</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">FECHA CIERRE</th>
-                      
-                     </tr>
+                    </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {alertas.map((alerta) => (
@@ -589,7 +583,6 @@ const AlertasCerradas = () => {
                         <td className="px-4 py-3 text-sm text-gray-500">
                           {formatearFechaCorta(alerta.fecha_cierre)}
                         </td>
-                        
                       </tr>
                     ))}
                   </tbody>

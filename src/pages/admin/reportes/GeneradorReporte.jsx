@@ -1,4 +1,3 @@
-// src/pages/admin/reportes/GeneradorReporte.jsx
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
@@ -17,16 +16,20 @@ import useAuthStore from '../../../store/authStore';
 import IconoEntidad, { BadgeTipoAlerta, BadgeIcono } from '../../../components/ui/IconoEntidad';
 import authService from '../../../services/auth.service';
 
-// Mapeo de roles/tipos a entidades
+// Mapeos correctos de roles y tipos
 const rolToEntidad = {
   policia: 'POLICIA',
-  ambulancia: 'PERSONAL_AMBULANCIA',
+  paramedico: 'PARAMEDICO',
   admin: 'ADMIN',
-  superadmin: 'SUPERADMIN'
+  superadmin: 'SUPERADMIN',
+  operador_tecnico: 'OPERADOR_TECNICO',
+  operador_policial: 'OPERADOR_POLICIAL',
+  operador_medico: 'OPERADOR_MEDICO',
+  operador_general: 'OPERADOR_GENERAL'
 };
 
 const tipoUnidadToEntidad = {
-  policia: 'PATRULLA',
+  patrulla: 'PATRULLA',
   ambulancia: 'AMBULANCIA'
 };
 
@@ -35,7 +38,6 @@ const GeneradorReporte = () => {
   const { tipo } = useParams();
   const { user } = useAuthStore();
   
-  // Obtener filtros según rol
   const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
   const rolPersonalPermitido = authService.getRolPersonalPermitido();
   
@@ -45,13 +47,12 @@ const GeneradorReporte = () => {
   const [datosFiltrados, setDatosFiltrados] = useState([]);
   const [estadisticas, setEstadisticas] = useState(null);
   
-  // ✅ CORRECCIÓN: Inicializar filtros correctamente según el tipo de reporte
   const getInitialTipo = () => {
     if (tipo === 'personal' && rolPersonalPermitido) {
-      return rolPersonalPermitido; // 'policia' o 'ambulancia'
+      return rolPersonalPermitido;
     }
     if (tipo === 'alertas' && tipoAlertaPermitido) {
-      return tipoAlertaPermitido; // 'panico' o 'medica'
+      return tipoAlertaPermitido;
     }
     return 'todos';
   };
@@ -66,10 +67,8 @@ const GeneradorReporte = () => {
   });
   const [vistaPrevia, setVistaPrevia] = useState(true);
 
-  // REF para AbortController
   const abortControllerRef = useRef(null);
 
-  // Configuración según el tipo de reporte
   const config = {
     personal: {
       titulo: 'Reporte de Personal',
@@ -87,7 +86,7 @@ const GeneradorReporte = () => {
         { key: 'creado_en', label: 'Fecha Registro' }
       ],
       filtrosDisponibles: [
-        { tipo: 'rol', opciones: rolPersonalPermitido ? [rolPersonalPermitido] : ['policia', 'ambulancia', 'admin', 'superadmin'] },
+        { tipo: 'rol', opciones: rolPersonalPermitido ? [rolPersonalPermitido] : ['policia', 'paramedico', 'admin', 'superadmin'] },
         { tipo: 'estado', opciones: ['activo', 'inactivo'] }
       ],
       metricas: ['Total', 'Activos', 'Inactivos', 'Disponibles', 'Ocupados']
@@ -107,7 +106,7 @@ const GeneradorReporte = () => {
         { key: 'creado_en', label: 'Fecha Registro' }
       ],
       filtrosDisponibles: [
-        { tipo: 'tipo', opciones: ['policia', 'ambulancia'] },
+        { tipo: 'tipo', opciones: ['patrulla', 'ambulancia'] },
         { tipo: 'estado', opciones: ['disponible', 'ocupada', 'inactiva'] }
       ],
       metricas: ['Total', 'Activas', 'Inactivas', 'Disponibles', 'Ocupadas']
@@ -139,15 +138,12 @@ const GeneradorReporte = () => {
 
   const info = config[tipo] || config.personal;
 
-  // Función para cargar datos con AbortController
   const cargarDatos = useCallback(async () => {
-    // Cancelar petición anterior si existe
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       console.log('🛑 Petición anterior cancelada en GeneradorReporte');
     }
     
-    // Crear nuevo AbortController
     abortControllerRef.current = new AbortController();
     const signal = abortControllerRef.current.signal;
     
@@ -159,7 +155,6 @@ const GeneradorReporte = () => {
       if (filtros.fechaInicio) params.desde = filtros.fechaInicio;
       if (filtros.fechaFin) params.hasta = filtros.fechaFin;
       
-      // Aplicar filtros según rol
       if (tipo === 'personal' && rolPersonalPermitido) {
         params.rol = rolPersonalPermitido;
       }
@@ -169,28 +164,16 @@ const GeneradorReporte = () => {
       
       if (tipo === 'personal') {
         const res = await personalService.listarPersonal({ limite: 1000, ...params });
-        console.log('🔍 [PERSONAL] Respuesta:', res);
-        console.log('🔍 [PERSONAL] Datos cargados:', res.data?.length);
         data = res.data || [];
       } else if (tipo === 'unidades') {
         const res = await unidadService.listarUnidades({ limite: 1000, ...params });
-        console.log('🔍 [UNIDADES] Datos cargados:', res.data?.length);
         data = res.data || [];
       } else if (tipo === 'alertas') {
-        const [exp, cer, act, proc] = await Promise.all([
-          alertasService.obtenerExpiradas({ limite: 500, ...params }).catch(() => ({ data: [] })),
-          alertasService.obtenerCerradasManual({ limite: 500, ...params }).catch(() => ({ data: [] })),
-          alertasService.obtenerActivas?.({ limite: 500, ...params }).catch(() => ({ data: [] })) || Promise.resolve({ data: [] }),
-          alertasService.obtenerEnProceso?.({ limite: 500, ...params }).catch(() => ({ data: [] })) || Promise.resolve({ data: [] })
+        const [exp, cer] = await Promise.all([
+          alertasService.obtenerExpiradas({ limite: 1000, ...params }).catch(() => ({ data: [] })),
+          alertasService.obtenerCerradasManual({ limite: 1000, ...params }).catch(() => ({ data: [] }))
         ]);
-        
-        data = [
-          ...(exp.data || []),
-          ...(cer.data || []),
-          ...(act.data || []),
-          ...(proc.data || [])
-        ];
-        console.log('🔍 [ALERTAS] Datos cargados:', data.length);
+        data = [...(exp.data || []), ...(cer.data || [])];
       }
 
       setDatos(data);
@@ -205,14 +188,11 @@ const GeneradorReporte = () => {
     }
   }, [tipo, filtros.fechaInicio, filtros.fechaFin, rolPersonalPermitido, tipoAlertaPermitido]);
 
-  // Efecto con limpieza
   useEffect(() => {
     cargarDatos();
-    
     return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
-        console.log('🛑 Componente GeneradorReporte desmontado - peticiones canceladas');
       }
     };
   }, [cargarDatos]);
@@ -238,18 +218,13 @@ const GeneradorReporte = () => {
   };
 
   const aplicarFiltrosYEstadisticas = () => {
-    console.log('🔍 [FILTROS] Datos originales length:', datos.length);
-    console.log('🔍 [FILTROS] Filtros aplicados:', filtros);
-    
     let filtrados = [...datos];
 
-    // Filtro por fechas
     if (filtros.fechaInicio && filtros.fechaFin) {
       const inicio = new Date(filtros.fechaInicio);
       inicio.setHours(0, 0, 0, 0);
       const fin = new Date(filtros.fechaFin);
       fin.setHours(23, 59, 59, 999);
-      
       filtrados = filtrados.filter(item => {
         const fecha = new Date(item.fecha_creacion || item.creado_en);
         return fecha >= inicio && fecha <= fin;
@@ -270,21 +245,16 @@ const GeneradorReporte = () => {
       });
     }
 
-    // ✅ CORRECCIÓN: Filtro por tipo - aplicar solo si tiene sentido
     if (filtros.tipo !== 'todos') {
       if (tipo === 'personal') {
-        // Para personal, filtrar por rol
         filtrados = filtrados.filter(item => item.rol === filtros.tipo);
       } else if (tipo === 'alertas') {
-        // Para alertas, filtrar por tipo
         filtrados = filtrados.filter(item => item.tipo === filtros.tipo);
       } else if (tipo === 'unidades') {
-        // Para unidades, filtrar por tipo
         filtrados = filtrados.filter(item => item.tipo === filtros.tipo);
       }
     }
 
-    // Filtro por estado
     if (filtros.estado !== 'todos') {
       filtrados = filtrados.filter(item => {
         if (tipo === 'personal') return item.activo === (filtros.estado === 'activo');
@@ -294,7 +264,6 @@ const GeneradorReporte = () => {
       });
     }
 
-    // Filtro por zona (solo alertas)
     if (tipo === 'alertas' && filtros.zona !== 'todas') {
       filtrados = filtrados.filter(item => {
         const zona = calcularZona(item.lat, item.lng);
@@ -302,7 +271,6 @@ const GeneradorReporte = () => {
       });
     }
 
-    // Filtro por búsqueda
     if (filtros.busqueda) {
       const busqueda = filtros.busqueda.toLowerCase();
       filtrados = filtrados.filter(item => {
@@ -322,7 +290,6 @@ const GeneradorReporte = () => {
       });
     }
 
-    console.log('🔍 [FILTROS] Datos filtrados length:', filtrados.length);
     setDatosFiltrados(filtrados);
     calcularEstadisticas(filtrados);
   };
@@ -336,10 +303,9 @@ const GeneradorReporte = () => {
       stats.inactivos = datosFiltrados.filter(d => !d.activo).length;
       stats.disponibles = datosFiltrados.filter(d => d.disponible).length;
       stats.ocupados = datosFiltrados.filter(d => !d.disponible && d.activo).length;
-      
       stats.porRol = {
         policia: datosFiltrados.filter(d => d.rol === 'policia').length,
-        ambulancia: datosFiltrados.filter(d => d.rol === 'ambulancia').length,
+        paramedico: datosFiltrados.filter(d => d.rol === 'paramedico').length,
         admin: datosFiltrados.filter(d => d.rol === 'admin').length,
         superadmin: datosFiltrados.filter(d => d.rol === 'superadmin').length
       };
@@ -349,9 +315,8 @@ const GeneradorReporte = () => {
       stats.inactivas = datosFiltrados.filter(d => !d.activa).length;
       stats.disponibles = datosFiltrados.filter(d => d.estado === 'disponible').length;
       stats.ocupadas = datosFiltrados.filter(d => d.estado === 'ocupada').length;
-      
       stats.porTipo = {
-        policia: datosFiltrados.filter(d => d.tipo === 'policia').length,
+        patrulla: datosFiltrados.filter(d => d.tipo === 'patrulla').length,
         ambulancia: datosFiltrados.filter(d => d.tipo === 'ambulancia').length
       };
     } else if (tipo === 'alertas') {
@@ -364,11 +329,9 @@ const GeneradorReporte = () => {
       const tiempos = datosFiltrados
         .filter(d => d.fecha_creacion && d.fecha_cierre)
         .map(d => (new Date(d.fecha_cierre) - new Date(d.fecha_creacion)) / 60000);
-      
       stats.tiempoPromedio = tiempos.length > 0 
         ? Math.round(tiempos.reduce((a, b) => a + b, 0) / tiempos.length) 
         : 0;
-      
       stats.porTipo = {
         panico: datosFiltrados.filter(d => d.tipo === 'panico').length,
         medica: datosFiltrados.filter(d => d.tipo === 'medica').length
@@ -439,16 +402,21 @@ const GeneradorReporte = () => {
 
   const renderBadgeRol = (rol) => {
     const entidad = rolToEntidad[rol] || 'ADMIN';
-    const texto = rol === 'policia' ? 'Policía' :
-                  rol === 'ambulancia' ? 'Ambulancia' :
-                  rol === 'admin' ? 'Admin' :
-                  rol === 'superadmin' ? 'Superadmin' : rol;
+    const texto = 
+      rol === 'policia' ? 'Policía' :
+      rol === 'paramedico' ? 'Paramédico' :
+      rol === 'admin' ? 'Admin' :
+      rol === 'superadmin' ? 'Superadmin' :
+      rol === 'operador_tecnico' ? 'Op. Técnico' :
+      rol === 'operador_policial' ? 'Op. Policial' :
+      rol === 'operador_medico' ? 'Op. Médico' :
+      rol === 'operador_general' ? 'Op. General' : rol;
     return <BadgeIcono entidad={entidad} texto={texto} size={12} />;
   };
 
   const renderBadgeTipoUnidad = (tipo) => {
     const entidad = tipoUnidadToEntidad[tipo] || 'PATRULLA';
-    const texto = tipo === 'policia' ? 'Policía' : 'Ambulancia';
+    const texto = tipo === 'patrulla' ? 'Patrulla' : 'Ambulancia';
     return <BadgeIcono entidad={entidad} texto={texto} size={12} />;
   };
 
@@ -480,14 +448,14 @@ const GeneradorReporte = () => {
           </button>
           <div>
             <div className="flex items-center gap-2">
-              <div className={`bg-gradient-to-r ${info.gradient} p-2 rounded-lg shadow-lg shadow-${info.color}-200`}>
+              <div className={`bg-gradient-to-r ${info.gradient} p-2 rounded-lg shadow-lg`}>
                 <info.icono size={20} className="text-white" />
               </div>
               <h1 className="text-2xl font-bold text-gray-800">{info.titulo}</h1>
             </div>
             <p className="text-sm text-gray-500 mt-1">
               {datosFiltrados.length} registros encontrados
-              {tipo === 'personal' && rolPersonalPermitido && ` (${rolPersonalPermitido === 'policia' ? 'Solo Policía' : 'Solo Ambulancia'})`}
+              {tipo === 'personal' && rolPersonalPermitido && ` (${rolPersonalPermitido === 'policia' ? 'Solo Policía' : 'Solo Paramédico'})`}
               {tipo === 'alertas' && tipoAlertaPermitido && ` (${tipoAlertaPermitido === 'panico' ? 'Solo Pánico' : 'Solo Médicas'})`}
             </p>
           </div>
@@ -663,9 +631,7 @@ const GeneradorReporte = () => {
       {vistaPrevia && datosFiltrados.length > 0 && (
         <div className="bg-white rounded-xl shadow-lg overflow-hidden mb-6">
           <div className="px-6 py-4 border-b bg-gray-50 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-gray-700">
-              Vista previa de datos
-            </h2>
+            <h2 className="text-sm font-semibold text-gray-700">Vista previa de datos</h2>
             <span className="text-xs text-gray-500">
               Mostrando {Math.min(10, datosFiltrados.length)} de {datosFiltrados.length} registros
             </span>
@@ -686,27 +652,27 @@ const GeneradorReporte = () => {
                 {datosFiltrados.slice(0, 10).map((item, idx) => (
                   <tr key={idx} className="hover:bg-gray-50">
                     {info.campos.map(campo => {
-                      let valor = renderValorCelda(item, campo);
+                      const valor = renderValorCelda(item, campo);
                       
                       if (campo.key === 'rol' && tipo === 'personal') {
                         return (
                           <td key={campo.key} className="px-4 py-3">
                             {renderBadgeRol(item.rol)}
-                           </td>
+                          </td>
                         );
                       }
                       if (campo.key === 'tipo' && tipo === 'unidades') {
                         return (
                           <td key={campo.key} className="px-4 py-3">
                             {renderBadgeTipoUnidad(item.tipo)}
-                            </td>
+                          </td>
                         );
                       }
                       if (campo.key === 'tipo' && tipo === 'alertas') {
                         return (
                           <td key={campo.key} className="px-4 py-3">
                             {renderBadgeAlerta(item.tipo)}
-                            </td>
+                          </td>
                         );
                       }
                       
@@ -725,7 +691,7 @@ const GeneradorReporte = () => {
       )}
 
       {/* Resumen del reporte */}
-      <div className={`bg-gradient-to-r ${info.gradient} rounded-xl p-4 border border-${info.color}-200`}>
+      <div className={`bg-gradient-to-r ${info.gradient} rounded-xl p-4`}>
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-white/20 rounded-lg">
@@ -762,7 +728,6 @@ const GeneradorReporte = () => {
   );
 };
 
-// Componente de tarjeta de estadísticas
 const StatCard = ({ label, value, icon: Icon, color }) => {
   const colors = {
     blue: 'bg-blue-50 text-blue-600 border-blue-100',

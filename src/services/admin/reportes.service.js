@@ -201,8 +201,9 @@ class ReportesService {
           nombre: corregirTexto(item.nombre || '—'),
           email: item.email || '—',
           rol: item.rol === 'policia' ? 'Policía' :
-                item.rol === 'ambulancia' ? 'Ambulancia' :
-                item.rol === 'admin' ? 'Admin' : 'Superadmin',
+                item.rol === 'paramedico' ? 'paramedico' :
+                 item.rol === 'admin' ? 'Admin' :
+         item.rol === 'superadmin' ? 'Superadmin' : item.rol,
           placa: item.placa || '—',
           telefono: formatearTelefono(item.telefono),
           activo: item.activo ? 'ACTIVO' : 'INACTIVO',
@@ -225,7 +226,7 @@ class ReportesService {
         datosParaExcel = datosProcesar.map(item => ({
           id: item.id,
           codigo: item.codigo || '—',
-          tipo: item.tipo === 'policia' ? 'Policía' : 'Ambulancia',
+          tipo: item.tipo === 'patrulla' ? 'Patrulla' : 'Ambulancia',
           estado: item.estado === 'disponible' ? 'DISPONIBLE' :
                    item.estado === 'ocupada' ? 'OCUPADA' : 'INACTIVA',
           activa: item.activa ? 'SÍ' : 'NO',
@@ -394,7 +395,7 @@ class ReportesService {
           corregirTexto(item.nombre || '—'),
           item.email || '—',
           item.rol === 'policia' ? 'Policía' : 
-          item.rol === 'ambulancia' ? 'Ambulancia' : 
+          item.rol === 'paramedico' ? 'Paramédico' : 
           item.rol === 'admin' ? 'Admin' : 'Superadmin',
           item.placa || '—',
           item.activo ? 'ACTIVO' : 'INACTIVO'
@@ -404,7 +405,7 @@ class ReportesService {
         getDataRow = (item) => [
           item.id,
           item.codigo || '—',
-          item.tipo === 'policia' ? 'Policía' : 'Ambulancia',
+          item.tipo === 'patrulla' ? 'Patrulla' : 'Ambulancia',
           (item.estado || '').toUpperCase() || '—',
           item.activa ? 'SÍ' : 'NO',
           calcularZona(item.lat, item.lng)

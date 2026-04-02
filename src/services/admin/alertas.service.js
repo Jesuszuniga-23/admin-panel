@@ -147,10 +147,8 @@ class AlertasService {
       
       const queryString = params.toString();
       
-      // ✅ AGREGAR DELAY ENTRE PETICIONES para evitar rate limit
       const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
       
-      // ✅ Ejecutar peticiones con delay
       const [activas, proceso, cerradas, expiradas] = await Promise.all([
         delay(0).then(() => axiosInstance.get(`${ENDPOINTS.ALERTAS_PANEL.ACTIVAS}?${queryString}`, config).catch(err => {
           if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') throw err;
@@ -186,6 +184,17 @@ class AlertasService {
       console.error('Error obteniendo alertas geográficas:', error);
       return { data: [], total: 0 };
     }
+  }
+
+  // =====================================================
+  // ✅ ALIAS PARA COMPATIBILIDAD CON DASHBOARD.SERVICE.JS
+  // =====================================================
+  async listarExpiradas(filtros = {}) {
+    return this.obtenerExpiradas(filtros);
+  }
+
+  async listarCerradasManual(filtros = {}) {
+    return this.obtenerCerradasManual(filtros);
   }
 }
 

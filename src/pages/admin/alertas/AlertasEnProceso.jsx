@@ -47,9 +47,9 @@ const AlertasEnProceso = () => {
   const [alertas, setAlertas] = useState([]);
   const [alertasOriginal, setAlertasOriginal] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [detalleLoading, setDetalleLoading] = useState(false); // ✅ Estado separado para detalle
+  const [detalleLoading, setDetalleLoading] = useState(false);
   
-  // ✅ REF para AbortControllers
+  // REF para AbortControllers
   const abortControllerRef = useRef(null);
   const detalleAbortControllerRef = useRef(null);
   
@@ -101,7 +101,7 @@ const AlertasEnProceso = () => {
   const [unidadesDisponibles, setUnidadesDisponibles] = useState([]);
   const [filtrosActivos, setFiltrosActivos] = useState(false);
 
-  // ✅ Función para cargar alertas con AbortController
+  // ✅ CORRECCIÓN #1 y #2: Función cargarAlertas corregida con whereExtra
   const cargarAlertas = useCallback(async () => {
     // Cancelar petición anterior si existe
     if (abortControllerRef.current) {
@@ -114,16 +114,17 @@ const AlertasEnProceso = () => {
     
     setLoading(true);
     try {
-      const params = {};
+      const params = { 
+        limite: 1000,
+        signal: abortControllerRef.current.signal 
+      };
+      
+      // ✅ APLICAR FILTRO DE SEGURIDAD como whereExtra
       if (tipoAlertaPermitido) {
-        params.tipo = tipoAlertaPermitido;
+        params.whereExtra = { tipo: tipoAlertaPermitido };
       }
       
-      const response = await alertasPanelService.obtenerEnProceso({ 
-        limite: 1000, 
-        ...params,
-        signal: abortControllerRef.current.signal 
-      });
+      const response = await alertasPanelService.obtenerEnProceso(params);
       
       if (response.success) {
         const alertasFormateadas = (response.data || []).map(alerta => ({
@@ -154,11 +155,18 @@ const AlertasEnProceso = () => {
     }
   }, [tipoAlertaPermitido]);
 
+  // ✅ CORRECCIÓN #3: Función aplicarFiltrosLocal con filtro de seguridad local
   const aplicarFiltrosLocal = (datos = alertasOriginal) => {
     let datosFiltrados = datos;
     let filtrosAplicados = false;
     
-    if (filtros.tipo !== 'todos' && filtros.tipo) {
+    // ✅ APLICAR FILTRO DE SEGURIDAD LOCAL (doble capa de seguridad)
+    if (tipoAlertaPermitido) {
+      datosFiltrados = datosFiltrados.filter(a => a.tipo === tipoAlertaPermitido);
+      filtrosAplicados = true;
+    }
+    
+    if (filtros.tipo !== 'todos' && filtros.tipo && !tipoAlertaPermitido) {
       filtrosAplicados = true;
       datosFiltrados = datosFiltrados.filter(a => a.tipo === filtros.tipo);
     }
@@ -231,9 +239,9 @@ const AlertasEnProceso = () => {
     if (alertasOriginal.length) {
       aplicarFiltrosLocal();
     }
-  }, [filtros.tipo, filtros.unidad, filtros.desde, filtros.hasta, filtros.pagina, alertasOriginal]);
+  }, [filtros.tipo, filtros.unidad, filtros.desde, filtros.hasta, filtros.pagina, alertasOriginal, tipoAlertaPermitido]);
 
-  // ✅ Efecto con limpieza
+  // Efecto con limpieza
   useEffect(() => {
     cargarAlertas();
     
@@ -249,7 +257,7 @@ const AlertasEnProceso = () => {
     };
   }, [cargarAlertas]);
 
-  // ✅ Manejar clic en alerta con AbortController
+  // Manejar clic en alerta con AbortController
   const handleRowClick = useCallback(async (alerta) => {
     // Cancelar petición de detalle anterior si existe
     if (detalleAbortControllerRef.current) {
@@ -507,7 +515,7 @@ const AlertasEnProceso = () => {
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">TIEMPO EN PROCESO</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">FECHA ASIGNACIÓN</th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">ACCIONES</th>
-                      </tr>
+                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {alertas.map((alerta) => (

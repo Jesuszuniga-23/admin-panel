@@ -98,6 +98,7 @@ const AlertasExpiradas = () => {
     total_paginas: 0
   });
 
+  // ✅ CORRECCIÓN #1: Usar tipoFiltro para filtro de seguridad
   const cargarAlertas = useCallback(async () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -108,16 +109,17 @@ const AlertasExpiradas = () => {
     
     setCargando(true);
     try {
-      const params = {};
+      const params = { 
+        limite: 1000,
+        signal: abortControllerRef.current.signal 
+      };
+      
+      // ✅ APLICAR FILTRO DE SEGURIDAD como tipoFiltro
       if (tipoAlertaPermitido) {
-        params.tipo = tipoAlertaPermitido;
+        params.tipoFiltro = tipoAlertaPermitido;
       }
       
-      const resultado = await alertasService.obtenerExpiradas({ 
-        limite: 1000, 
-        ...params,
-        signal: abortControllerRef.current.signal 
-      });
+      const resultado = await alertasService.obtenerExpiradas(params);
       
       console.log('📊 [DEBUG] resultado completo:', resultado);
       console.log('📊 [DEBUG] resultado.data length:', resultado.data?.length);
@@ -155,12 +157,18 @@ const AlertasExpiradas = () => {
     } finally {
       setCargando(false);
     }
-  }, [tipoAlertaPermitido]);
+  }, [tipoAlertaPermitido, filtros.pagina, filtros.limite, aplicarFiltrosLocalDirecto]);
 
+  // ✅ CORRECCIÓN #2: Aplicar filtro de seguridad local
   const aplicarFiltrosLocalDirecto = useCallback((datos) => {
     if (!datos || datos.length === 0) return [];
     
     let datosFiltrados = [...datos];
+    
+    // ✅ APLICAR FILTRO DE SEGURIDAD LOCAL (doble capa de seguridad)
+    if (tipoAlertaPermitido) {
+      datosFiltrados = datosFiltrados.filter(item => item.tipo === tipoAlertaPermitido);
+    }
     
     if (filtros.search && filtros.search.trim() !== '') {
       const termino = filtros.search.toLowerCase().trim();
@@ -195,7 +203,7 @@ const AlertasExpiradas = () => {
     const datosPaginados = datosFiltrados.slice(inicio, fin);
     
     return datosPaginados;
-  }, [filtros.search, filtros.desde, filtros.hasta, filtros.pagina, filtros.limite]);
+  }, [tipoAlertaPermitido, filtros.search, filtros.desde, filtros.hasta, filtros.pagina, filtros.limite]);
 
   useEffect(() => {
     if (alertasOriginal.length > 0) {
@@ -442,7 +450,6 @@ const AlertasExpiradas = () => {
             </div>
 
             <div className="flex items-end gap-2 sm:col-span-2 lg:col-span-1">
-            
               <button
                 onClick={limpiarFiltros}
                 className="flex-1 px-3 sm:px-4 py-2 border border-slate-200 bg-white rounded-lg md:rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all text-xs sm:text-sm font-medium text-slate-600 whitespace-nowrap"
@@ -498,7 +505,7 @@ const AlertasExpiradas = () => {
                       <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-slate-500 uppercase">CIUDADANO</th>
                       <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-slate-500 uppercase">UBICACIÓN</th>
                       <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-slate-500 uppercase">FECHA</th>
-                    </tr>
+                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {alertas.map((alerta) => (
@@ -537,7 +544,6 @@ const AlertasExpiradas = () => {
                             </span>
                           </div>
                         </td>
-                        
                       </tr>
                     ))}
                   </tbody>

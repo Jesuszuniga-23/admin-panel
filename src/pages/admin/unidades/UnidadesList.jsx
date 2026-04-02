@@ -90,20 +90,20 @@ const ModalConfirmacion = ({ isOpen, onClose, onConfirm, titulo, mensaje, itemNo
             </div>
             <h3 className="text-lg font-semibold text-gray-800">{titulo || 'Confirmar acción'}</h3>
           </div>
-          
+
           <p className="text-sm text-gray-600 mb-2">{mensaje}</p>
           {itemNombre && (
             <p className="text-base font-semibold text-center p-3 rounded-lg mb-4" style={{
-              color: tipoAccion === 'eliminar' ? '#dc2626' : 
-                     tipoAccion === 'desactivar' ? '#d97706' : '#059669',
-              backgroundColor: tipoAccion === 'eliminar' ? '#fee2e2' : 
-                             tipoAccion === 'desactivar' ? '#fef3c7' : '#d1fae5'
+              color: tipoAccion === 'eliminar' ? '#dc2626' :
+                tipoAccion === 'desactivar' ? '#d97706' : '#059669',
+              backgroundColor: tipoAccion === 'eliminar' ? '#fee2e2' :
+                tipoAccion === 'desactivar' ? '#fef3c7' : '#d1fae5'
             }}>
               "{itemNombre}"
             </p>
           )}
           <p className="text-xs text-gray-400 mb-6">{conf.mensajeAdicional}</p>
-          
+
           <div className="flex justify-end gap-3">
             <button
               onClick={onClose}
@@ -137,25 +137,25 @@ const UnidadesList = () => {
   const [loading, setLoading] = useState(true);
   const [exportando, setExportando] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
-  
+
   const abortControllerRef = useRef(null);
-  
+
   const tipoUnidadPermitido = authService.getTipoUnidadPermitido();
-  
+
   const puedeCrearUnidades = useCallback(() => {
     const puedeCrearPatrulla = authService.puedeCrearUnidad('patrulla');
     const puedeCrearAmbulancia = authService.puedeCrearUnidad('ambulancia');
     return puedeCrearPatrulla || puedeCrearAmbulancia;
   }, []);
-  
+
   const puedeGestionarUnidad = useCallback((unidad) => {
     return authService.puedeEditarUnidad(unidad.tipo);
   }, []);
-  
+
   const puedeEliminarUnidad = useCallback((unidad) => {
     return authService.puedeEliminarUnidad(unidad.tipo);
   }, []);
-  
+
   const [modalInfo, setModalInfo] = useState({ show: false, mensaje: '' });
   const [modalConfirmacion, setModalConfirmacion] = useState({
     show: false,
@@ -174,7 +174,7 @@ const UnidadesList = () => {
   });
 
   const [filtros, setFiltros] = useState({
-    tipo: tipoUnidadPermitido || '',
+    tipo: '',
     estado: '',
     search: '',
     pagina: 1,
@@ -186,31 +186,45 @@ const UnidadesList = () => {
     limite: 10,
     total_paginas: 0
   });
-  
-  // ✅ CORRECCIÓN AQUÍ - Extraer value del objeto
+
   const { value: searchTerm } = useDebounce(filtros.search, 500);
 
+  // ✅ CORRECCIÓN CRÍTICA: Aplicar filtro de seguridad con prioridad
   const cargarUnidades = useCallback(async () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       console.log('🛑 Petición anterior cancelada en UnidadesList');
     }
-    
+
     abortControllerRef.current = new AbortController();
-    
+
     setLoading(true);
     try {
       const filtrosActivos = { signal: abortControllerRef.current.signal };
-      if (filtros.tipo) filtrosActivos.tipo = filtros.tipo;
-      if (filtros.estado) filtrosActivos.estado = filtros.estado;
+
+      // ✅ APLICAR FILTRO DE SEGURIDAD PRIMERO
+      if (tipoUnidadPermitido) {
+        filtrosActivos.tipo = tipoUnidadPermitido;
+        console.log('🔒 [UnidadesList] Filtro de seguridad aplicado:', tipoUnidadPermitido);
+      }
+      // ✅ LUEGO APLICAR FILTRO DEL USUARIO SI CORRESPONDE
+      else if (filtros.tipo && filtros.tipo !== '') {
+        filtrosActivos.tipo = filtros.tipo;
+      }
+
+      if (filtros.estado && filtros.estado !== '') {
+        filtrosActivos.estado = filtros.estado;
+      }
+
       if (searchTerm && typeof searchTerm === 'string' && searchTerm.trim() !== '') {
         filtrosActivos.search = searchTerm;
       }
+
       filtrosActivos.pagina = filtros.pagina;
       filtrosActivos.limite = filtros.limite;
 
-      console.log('🔍 [UnidadesList] searchTerm:', searchTerm);
-      console.log('🔍 [UnidadesList] filtrosActivos:', filtrosActivos);
+      console.log('🔍 [UnidadesList] tipoUnidadPermitido:', tipoUnidadPermitido);
+      console.log('🔍 [UnidadesList] filtrosActivos enviados:', filtrosActivos);
 
       const response = await unidadService.listarUnidades(filtrosActivos);
       setUnidades(response.data || []);
@@ -220,6 +234,9 @@ const UnidadesList = () => {
         limite: filtros.limite,
         total_paginas: 1
       });
+
+      console.log('📊 [UnidadesList] Total de registros:', response.paginacion?.total || response.data?.length || 0);
+
     } catch (error) {
       if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
         console.error('Error:', error);
@@ -234,11 +251,11 @@ const UnidadesList = () => {
     } finally {
       setLoading(false);
     }
-  }, [filtros.tipo, filtros.estado, searchTerm, filtros.pagina, filtros.limite]);
+  }, [filtros.tipo, filtros.estado, searchTerm, filtros.pagina, filtros.limite, tipoUnidadPermitido]);  // ✅ CIERRE CORRECTO
 
   useEffect(() => {
     cargarUnidades();
-    
+
     return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -295,7 +312,7 @@ const UnidadesList = () => {
       });
       return;
     }
-    
+
     if (isUnidadOcupada(unidad)) {
       setModalInfo({
         show: true,
@@ -372,7 +389,7 @@ const UnidadesList = () => {
       });
       return;
     }
-    
+
     if (isUnidadOcupada(unidad)) {
       setModalInfo({
         show: true,
@@ -423,7 +440,7 @@ const UnidadesList = () => {
       });
       return;
     }
-    
+
     if (isUnidadOcupada(unidad)) {
       setModalInfo({
         show: true,
@@ -436,7 +453,7 @@ const UnidadesList = () => {
 
   const limpiarFiltros = () => {
     setFiltros({
-      tipo: tipoUnidadPermitido || '',
+      tipo: '',
       estado: '',
       search: '',
       pagina: 1,
@@ -471,8 +488,8 @@ const UnidadesList = () => {
         onClose={() => setModalToggle({ show: false, id: null, codigo: '', unidad: null, activar: false, estadoActual: null })}
         onConfirm={ejecutarToggle}
         titulo={modalToggle.activar ? "Confirmar activación" : "Confirmar desactivación"}
-        mensaje={modalToggle.activar 
-          ? "¿Estás seguro de activar la unidad?" 
+        mensaje={modalToggle.activar
+          ? "¿Estás seguro de activar la unidad?"
           : "¿Estás seguro de desactivar la unidad?"}
         itemNombre={modalToggle.codigo}
         tipoAccion={modalToggle.activar ? "activar" : "desactivar"}
@@ -591,6 +608,15 @@ const UnidadesList = () => {
             <span className="text-blue-600 font-medium">Filtros activos - {paginacion.total} resultados</span>
           </div>
         )}
+
+        {tipoUnidadPermitido && (
+          <div className="mt-2 sm:mt-3 flex items-center gap-1.5 text-xs">
+            <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
+            <span className="text-green-600 font-medium">
+              Filtro de seguridad activo: Mostrando solo {tipoUnidadPermitido === 'patrulla' ? 'Patrullas' : 'Ambulancias'}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Tabla */}
@@ -605,7 +631,7 @@ const UnidadesList = () => {
             <Truck size={36} className="sm:w-12 sm:h-12 text-gray-300 mx-auto mb-3 sm:mb-4" />
             <h3 className="text-sm sm:text-base font-medium text-gray-800 mb-1 sm:mb-2">No hay unidades registradas</h3>
             <p className="text-xs sm:text-sm text-gray-500 mb-3 sm:mb-4">
-              {tipoUnidadPermitido 
+              {tipoUnidadPermitido
                 ? `No hay unidades de tipo ${tipoUnidadPermitido === 'patrulla' ? 'Patrulla' : 'Ambulancia'} registradas`
                 : 'Comienza creando una nueva unidad'}
             </p>
@@ -630,38 +656,40 @@ const UnidadesList = () => {
                     <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
                     <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase">Personal</th>
                     <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-right text-xs font-medium text-gray-500 uppercase">Acciones</th>
-                    </tr>
+                  </tr>
                 </thead>
                 <tbody className="divide-y">
                   {unidades.map((unidad) => (
                     <tr key={unidad.id} className="hover:bg-gray-50">
                       <td className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 lg:py-4">
                         <div className="flex items-center gap-2 sm:gap-3">
-                          <IconoEntidad 
-                            entidad={tipoToEntidad[unidad.tipo] || 'PATRULLA'} 
-                            size={16} 
+                          <IconoEntidad
+                            entidad={tipoToEntidad[unidad.tipo] || 'PATRULLA'}
+                            size={16}
                           />
                           <span className="text-xs sm:text-sm font-medium text-gray-800 truncate max-w-[80px] sm:max-w-[120px]">
                             {unidad.codigo}
                           </span>
                         </div>
                       </td>
+
                       <td className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 lg:py-4">
-                        <BadgeIcono 
+                        <BadgeIcono
                           entidad={tipoToEntidad[unidad.tipo] || 'PATRULLA'}
                           texto={unidad.tipo === 'patrulla' ? 'Patrulla' : 'Ambulancia'}
                           size={12}
                         />
                       </td>
+
                       <td className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 lg:py-4">
-                        <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs whitespace-nowrap ${
-                          unidad.estado === 'disponible' ? 'bg-green-100 text-green-700' :
-                          unidad.estado === 'ocupada' ? 'bg-red-100 text-red-700' :
-                          'bg-gray-100 text-gray-700'
-                        }`}>
+                        <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs whitespace-nowrap ${unidad.estado === 'disponible' ? 'bg-green-100 text-green-700' :
+                            unidad.estado === 'ocupada' ? 'bg-red-100 text-red-700' :
+                              'bg-gray-100 text-gray-700'
+                          }`}>
                           {capitalizar(unidad.estado)}
                         </span>
                       </td>
+
                       <td className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 lg:py-4">
                         <div className="flex items-center gap-1">
                           <Users size={12} className="text-gray-400" />
@@ -670,20 +698,21 @@ const UnidadesList = () => {
                           </span>
                         </div>
                       </td>
+
                       <td className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 lg:py-4 text-right">
                         <div className="flex items-center justify-end gap-1 sm:gap-1.5 lg:gap-2">
                           {puedeGestionarUnidad(unidad) && (
                             <button
                               onClick={() => handleToggleActivo(unidad.id, unidad.codigo, unidad)}
                               disabled={actionLoading}
-                              className={`p-1 rounded-lg transition-colors ${
-                                unidad.activa ? 'hover:bg-yellow-50 text-yellow-600' : 'hover:bg-green-50 text-green-600'
-                              } disabled:opacity-50`}
+                              className={`p-1 rounded-lg transition-colors ${unidad.activa ? 'hover:bg-yellow-50 text-yellow-600' : 'hover:bg-green-50 text-green-600'
+                                } disabled:opacity-50`}
                               title={unidad.activa ? 'Desactivar' : 'Activar'}
                             >
                               <Power size={14} className="sm:w-4 sm:h-4" />
                             </button>
                           )}
+
                           <button
                             onClick={() => handleVerDetalle(unidad.id)}
                             className="p-1 hover:bg-gray-100 rounded-lg"
@@ -691,6 +720,7 @@ const UnidadesList = () => {
                           >
                             <Eye size={14} className="text-gray-500" />
                           </button>
+
                           {puedeGestionarUnidad(unidad) && (
                             <button
                               onClick={() => handleEditar(unidad.id, unidad)}
@@ -700,6 +730,7 @@ const UnidadesList = () => {
                               <Edit size={14} className="text-gray-500" />
                             </button>
                           )}
+
                           {puedeEliminarUnidad(unidad) && (
                             <button
                               onClick={() => handleEliminar(unidad.id, unidad.codigo, unidad)}
@@ -721,27 +752,25 @@ const UnidadesList = () => {
             {/* Paginación */}
             <div className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 border-t flex flex-col xs:flex-row items-center justify-between gap-3">
               <p className="text-xs sm:text-sm text-gray-500 text-center xs:text-left">
-                Mostrando <span className="font-medium">
-                  {paginacion.total > 0 ? ((paginacion.pagina - 1) * paginacion.limite) + 1 : 0}
-                </span> a{' '}
-                <span className="font-medium">{Math.min(paginacion.pagina * paginacion.limite, paginacion.total)}</span>{' '}
+                Mostrando <span className="font-medium">{inicio}</span> a{' '}
+                <span className="font-medium">{fin}</span>{' '}
                 de <span className="font-medium">{paginacion.total}</span> registros
               </p>
               <div className="flex items-center gap-1 sm:gap-2">
                 <button
-                  onClick={() => setFiltros(prev => ({ ...prev, pagina: prev.pagina - 1 }))}
-                  disabled={paginacion.pagina === 1 || actionLoading}
-                  className="px-2 sm:px-3 py-1 text-xs sm:text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                  onClick={() => setFiltros(prev => ({ ...prev, pagina: Math.max(1, prev.pagina - 1) }))}
+                  disabled={paginacion.pagina === 1 || actionLoading || loading}
+                  className="px-2 sm:px-3 py-1 text-xs sm:text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   Anterior
                 </button>
                 <span className="px-2 sm:px-3 py-1 text-xs sm:text-sm text-gray-600">
-                  {paginacion.pagina} / {paginacion.total_paginas}
+                  {paginacion.pagina} / {Math.max(1, paginacion.total_paginas)}
                 </span>
                 <button
-                  onClick={() => setFiltros(prev => ({ ...prev, pagina: prev.pagina + 1 }))}
-                  disabled={paginacion.pagina === paginacion.total_paginas || actionLoading}
-                  className="px-2 sm:px-3 py-1 text-xs sm:text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                  onClick={() => setFiltros(prev => ({ ...prev, pagina: Math.min(paginacion.total_paginas, prev.pagina + 1) }))}
+                  disabled={paginacion.pagina >= paginacion.total_paginas || actionLoading || loading || paginacion.total === 0}
+                  className="px-2 sm:px-3 py-1 text-xs sm:text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   Siguiente
                 </button>
@@ -753,5 +782,6 @@ const UnidadesList = () => {
     </div>
   );
 };
+
 
 export default UnidadesList;

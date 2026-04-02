@@ -8,7 +8,8 @@ class ReasignacionService {
       console.log("📡 Obteniendo alertas pendientes de reasignación...");
       
       const params = new URLSearchParams();
-      if (filtros.tipo) params.append('tipo', filtros.tipo);
+      // ✅ CORREGIDO: El backend espera 'minutos', no 'tipo'
+      if (filtros.minutos) params.append('minutos', filtros.minutos);
       
       const url = `${ENDPOINTS.REASIGNACIONES.PENDIENTES}?${params.toString()}`;
       

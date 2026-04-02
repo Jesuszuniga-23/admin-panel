@@ -64,14 +64,18 @@ const rolTexto = {
   operador_general: 'Operador General'
 };
 
-// Roles disponibles según el rol del usuario
+// ✅ CORRECCIÓN #1: Roles disponibles según el rol del usuario
+// Operadores pueden crear personal a su mando (policías para operador_policial, paramédicos para operador_medico)
 const rolesDisponiblesPorUsuario = {
   admin: ['admin', 'operador_tecnico', 'operador_general'],
-  superadmin: ['policia', 'paramedico', 'admin', 'superadmin', 'operador_tecnico', 'operador_policial', 'operador_medico', 'operador_general'],
-  operador_policial: ['policia'],
-  operador_medico: ['paramedico'],
-  operador_tecnico: [],
-  operador_general: []
+  superadmin: [
+    'policia', 'paramedico', 'admin', 'superadmin', 
+    'operador_tecnico', 'operador_policial', 'operador_medico', 'operador_general'
+  ],
+  operador_policial: ['policia'],      // ✅ Puede crear policías
+  operador_medico: ['paramedico'],     // ✅ Puede crear paramédicos
+  operador_tecnico: [],                // No puede crear personal
+  operador_general: []                 // No puede crear personal
 };
 
 // Función para corregir caracteres mal codificados
@@ -549,11 +553,14 @@ const PersonalForm = () => {
       setErrors(prev => ({ ...prev, [name]: error }));
       verificarDuplicado(name, value);
     }
+    // ✅ CORRECCIÓN #2: Mejorar lógica de activación/desactivación
     else if (name === 'activo') {
       if (!checked) {
+        // Al desactivar, también marcar como no disponible
         setFormData(prev => ({ ...prev, activo: false, disponible: false }));
       } else {
-        setFormData(prev => ({ ...prev, activo: true }));
+        // Al activar, restaurar disponible a true (por defecto)
+        setFormData(prev => ({ ...prev, activo: true, disponible: true }));
       }
     }
     else if (name === 'disponible' && formData.activo) {
@@ -604,6 +611,7 @@ const PersonalForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    // ✅ Verificar permisos según el rol que se quiere crear
     if (!isEditing && !authService.puedeCrearPersonal(formData.rol)) {
       toast.error(`No tienes permisos para crear personal con rol: ${rolTexto[formData.rol] || formData.rol}`);
       return;

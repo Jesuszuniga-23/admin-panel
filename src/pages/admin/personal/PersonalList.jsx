@@ -54,10 +54,9 @@ const formatearNombreCompleto = (persona) => {
     .join(' ');
 };
 
-// ✅ FUNCIÓN CON ICONOS SEGÚN ROL
+// Función con iconos según rol
 const getIconoPorRol = (rol, size = 18) => {
   const iconos = {
-    // Operadores
     operador_policial: { 
       icon: ShieldUser, 
       color: 'text-blue-600', 
@@ -82,7 +81,6 @@ const getIconoPorRol = (rol, size = 18) => {
       bg: 'bg-gray-100',
       nombre: 'Operador General'
     },
-    // Administrativos
     admin: { 
       icon: Crown, 
       color: 'text-indigo-600', 
@@ -95,7 +93,6 @@ const getIconoPorRol = (rol, size = 18) => {
       bg: 'bg-amber-100',
       nombre: 'Super Administrador'
     },
-    // Personal operativo
     policia: { 
       icon: ShieldCheck, 
       color: 'text-blue-600', 
@@ -130,22 +127,6 @@ const getIconoPorRol = (rol, size = 18) => {
   };
 };
 
-// ✅ COMPONENTE BADGE CON ICONO (para la celda "Rol")
-const BadgeRolConIcono = ({ rol, texto, size = 12 }) => {
-  const iconoConfig = getIconoPorRol(rol, 12);
-  
-  if (!iconoConfig.esIcono) {
-    return <BadgeIcono entidad={rolToEntidad[rol] || 'ADMIN'} texto={texto} size={size} />;
-  }
-  
-  return (
-    <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${iconoConfig.bgColor} ${iconoConfig.color.replace('text-', '')}`}>
-      {iconoConfig.contenido}
-      <span className={iconoConfig.color}>{texto}</span>
-    </span>
-  );
-};
-
 // Mapeo de roles a entidades para badges (fallback)
 const rolToEntidad = {
   admin: 'ADMIN',
@@ -177,6 +158,7 @@ const PersonalList = () => {
   const puedeEditarPersonal = (rol) => authService.puedeEditarPersonal(rol);
   const puedeEliminarPersonal = (rol) => authService.puedeEliminarPersonal(rol);
   
+  // ✅ CORRECCIÓN #2: Función puedeCrearPersonal mejorada
   const puedeCrearPersonal = () => {
     const currentUserRol = authService.getCurrentUser()?.rol;
     if (currentUserRol === 'superadmin') return true;
@@ -230,6 +212,7 @@ const PersonalList = () => {
     });
   }, [filtros.search, filtros.rol, filtros.activo, filtros.disponible]);
 
+  // ✅ CORRECCIÓN #1: Enviar filtro de seguridad como filtroRol
   const cargarPersonal = useCallback(async () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -239,12 +222,17 @@ const PersonalList = () => {
     abortControllerRef.current = new AbortController();
     setLoading(true);
     try {
-      const params = { signal: abortControllerRef.current.signal };
+      const params = { 
+        signal: abortControllerRef.current.signal,
+        limite: 1000
+      };
+      
+      // ✅ Enviar filtro de seguridad como filtroRol (el backend lo aplica con prioridad)
       if (rolPersonalPermitido) {
-        params.rol = rolPersonalPermitido;
+        params.filtroRol = { rol: rolPersonalPermitido };
       }
       
-      const response = await personalService.listarPersonal({ limite: 1000, ...params });
+      const response = await personalService.listarPersonal(params);
       
       const personalFormateado = (response.data || []).map(p => {
         const nombreCompleto = formatearNombreCompleto(p);
@@ -480,6 +468,7 @@ const PersonalList = () => {
               )}
             </div>
 
+            {/* ✅ CORRECCIÓN #3: Select de roles con todos los roles del sistema */}
             <select
               value={filtros.rol}
               onChange={(e) => setFiltros(prev => ({ ...prev, rol: e.target.value, pagina: 1 }))}
@@ -491,6 +480,10 @@ const PersonalList = () => {
               <option value="superadmin">Superadmin</option>
               <option value="policia">Policía</option>
               <option value="paramedico">Paramédico</option>
+              <option value="operador_policial">Operador Policial</option>
+              <option value="operador_medico">Operador Médico</option>
+              <option value="operador_tecnico">Operador Técnico</option>
+              <option value="operador_general">Operador General</option>
             </select>
 
             <select
@@ -567,7 +560,6 @@ const PersonalList = () => {
                   <tbody className="divide-y">
                     {personal.map((persona) => {
                       const iconoConfig = getIconoPorRol(persona.rol);
-                      // Texto legible para el rol
                       const textoRol = 
                         persona.rol === 'policia' ? 'Policía' :
                         persona.rol === 'paramedico' ? 'Paramédico' :
@@ -613,7 +605,6 @@ const PersonalList = () => {
                               )}
                             </div>
                           </td>
-                          {/* ✅ CELDA "ROL" CON EL MISMO ICONO QUE LA CELDA "PERSONAL" */}
                           <td className="px-4 py-3">
                             <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${iconoConfig.bgColor}`}>
                               {iconoConfig.esIcono && iconoConfig.contenido}

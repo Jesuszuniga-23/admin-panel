@@ -1,4 +1,5 @@
 import axiosInstance from '../api/axiosConfig';
+import { ENDPOINTS } from '../api/endpoints';
 import personalService from './personal.service';
 import unidadService from './unidad.service';
 import alertasService from './alertas.service';
@@ -10,7 +11,7 @@ class DashboardService {
   // ✅ Obtener dashboard completo en UNA sola petición
   async obtenerDashboardCompleto(options = {}) {
     try {
-      const response = await axiosInstance.get('/admin/dashboard/completo', {
+      const response = await axiosInstance.get(ENDPOINTS.DASHBOARD.COMPLETO, {
         signal: options.signal
       });
       return response.data;
@@ -49,11 +50,11 @@ class DashboardService {
       ] = await Promise.allSettled([
         personalService.listarPersonal({ limite: 1000, ...personalParams, ...filtros, signal }),
         unidadService.listarUnidades({ limite: 1000, ...unidadParams, ...filtros, signal }),
-        alertasService.obtenerExpiradas({ limite: 1000, ...alertasParams, ...filtros, signal }),
-        alertasService.obtenerCerradasManual({ limite: 1000, ...alertasParams, ...filtros, signal }),
-        alertasPanelService.obtenerActivas({ limite: 1000, ...alertasParams, ...filtros, signal }),
-        alertasPanelService.obtenerEnProceso({ limite: 1000, ...alertasParams, ...filtros, signal }),
-        alertasPanelService.obtenerCerradas({ limite: 1000, ...alertasParams, ...filtros, signal })
+        alertasService.listarExpiradas({ limite: 1000, ...alertasParams, ...filtros, signal }), // ✅ CORREGIDO
+        alertasService.listarCerradasManual({ limite: 1000, ...alertasParams, ...filtros, signal }), // ✅ CORREGIDO
+        alertasPanelService.listarActivas({ limite: 1000, ...alertasParams, ...filtros, signal }), // ✅ CORREGIDO
+        alertasPanelService.listarEnProceso({ limite: 1000, ...alertasParams, ...filtros, signal }), // ✅ CORREGIDO
+        alertasPanelService.listarCerradas({ limite: 1000, ...alertasParams, ...filtros, signal }) // ✅ CORREGIDO
       ]);
 
       const personalData = personalRes.status === 'fulfilled' ? personalRes.value.data || [] : [];
@@ -184,8 +185,8 @@ class DashboardService {
       const signal = options.signal;
       
       const [expiradasRes, cerradasRes] = await Promise.allSettled([
-        alertasService.obtenerExpiradas({ limite: 500, ...alertasParams, ...filtros, signal }),
-        alertasService.obtenerCerradasManual({ limite: 500, ...alertasParams, ...filtros, signal })
+        alertasService.listarExpiradas({ limite: 500, ...alertasParams, ...filtros, signal }), // ✅ CORREGIDO
+        alertasService.listarCerradasManual({ limite: 500, ...alertasParams, ...filtros, signal }) // ✅ CORREGIDO
       ]);
 
       const expiradas = expiradasRes.status === 'fulfilled' ? expiradasRes.value.data || [] : [];
@@ -239,8 +240,8 @@ class DashboardService {
       const [personalRes, unidadesRes, alertasActivasRes, alertasProcesoRes] = await Promise.allSettled([
         personalService.listarPersonal({ limite: 5, orden: 'DESC', ordenarPor: 'creado_en', ...personalParams, ...filtros, signal }),
         unidadService.listarUnidades({ limite: 5, orden: 'DESC', ordenarPor: 'creado_en', ...unidadParams, ...filtros, signal }),
-        alertasPanelService.obtenerActivas({ limite: 3, ...alertasParams, ...filtros, signal }),
-        alertasPanelService.obtenerEnProceso({ limite: 3, ...alertasParams, ...filtros, signal })
+        alertasPanelService.listarActivas({ limite: 3, ...alertasParams, ...filtros, signal }), // ✅ CORREGIDO
+        alertasPanelService.listarEnProceso({ limite: 3, ...alertasParams, ...filtros, signal }) // ✅ CORREGIDO
       ]);
 
       const personalReciente = personalRes.status === 'fulfilled' ? personalRes.value.data || [] : [];
