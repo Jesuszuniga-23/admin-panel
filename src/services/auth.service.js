@@ -309,28 +309,29 @@ class AuthService {
   }
   
   puedeEliminarPersonal(rolPersonal) {
-    const user = this.getCurrentUser();
-    if (!user) return false;
-    
-    const rolUsuario = user.rol;
-    
-    // ✅ CORREGIDO: Superadmin no puede eliminarse a sí mismo
-    if (rolUsuario === 'superadmin') {
-      return rolPersonal !== 'superadmin';
-    }
-    
-    // ✅ CORREGIDO: Admin puede eliminar cualquier rol excepto superadmin y admin
-    if (rolUsuario === 'admin') {
-      return rolPersonal !== 'superadmin' && rolPersonal !== 'admin';
-    }
-    
-    if (rolUsuario === 'operador_policial') return rolPersonal === 'policia';
-    if (rolUsuario === 'operador_medico') return rolPersonal === 'paramedico';
-    if (rolUsuario === 'operador_tecnico') return false;
-    if (rolUsuario === 'operador_general') return false;
-    
-    return false;
+  const user = this.getCurrentUser();
+  if (!user) return false;
+  
+  const rolUsuario = user.rol;
+  
+  // Superadmin puede eliminar cualquier rol EXCEPTO a sí mismo
+  if (rolUsuario === 'superadmin') {
+    return rolPersonal !== 'superadmin';
   }
+  
+  // ✅ CORREGIDO: Admin puede eliminar otros admins
+  if (rolUsuario === 'admin') {
+    // Solo no puede eliminar superadmin
+    return rolPersonal !== 'superadmin';
+  }
+  
+  if (rolUsuario === 'operador_policial') return rolPersonal === 'policia';
+  if (rolUsuario === 'operador_medico') return rolPersonal === 'paramedico';
+  if (rolUsuario === 'operador_tecnico') return false;
+  if (rolUsuario === 'operador_general') return false;
+  
+  return false;
+}
   
   puedeEditarUnidad(tipoUnidad) {
     const user = this.getCurrentUser();
