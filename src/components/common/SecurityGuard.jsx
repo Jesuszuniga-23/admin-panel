@@ -33,35 +33,43 @@ const SecurityGuard = () => {
     return recentReportsRef.current.length < REPORT_LIMIT.MAX_REPORTS_PER_MINUTE;
   }, [limpiarReportesAntiguos]);
   
-  // ✅ Enviar lote de reportes
+  // ✅ Enviar lote de reportes - CORREGIDO (deshabilitado)
   const enviarLote = useCallback(async () => {
     if (reportQueueRef.current.length === 0) return;
     
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
+    // ✅ DESHABILITAR ENVÍO DE REPORTES (el endpoint no existe en backend)
+    console.log(`📊 [DEBUG] Reportes en cola (no enviados): ${reportQueueRef.current.length}`);
     
-    abortControllerRef.current = new AbortController();
-    
-    const lote = [...reportQueueRef.current];
+    // Limpiar la cola sin enviar
     reportQueueRef.current = [];
+    return;
     
-    try {
-      await axiosInstance.post('/security/report-batch', {
-        reports: lote
-      }, {
-        signal: abortControllerRef.current.signal
-      });
-      console.log(`📊 ${lote.length} reportes enviados al servidor`);
-    } catch (error) {
-      if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
-        console.debug('Error enviando lote de reportes:', error);
-        if (reportQueueRef.current.length === 0) {
-          reportQueueRef.current = [...lote, ...reportQueueRef.current];
-          scheduleEnvioLote();
-        }
-      }
-    }
+    // ❌ CÓDIGO ORIGINAL COMENTADO (causaba el error 404)
+    // if (abortControllerRef.current) {
+    //   abortControllerRef.current.abort();
+    // }
+    // 
+    // abortControllerRef.current = new AbortController();
+    // 
+    // const lote = [...reportQueueRef.current];
+    // reportQueueRef.current = [];
+    // 
+    // try {
+    //   await axiosInstance.post('/security/report-batch', {
+    //     reports: lote
+    //   }, {
+    //     signal: abortControllerRef.current.signal
+    //   });
+    //   console.log(`📊 ${lote.length} reportes enviados al servidor`);
+    // } catch (error) {
+    //   if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
+    //     console.debug('Error enviando lote de reportes:', error);
+    //     if (reportQueueRef.current.length === 0) {
+    //       reportQueueRef.current = [...lote, ...reportQueueRef.current];
+    //       scheduleEnvioLote();
+    //     }
+    //   }
+    // }
   }, []);
   
   // ✅ Programar envío de lote
@@ -185,17 +193,17 @@ const SecurityGuard = () => {
       }
       
       // 🔓 F12 DESBLOQUEADO PARA DEPURACIÓN
-       if (e.key === 'F12') {
-         e.preventDefault();
+      if (e.key === 'F12') {
+        e.preventDefault();
         return false;
-       }
+      }
       
       // 🔓 Ctrl+Shift+I DESBLOQUEADO PARA DEPURACIÓN
-       if ((e.ctrlKey && e.shiftKey && e.key === 'I') ||
+      if ((e.ctrlKey && e.shiftKey && e.key === 'I') ||
           (e.metaKey && e.shiftKey && e.key === 'I')) {
         e.preventDefault();
         return false;
-       }
+      }
     };
     document.addEventListener('keydown', handleKeyDown);
     
