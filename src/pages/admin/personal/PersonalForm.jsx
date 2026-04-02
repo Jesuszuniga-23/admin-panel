@@ -64,25 +64,27 @@ const rolTexto = {
   operador_general: 'Operador General'
 };
 
-// ✅ CORRECCIÓN #1: Roles disponibles según el rol del usuario
-// Operadores pueden crear personal a su mando (policías para operador_policial, paramédicos para operador_medico)
+// ✅ CORRECCIÓN: Roles disponibles según el rol del usuario
 const rolesDisponiblesPorUsuario = {
   admin: [
-    'admin',                          // ✅ Puede crear admins
-    'operador_tecnico',               // ✅ Puede crear operadores técnicos
-    'operador_general',               // ✅ Puede crear operadores generales
-    'operador_policial',              // ✅ NUEVO: Puede crear operadores policiales
-    'operador_medico',                // ✅ NUEVO: Puede crear operadores médicos
-    'policia',                        // ✅ NUEVO: Puede crear policías
-    'paramedico'                      // ✅ NUEVO: Puede crear paramédicos
-  ], superadmin: [
+    'admin',                          // Administradores
+    'operador_tecnico',               // Operadores técnicos
+    'operador_general',               // Operadores generales
+    'operador_policial',              // Operadores policiales
+    'operador_medico',                // Operadores médicos
+    'policia',                        // Policías de campo
+    'paramedico'                      // Paramédicos de campo
+  ],
+  superadmin: [
     'policia', 'paramedico', 'admin', 'superadmin',
     'operador_tecnico', 'operador_policial', 'operador_medico', 'operador_general'
   ],
-  operador_policial: ['policia'],      // ✅ Puede crear policías
-  operador_medico: ['paramedico'],     // ✅ Puede crear paramédicos
-  operador_tecnico: [],                // No puede crear personal
-  operador_general: []                 // No puede crear personal
+  // ✅ CORREGIDO: Operador policial puede crear policías Y operadores policiales
+  operador_policial: ['policia', 'operador_policial'],
+  // ✅ CORREGIDO: Operador médico puede crear paramédicos Y operadores médicos
+  operador_medico: ['paramedico', 'operador_medico'],
+  operador_tecnico: [],
+  operador_general: []
 };
 
 // Función para corregir caracteres mal codificados
@@ -560,13 +562,10 @@ const PersonalForm = () => {
       setErrors(prev => ({ ...prev, [name]: error }));
       verificarDuplicado(name, value);
     }
-    // ✅ CORRECCIÓN #2: Mejorar lógica de activación/desactivación
     else if (name === 'activo') {
       if (!checked) {
-        // Al desactivar, también marcar como no disponible
         setFormData(prev => ({ ...prev, activo: false, disponible: false }));
       } else {
-        // Al activar, restaurar disponible a true (por defecto)
         setFormData(prev => ({ ...prev, activo: true, disponible: true }));
       }
     }
@@ -618,7 +617,6 @@ const PersonalForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // ✅ Verificar permisos según el rol que se quiere crear
     if (!isEditing && !authService.puedeCrearPersonal(formData.rol)) {
       toast.error(`No tienes permisos para crear personal con rol: ${rolTexto[formData.rol] || formData.rol}`);
       return;

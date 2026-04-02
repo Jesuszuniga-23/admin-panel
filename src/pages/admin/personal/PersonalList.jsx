@@ -158,13 +158,20 @@ const PersonalList = () => {
   const puedeEditarPersonal = (rol) => authService.puedeEditarPersonal(rol);
   const puedeEliminarPersonal = (rol) => authService.puedeEliminarPersonal(rol);
   
-  // ✅ CORRECCIÓN #2: Función puedeCrearPersonal mejorada
+  // ✅ CORREGIDO: Función puedeCrearPersonal usando authService
   const puedeCrearPersonal = () => {
-    const currentUserRol = authService.getCurrentUser()?.rol;
-    if (currentUserRol === 'superadmin') return true;
-    if (currentUserRol === 'admin') return true;
-    if (currentUserRol === 'operador_policial') return true;
-    if (currentUserRol === 'operador_medico') return true;
+    const user = authService.getCurrentUser();
+    if (!user) return false;
+    
+    const rolUsuario = user.rol;
+    
+    // Superadmin y admin siempre pueden crear personal
+    if (rolUsuario === 'superadmin' || rolUsuario === 'admin') return true;
+    
+    // Operadores pueden crear personal de su propio tipo
+    if (rolUsuario === 'operador_policial') return true;
+    if (rolUsuario === 'operador_medico') return true;
+    
     return false;
   };
   
@@ -212,7 +219,7 @@ const PersonalList = () => {
     });
   }, [filtros.search, filtros.rol, filtros.activo, filtros.disponible]);
 
-  // ✅ CORRECCIÓN #1: Enviar filtro de seguridad como filtroRol
+  // ✅ CORRECCIÓN: Enviar filtro de seguridad como filtroRol
   const cargarPersonal = useCallback(async () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -468,7 +475,7 @@ const PersonalList = () => {
               )}
             </div>
 
-            {/* ✅ CORRECCIÓN #3: Select de roles con todos los roles del sistema */}
+            {/* Select de roles - todos los roles disponibles para filtro visual */}
             <select
               value={filtros.rol}
               onChange={(e) => setFiltros(prev => ({ ...prev, rol: e.target.value, pagina: 1 }))}

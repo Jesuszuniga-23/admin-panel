@@ -105,37 +105,37 @@ class AuthService {
   }
 
   async logout(navigate = null) {
-  try {
-    await axiosInstance.post(ENDPOINTS.AUTH.LOGOUT);
-  } catch (error) {
-    console.error("Error en logout API:", error);
-  } finally {
-    this.#currentUser = null;
-    localStorage.removeItem('user');
-    localStorage.removeItem('auth_timestamp');
-    localStorage.removeItem('auth-storage');
-    localStorage.removeItem('pending_2fa_token');
-    
-    // ✅ LIMPIAR TODA LA CACHÉ DEL DASHBOARD
-    const keysToRemove = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && (key.startsWith('dashboard_cache_') || key.startsWith('dashboard_cache_time_'))) {
-        keysToRemove.push(key);
+    try {
+      await axiosInstance.post(ENDPOINTS.AUTH.LOGOUT);
+    } catch (error) {
+      console.error("Error en logout API:", error);
+    } finally {
+      this.#currentUser = null;
+      localStorage.removeItem('user');
+      localStorage.removeItem('auth_timestamp');
+      localStorage.removeItem('auth-storage');
+      localStorage.removeItem('pending_2fa_token');
+      
+      // ✅ LIMPIAR TODA LA CACHÉ DEL DASHBOARD
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('dashboard_cache_') || key.startsWith('dashboard_cache_time_'))) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+      console.log(`🧹 Limpiadas ${keysToRemove.length} entradas de caché del dashboard`);
+      
+      sessionStorage.clear();
+      
+      if (navigate && typeof navigate === 'function') {
+        navigate('/login', { replace: true });
+      } else {
+        window.location.href = '/login';
       }
     }
-    keysToRemove.forEach(key => localStorage.removeItem(key));
-    console.log(`🧹 Limpiadas ${keysToRemove.length} entradas de caché del dashboard`);
-    
-    sessionStorage.clear();
-    
-    if (navigate && typeof navigate === 'function') {
-      navigate('/login', { replace: true });
-    } else {
-      window.location.href = '/login';
-    }
   }
-}
 
   async checkSession(options = {}) {
     try {
@@ -265,8 +265,10 @@ class AuthService {
         'policia',            // Policías de campo
         'paramedico'          // Paramédicos de campo
       ],
-      operador_policial: ['policia'],
-      operador_medico: ['paramedico'],
+      // ✅ CORREGIDO: Operador policial puede crear policías Y operadores policiales
+      operador_policial: ['policia', 'operador_policial'],
+      // ✅ CORREGIDO: Operador médico puede crear paramédicos Y operadores médicos
+      operador_medico: ['paramedico', 'operador_medico'],
       operador_tecnico: [],
       operador_general: []
     };
@@ -288,7 +290,7 @@ class AuthService {
     
     const permisos = {
       superadmin: true,
-      admin: true,  // ✅ CORREGIDO: Admin SÍ puede crear unidades
+      admin: true,
       operador_policial: tipoUnidad === 'patrulla',
       operador_medico: tipoUnidad === 'ambulancia',
       operador_tecnico: true,
@@ -307,13 +309,20 @@ class AuthService {
     
     if (rolUsuario === 'superadmin') return true;
     
-    // ✅ CORREGIDO: Admin puede editar cualquier rol excepto superadmin
     if (rolUsuario === 'admin') {
       return rolPersonal !== 'superadmin';
     }
     
-    if (rolUsuario === 'operador_policial') return rolPersonal === 'policia';
-    if (rolUsuario === 'operador_medico') return rolPersonal === 'paramedico';
+    // ✅ CORREGIDO: Operador policial puede editar policías Y operadores policiales
+    if (rolUsuario === 'operador_policial') {
+      return rolPersonal === 'policia' || rolPersonal === 'operador_policial';
+    }
+    
+    // ✅ CORREGIDO: Operador médico puede editar paramédicos Y operadores médicos
+    if (rolUsuario === 'operador_medico') {
+      return rolPersonal === 'paramedico' || rolPersonal === 'operador_medico';
+    }
+    
     if (rolUsuario === 'operador_tecnico') return false;
     if (rolUsuario === 'operador_general') return false;
     
@@ -321,29 +330,34 @@ class AuthService {
   }
   
   puedeEliminarPersonal(rolPersonal) {
-  const user = this.getCurrentUser();
-  if (!user) return false;
-  
-  const rolUsuario = user.rol;
-  
-  // Superadmin puede eliminar cualquier rol EXCEPTO a sí mismo
-  if (rolUsuario === 'superadmin') {
-    return rolPersonal !== 'superadmin';
+    const user = this.getCurrentUser();
+    if (!user) return false;
+    
+    const rolUsuario = user.rol;
+    
+    if (rolUsuario === 'superadmin') {
+      return rolPersonal !== 'superadmin';
+    }
+    
+    if (rolUsuario === 'admin') {
+      return rolPersonal !== 'superadmin';
+    }
+    
+    // ✅ CORREGIDO: Operador policial puede eliminar policías Y operadores policiales
+    if (rolUsuario === 'operador_policial') {
+      return rolPersonal === 'policia' || rolPersonal === 'operador_policial';
+    }
+    
+    // ✅ CORREGIDO: Operador médico puede eliminar paramédicos Y operadores médicos
+    if (rolUsuario === 'operador_medico') {
+      return rolPersonal === 'paramedico' || rolPersonal === 'operador_medico';
+    }
+    
+    if (rolUsuario === 'operador_tecnico') return false;
+    if (rolUsuario === 'operador_general') return false;
+    
+    return false;
   }
-  
-  // ✅ CORREGIDO: Admin puede eliminar otros admins
-  if (rolUsuario === 'admin') {
-    // Solo no puede eliminar superadmin
-    return rolPersonal !== 'superadmin';
-  }
-  
-  if (rolUsuario === 'operador_policial') return rolPersonal === 'policia';
-  if (rolUsuario === 'operador_medico') return rolPersonal === 'paramedico';
-  if (rolUsuario === 'operador_tecnico') return false;
-  if (rolUsuario === 'operador_general') return false;
-  
-  return false;
-}
   
   puedeEditarUnidad(tipoUnidad) {
     const user = this.getCurrentUser();
@@ -357,7 +371,7 @@ class AuthService {
     }
     
     if (rolUsuario === 'superadmin') return true;
-    if (rolUsuario === 'admin') return true;  // ✅ Admin SÍ puede editar unidades
+    if (rolUsuario === 'admin') return true;
     if (rolUsuario === 'operador_policial') return tipoUnidad === 'patrulla';
     if (rolUsuario === 'operador_medico') return tipoUnidad === 'ambulancia';
     if (rolUsuario === 'operador_tecnico') return true;
