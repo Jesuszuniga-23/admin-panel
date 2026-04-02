@@ -67,9 +67,16 @@ const rolTexto = {
 // ✅ CORRECCIÓN #1: Roles disponibles según el rol del usuario
 // Operadores pueden crear personal a su mando (policías para operador_policial, paramédicos para operador_medico)
 const rolesDisponiblesPorUsuario = {
-  admin: ['admin', 'operador_tecnico', 'operador_general'],
-  superadmin: [
-    'policia', 'paramedico', 'admin', 'superadmin', 
+  admin: [
+    'admin',                          // ✅ Puede crear admins
+    'operador_tecnico',               // ✅ Puede crear operadores técnicos
+    'operador_general',               // ✅ Puede crear operadores generales
+    'operador_policial',              // ✅ NUEVO: Puede crear operadores policiales
+    'operador_medico',                // ✅ NUEVO: Puede crear operadores médicos
+    'policia',                        // ✅ NUEVO: Puede crear policías
+    'paramedico'                      // ✅ NUEVO: Puede crear paramédicos
+  ], superadmin: [
+    'policia', 'paramedico', 'admin', 'superadmin',
     'operador_tecnico', 'operador_policial', 'operador_medico', 'operador_general'
   ],
   operador_policial: ['policia'],      // ✅ Puede crear policías
@@ -81,26 +88,26 @@ const rolesDisponiblesPorUsuario = {
 // Función para corregir caracteres mal codificados
 const corregirTexto = (texto) => {
   if (!texto) return '';
-  
+
   const correcciones = {
     'Ã¡': 'á', 'Ã©': 'é', 'Ã­': 'í', 'Ã³': 'ó', 'Ãº': 'ú',
     'Ã�': 'Á', 'Ã‰': 'É', 'Ã“': 'Ó', 'Ãš': 'Ú', 'Ã‘': 'Ñ',
     'Ã±': 'ñ', 'Â¿': '¿', 'Â¡': '¡',
     '£': 'ú', '¤': 'ñ', '€': 'é', '‚': 'é', '¢': 'ó'
   };
-  
+
   let textoCorregido = texto;
   Object.entries(correcciones).forEach(([de, para]) => {
     textoCorregido = textoCorregido.split(de).join(para);
   });
-  
+
   return textoCorregido;
 };
 
 // Componente de barra de progreso
 const ProgressBar = ({ completed, total }) => {
   const percentage = Math.min(100, Math.round((completed / total) * 100));
-  
+
   return (
     <div className="mb-6 bg-white rounded-xl p-4 shadow-sm border border-gray-200">
       <div className="flex items-center justify-between mb-2">
@@ -113,7 +120,7 @@ const ProgressBar = ({ completed, total }) => {
         </span>
       </div>
       <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-        <div 
+        <div
           className="h-full bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full transition-all duration-500"
           style={{ width: `${percentage}%` }}
         />
@@ -132,12 +139,12 @@ const PersonalForm = () => {
 
   const [loading, setLoading] = useState(false);
   const [cargandoDatos, setCargandoDatos] = useState(isEditing);
-  
+
   const abortControllerRef = useRef(null);
   const abortControllerListaRef = useRef(null);
-  
+
   const rolesPermitidos = rolesDisponiblesPorUsuario[currentUser?.rol] || [];
-  
+
   const [formData, setFormData] = useState(() => {
     const savedData = sessionStorage.getItem(storageKey);
     if (savedData && !isEditing) {
@@ -147,7 +154,7 @@ const PersonalForm = () => {
         console.error('Error parsing saved data:', e);
       }
     }
-    
+
     return {
       nombre: '',
       apellido_paterno: '',
@@ -160,7 +167,7 @@ const PersonalForm = () => {
       activo: true
     };
   });
-  
+
   const [originalFormData, setOriginalFormData] = useState(null);
   const [errors, setErrors] = useState({
     nombre: '',
@@ -170,20 +177,20 @@ const PersonalForm = () => {
     placa: '',
     rol: ''
   });
-  
+
   const [duplicados, setDuplicados] = useState({
     email: null,
     telefono: null,
     placa: null
   });
-  
+
   const [todosPersonales, setTodosPersonales] = useState([]);
   const [touched, setTouched] = useState({});
-  
+
   const [telefonoClicks, setTelefonoClicks] = useState(0);
   const [telefonoBloqueado, setTelefonoBloqueado] = useState(isEditing);
   const [ultimoClickTelefono, setUltimoClickTelefono] = useState(0);
-  
+
   const nombreRef = useRef(null);
   const apellidoPaternoRef = useRef(null);
   const apellidoMaternoRef = useRef(null);
@@ -204,9 +211,9 @@ const PersonalForm = () => {
   // Función para verificar si hay cambios
   const hasUnsavedChanges = () => {
     if (!originalFormData || isEditing) return false;
-    
+
     const camposImportantes = ['nombre', 'apellido_paterno', 'apellido_materno', 'email', 'telefono', 'placa', 'rol', 'activo', 'disponible'];
-    
+
     for (let campo of camposImportantes) {
       if (formData[campo] !== originalFormData[campo]) {
         return true;
@@ -219,8 +226,8 @@ const PersonalForm = () => {
   useEffect(() => {
     const emitUnsavedStatus = () => {
       const hasChanges = hasUnsavedChanges() && !isEditing;
-      const event = new CustomEvent('formUnsavedStatus', { 
-        detail: { 
+      const event = new CustomEvent('formUnsavedStatus', {
+        detail: {
           hasUnsaved: hasChanges,
           isPersonalFormActive: true
         }
@@ -229,7 +236,7 @@ const PersonalForm = () => {
     };
 
     emitUnsavedStatus();
-    
+
     const interval = setInterval(emitUnsavedStatus, 500);
     return () => clearInterval(interval);
   }, [formData, originalFormData, isEditing]);
@@ -237,8 +244,8 @@ const PersonalForm = () => {
   // Limpiar estado cuando el componente se desmonta
   useEffect(() => {
     return () => {
-      const event = new CustomEvent('formUnsavedStatus', { 
-        detail: { 
+      const event = new CustomEvent('formUnsavedStatus', {
+        detail: {
           hasUnsaved: false,
           isPersonalFormActive: false
         }
@@ -271,7 +278,7 @@ const PersonalForm = () => {
 
     window.addEventListener('saveFormProgress', handleSaveProgress);
     window.addEventListener('discardFormProgress', handleDiscardProgress);
-    
+
     return () => {
       window.removeEventListener('saveFormProgress', handleSaveProgress);
       window.removeEventListener('discardFormProgress', handleDiscardProgress);
@@ -303,13 +310,13 @@ const PersonalForm = () => {
       abortControllerListaRef.current.abort();
       console.log('🛑 Petición anterior cancelada en cargarTodosPersonales');
     }
-    
+
     abortControllerListaRef.current = new AbortController();
-    
+
     try {
-      const response = await personalService.listarPersonal({ 
+      const response = await personalService.listarPersonal({
         limite: 1000,
-        signal: abortControllerListaRef.current.signal 
+        signal: abortControllerListaRef.current.signal
       });
       const personalesCorregidos = (response.data || []).map(p => ({
         ...p,
@@ -328,20 +335,20 @@ const PersonalForm = () => {
   // Cargar personal individual con AbortController
   const cargarPersonal = useCallback(async () => {
     if (!id) return;
-    
+
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       console.log('🛑 Petición anterior cancelada en cargarPersonal');
     }
-    
+
     abortControllerRef.current = new AbortController();
-    
+
     setCargandoDatos(true);
     try {
       const response = await personalService.obtenerPersonal(id, {
         signal: abortControllerRef.current.signal
       });
-      
+
       const loadedData = {
         nombre: corregirTexto(response.data.nombre || ''),
         apellido_paterno: corregirTexto(response.data.apellido_paterno || ''),
@@ -353,7 +360,7 @@ const PersonalForm = () => {
         activo: response.data.activo ?? true,
         disponible: response.data.activo ? (response.data.disponible ?? true) : false
       };
-      
+
       setFormData(loadedData);
       setOriginalFormData(JSON.parse(JSON.stringify(loadedData)));
     } catch (error) {
@@ -370,7 +377,7 @@ const PersonalForm = () => {
   // Efectos con limpieza
   useEffect(() => {
     cargarTodosPersonales();
-    
+
     return () => {
       if (abortControllerListaRef.current) {
         abortControllerListaRef.current.abort();
@@ -383,7 +390,7 @@ const PersonalForm = () => {
     if (isEditing) {
       cargarPersonal();
     }
-    
+
     return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -412,30 +419,30 @@ const PersonalForm = () => {
     if (!isEditing) return;
     e.preventDefault();
     if (!telefonoBloqueado) return;
-    
+
     const ahora = Date.now();
-    
+
     if (ahora - ultimoClickTelefono > 2000) {
       setTelefonoClicks(1);
     } else {
       setTelefonoClicks(prev => prev + 1);
     }
     setUltimoClickTelefono(ahora);
-    
+
     if (clickTimeoutRef.current) {
       clearTimeout(clickTimeoutRef.current);
     }
-    
+
     clickTimeoutRef.current = setTimeout(() => {
       setTelefonoClicks(0);
     }, 2000);
-    
+
     const nuevosClicks = (ahora - ultimoClickTelefono > 2000) ? 1 : telefonoClicks + 1;
-    
+
     if (nuevosClicks >= 3) {
       setTelefonoBloqueado(false);
       setTelefonoClicks(0);
-      
+
       setTimeout(() => {
         if (telefonoRef.current) {
           telefonoRef.current.removeAttribute('readOnly');
@@ -447,8 +454,8 @@ const PersonalForm = () => {
 
   const validarCampo = (name, value) => {
     let error = '';
-    
-    switch(name) {
+
+    switch (name) {
       case 'nombre':
         if (!value.trim()) error = 'El nombre es obligatorio';
         else if (value.length < 2) error = 'El nombre debe tener al menos 2 caracteres';
@@ -478,14 +485,14 @@ const PersonalForm = () => {
       setDuplicados(prev => ({ ...prev, [campo]: null }));
       return;
     }
-    
-    const otrosPersonales = todosPersonales.filter(p => 
+
+    const otrosPersonales = todosPersonales.filter(p =>
       (isEditing ? p.id !== parseInt(id) : true) && p.activo === true
     );
-    
+
     let duplicado = null;
-    
-    switch(campo) {
+
+    switch (campo) {
       case 'email':
         duplicado = otrosPersonales.find(p => p.email?.toLowerCase() === valor.toLowerCase());
         break;
@@ -496,7 +503,7 @@ const PersonalForm = () => {
         duplicado = otrosPersonales.find(p => p.placa?.toLowerCase() === valor.toLowerCase());
         break;
     }
-    
+
     setDuplicados(prev => ({
       ...prev,
       [campo]: duplicado ? { existe: true, usuario: duplicado.nombre } : null
@@ -509,20 +516,20 @@ const PersonalForm = () => {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    
+
     if (isEditing) {
       if (name === 'telefono' && telefonoBloqueado) return;
       if ((name === 'placa' || name === 'email' || name === 'rol')) {
         toast.error('Este campo no se puede modificar', {
           duration: 2000,
-          icon: <Lock size={18} className="text-yellow-600" /> 
+          icon: <Lock size={18} className="text-yellow-600" />
         });
         return;
       }
     }
-    
+
     setErrors(prev => ({ ...prev, [name]: '' }));
-    
+
     if (name === 'telefono') {
       const soloNumeros = value.replace(/\D/g, '');
       if (soloNumeros.length <= 10) {
@@ -573,7 +580,7 @@ const PersonalForm = () => {
 
   const calcularProgreso = () => {
     const camposRequeridos = ['nombre', 'apellido_paterno', 'email', 'placa'];
-    const completados = camposRequeridos.filter(campo => 
+    const completados = camposRequeridos.filter(campo =>
       formData[campo] && formData[campo].trim() !== ''
     ).length;
     return completados;
@@ -588,7 +595,7 @@ const PersonalForm = () => {
 
   const isFieldDisabled = (campo) => {
     if (!isEditing) return false;
-    switch(campo) {
+    switch (campo) {
       case 'email': case 'placa': case 'rol': return true;
       case 'telefono': return telefonoBloqueado;
       default: return false;
@@ -610,18 +617,18 @@ const PersonalForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     // ✅ Verificar permisos según el rol que se quiere crear
     if (!isEditing && !authService.puedeCrearPersonal(formData.rol)) {
       toast.error(`No tienes permisos para crear personal con rol: ${rolTexto[formData.rol] || formData.rol}`);
       return;
     }
-    
+
     if (isEditing && !authService.puedeEditarPersonal(formData.rol)) {
       toast.error(`No tienes permisos para editar este personal`);
       return;
     }
-    
+
     const newErrors = {
       nombre: validarCampo('nombre', formData.nombre),
       apellido_paterno: validarCampo('apellido_paterno', formData.apellido_paterno),
@@ -630,9 +637,9 @@ const PersonalForm = () => {
       placa: validarCampo('placa', formData.placa),
       rol: ''
     };
-    
+
     setErrors(newErrors);
-    
+
     const hasErrors = Object.values(newErrors).some(error => error !== '');
     if (hasErrors) {
       if (newErrors.nombre) {
@@ -646,34 +653,34 @@ const PersonalForm = () => {
       } else if (newErrors.placa) {
         placaRef.current?.focus();
       }
-      
+
       toast.error('Por favor, corrige los errores en el formulario');
       return;
     }
-    
+
     if (duplicados.email?.existe && !isEditing) {
       toast.error(`El email ${formData.email} ya está registrado por ${duplicados.email.usuario}`);
       setErrors(prev => ({ ...prev, email: 'Email ya registrado' }));
       emailRef.current?.focus();
       return;
     }
-    
+
     if (duplicados.telefono?.existe) {
       toast.error(`El teléfono ${formData.telefono} ya está registrado por ${duplicados.telefono.usuario}`);
       setErrors(prev => ({ ...prev, telefono: 'Teléfono ya registrado' }));
       telefonoRef.current?.focus();
       return;
     }
-    
+
     if (duplicados.placa?.existe) {
       toast.error(`La placa ${formData.placa} ya está registrada por ${duplicados.placa.usuario}`);
       setErrors(prev => ({ ...prev, placa: 'Placa ya registrada' }));
       placaRef.current?.focus();
       return;
     }
-    
+
     setLoading(true);
-    
+
     try {
       const datosAEnviar = {
         nombre: formData.nombre,
@@ -686,9 +693,9 @@ const PersonalForm = () => {
         activo: formData.activo,
         disponible: formData.disponible
       };
-      
+
       console.log("Enviando datos al back:", datosAEnviar);
-      
+
       if (isEditing) {
         await personalService.actualizarPersonal(id, datosAEnviar);
         toast.success('Personal actualizado correctamente');
@@ -697,7 +704,7 @@ const PersonalForm = () => {
         toast.success('Personal creado correctamente');
         limpiarProgreso();
       }
-      
+
       navigate('/admin/personal');
     } catch (error) {
       console.error('Error guardando personal:', error);
@@ -711,17 +718,17 @@ const PersonalForm = () => {
     if (originalFormData && !isEditing) {
       setOriginalFormData(JSON.parse(JSON.stringify(formData)));
     }
-    
+
     if (!isEditing) limpiarProgreso();
-    
-    const event = new CustomEvent('formUnsavedStatus', { 
-      detail: { 
+
+    const event = new CustomEvent('formUnsavedStatus', {
+      detail: {
         hasUnsaved: false,
         isPersonalFormActive: false
       }
     });
     window.dispatchEvent(event);
-    
+
     navigate('/admin/personal');
   };
 
@@ -761,7 +768,7 @@ const PersonalForm = () => {
               </p>
             </div>
           </div>
-          
+
           {!isEditing && hasUnsavedChanges() && (
             <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
               <AlertTriangle size={14} className="text-amber-600" />
@@ -775,7 +782,7 @@ const PersonalForm = () => {
         {/* Formulario */}
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-200">
           <div className="h-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-600"></div>
-          
+
           <form onSubmit={handleSubmit} className="p-6 md:p-8">
             <div className="space-y-8">
               {/* SECCIÓN 1: Información personal */}
@@ -1038,9 +1045,8 @@ const PersonalForm = () => {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <label className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all cursor-pointer ${
-                    formData.activo ? 'border-blue-200 bg-blue-50 hover:bg-blue-100' : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
-                  }`}>
+                  <label className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all cursor-pointer ${formData.activo ? 'border-blue-200 bg-blue-50 hover:bg-blue-100' : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
+                    }`}>
                     <input
                       type="checkbox"
                       name="activo"
@@ -1056,10 +1062,9 @@ const PersonalForm = () => {
                     </div>
                   </label>
 
-                  <label className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all cursor-pointer ${
-                    !formData.activo ? 'border-gray-200 bg-gray-100 opacity-50 cursor-not-allowed' :
-                    formData.disponible ? 'border-blue-200 bg-blue-50 hover:bg-blue-100' : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
-                  }`}>
+                  <label className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all cursor-pointer ${!formData.activo ? 'border-gray-200 bg-gray-100 opacity-50 cursor-not-allowed' :
+                      formData.disponible ? 'border-blue-200 bg-blue-50 hover:bg-blue-100' : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
+                    }`}>
                     <input
                       type="checkbox"
                       name="disponible"

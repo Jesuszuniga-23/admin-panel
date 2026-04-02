@@ -216,7 +216,6 @@ class AuthService {
     return null;
   }
 
-  // ✅ PARA PERSONAL (filtro de lista de personal)
   getRolPersonalPermitido() {
     const user = this.getCurrentUser();
     if (!user) return null;
@@ -225,7 +224,6 @@ class AuthService {
     return null;
   }
 
-  // ✅ PARA UNIDADES (filtro de lista de unidades)
   getTipoUnidadPermitido() {
     const user = this.getCurrentUser();
     if (!user) return null;
@@ -233,6 +231,10 @@ class AuthService {
     if (user.rol === 'operador_medico') return 'ambulancia';
     return null;
   }
+
+  // =====================================================
+  // ✅ FUNCIONES CORREGIDAS
+  // =====================================================
 
   puedeCrearPersonal(rolACrear) {
     const user = this.getCurrentUser();
@@ -242,7 +244,15 @@ class AuthService {
     
     const permisos = {
       superadmin: true,
-      admin: ['admin', 'operador_tecnico', 'operador_general'],
+      admin: [
+        'admin',              // Administradores
+        'operador_tecnico',   // Operadores técnicos
+        'operador_general',   // Operadores generales
+        'operador_policial',  // Operadores policiales
+        'operador_medico',    // Operadores médicos
+        'policia',            // Policías de campo
+        'paramedico'          // Paramédicos de campo
+      ],
       operador_policial: ['policia'],
       operador_medico: ['paramedico'],
       operador_tecnico: [],
@@ -258,15 +268,15 @@ class AuthService {
     if (!user) return false;
     
     const rolUsuario = user.rol;
-    // ✅ Validar que el tipoUnidad sea válido
+    
     if (!['patrulla', 'ambulancia'].includes(tipoUnidad)) {
-        console.warn(`⚠️ Tipo de unidad inválido: ${tipoUnidad}`);
-        return false;
+      console.warn(`⚠️ Tipo de unidad inválido: ${tipoUnidad}`);
+      return false;
     }
     
     const permisos = {
       superadmin: true,
-      admin: false,
+      admin: true,  // ✅ CORREGIDO: Admin SÍ puede crear unidades
       operador_policial: tipoUnidad === 'patrulla',
       operador_medico: tipoUnidad === 'ambulancia',
       operador_tecnico: true,
@@ -274,7 +284,6 @@ class AuthService {
     };
     
     if (rolUsuario === 'superadmin') return true;
-    if (rolUsuario === 'admin') return false;
     return permisos[rolUsuario] || false;
   }
   
@@ -285,18 +294,42 @@ class AuthService {
     const rolUsuario = user.rol;
     
     if (rolUsuario === 'superadmin') return true;
+    
+    // ✅ CORREGIDO: Admin puede editar cualquier rol excepto superadmin
     if (rolUsuario === 'admin') {
-      return rolPersonal !== 'superadmin' && rolPersonal !== 'policia' && rolPersonal !== 'paramedico';
+      return rolPersonal !== 'superadmin';
     }
+    
     if (rolUsuario === 'operador_policial') return rolPersonal === 'policia';
     if (rolUsuario === 'operador_medico') return rolPersonal === 'paramedico';
     if (rolUsuario === 'operador_tecnico') return false;
     if (rolUsuario === 'operador_general') return false;
+    
     return false;
   }
   
   puedeEliminarPersonal(rolPersonal) {
-    return this.puedeEditarPersonal(rolPersonal);
+    const user = this.getCurrentUser();
+    if (!user) return false;
+    
+    const rolUsuario = user.rol;
+    
+    // ✅ CORREGIDO: Superadmin no puede eliminarse a sí mismo
+    if (rolUsuario === 'superadmin') {
+      return rolPersonal !== 'superadmin';
+    }
+    
+    // ✅ CORREGIDO: Admin puede eliminar cualquier rol excepto superadmin y admin
+    if (rolUsuario === 'admin') {
+      return rolPersonal !== 'superadmin' && rolPersonal !== 'admin';
+    }
+    
+    if (rolUsuario === 'operador_policial') return rolPersonal === 'policia';
+    if (rolUsuario === 'operador_medico') return rolPersonal === 'paramedico';
+    if (rolUsuario === 'operador_tecnico') return false;
+    if (rolUsuario === 'operador_general') return false;
+    
+    return false;
   }
   
   puedeEditarUnidad(tipoUnidad) {
@@ -304,17 +337,18 @@ class AuthService {
     if (!user) return false;
     
     const rolUsuario = user.rol;
-    // ✅ Validar que el tipoUnidad sea válido
+    
     if (!['patrulla', 'ambulancia'].includes(tipoUnidad)) {
-        console.warn(`⚠️ Tipo de unidad inválido: ${tipoUnidad}`);
-        return false;
+      console.warn(`⚠️ Tipo de unidad inválido: ${tipoUnidad}`);
+      return false;
     }
     
     if (rolUsuario === 'superadmin') return true;
-    if (rolUsuario === 'admin') return false;
+    if (rolUsuario === 'admin') return true;  // ✅ Admin SÍ puede editar unidades
     if (rolUsuario === 'operador_policial') return tipoUnidad === 'patrulla';
     if (rolUsuario === 'operador_medico') return tipoUnidad === 'ambulancia';
     if (rolUsuario === 'operador_tecnico') return true;
+    
     return false;
   }
   
@@ -334,6 +368,7 @@ class AuthService {
     if (user.rol === 'operador_tecnico') return true;
     if (user.rol === 'operador_policial') return tipoAlerta === 'panico';
     if (user.rol === 'operador_medico') return tipoAlerta === 'medica';
+    
     return false;
   }
 }
