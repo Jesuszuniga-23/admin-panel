@@ -105,25 +105,37 @@ class AuthService {
   }
 
   async logout(navigate = null) {
-    try {
-      await axiosInstance.post(ENDPOINTS.AUTH.LOGOUT);
-    } catch (error) {
-      console.error("Error en logout API:", error);
-    } finally {
-      this.#currentUser = null;
-      localStorage.removeItem('user');
-      localStorage.removeItem('auth_timestamp');
-      localStorage.removeItem('auth-storage');
-      localStorage.removeItem('pending_2fa_token');
-      sessionStorage.clear();
-      
-      if (navigate && typeof navigate === 'function') {
-        navigate('/login', { replace: true });
-      } else {
-        window.location.href = '/login';
+  try {
+    await axiosInstance.post(ENDPOINTS.AUTH.LOGOUT);
+  } catch (error) {
+    console.error("Error en logout API:", error);
+  } finally {
+    this.#currentUser = null;
+    localStorage.removeItem('user');
+    localStorage.removeItem('auth_timestamp');
+    localStorage.removeItem('auth-storage');
+    localStorage.removeItem('pending_2fa_token');
+    
+    // ✅ LIMPIAR TODA LA CACHÉ DEL DASHBOARD
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith('dashboard_cache_') || key.startsWith('dashboard_cache_time_'))) {
+        keysToRemove.push(key);
       }
     }
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+    console.log(`🧹 Limpiadas ${keysToRemove.length} entradas de caché del dashboard`);
+    
+    sessionStorage.clear();
+    
+    if (navigate && typeof navigate === 'function') {
+      navigate('/login', { replace: true });
+    } else {
+      window.location.href = '/login';
+    }
   }
+}
 
   async checkSession(options = {}) {
     try {

@@ -1,10 +1,9 @@
-// src/hooks/useDashboardCache.js
+// src/hooks/useDashboardCache.js - CORREGIDO
 import { useState, useEffect, useCallback, useRef } from 'react';
 import dashboardService from '../services/admin/dashboard.service';
+import useAuthStore from '../store/authStore';
 
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
-const CACHE_KEY = 'dashboard_cache';
-const CACHE_TIME_KEY = 'dashboard_cache_time';
 
 export const useDashboardCache = () => {
   const [data, setData] = useState(null);
@@ -12,10 +11,34 @@ export const useDashboardCache = () => {
   const [error, setError] = useState(null);
   const [cached, setCached] = useState(false);
   
+  // ✅ Obtener usuario actual del store
+  const { user } = useAuthStore();
+  
   // ✅ Ref para mantener el AbortController activo
   const abortControllerRef = useRef(null);
 
+  // ✅ GENERAR CLAVE ÚNICA POR USUARIO (basada en ID y rol)
+  const getCacheKey = useCallback(() => {
+    if (!user?.id) return null;
+    return `dashboard_cache_${user.id}_${user.rol}`;
+  }, [user?.id, user?.rol]);
+  
+  const getCacheTimeKey = useCallback(() => {
+    if (!user?.id) return null;
+    return `dashboard_cache_time_${user.id}_${user.rol}`;
+  }, [user?.id, user?.rol]);
+
   const cargarDatos = useCallback(async (forceRefresh = false) => {
+    // ✅ Si no hay usuario, no hacer nada
+    if (!user?.id) {
+      console.log('⏳ Esperando usuario...');
+      setLoading(false);
+      return;
+    }
+    
+    const cacheKey = getCacheKey();
+    const cacheTimeKey = getCacheTimeKey();
+    
     // ✅ Cancelar petición anterior si existe
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -23,13 +46,14 @@ export const useDashboardCache = () => {
     }
     
     // Verificar caché si no se fuerza recarga
-    if (!forceRefresh) {
+    if (!forceRefresh && cacheKey && cacheTimeKey) {
       try {
-        const cachedData = localStorage.getItem(CACHE_KEY);
-        const cachedTime = localStorage.getItem(CACHE_TIME_KEY);
+        const cachedData = localStorage.getItem(cacheKey);
+        const cachedTime = localStorage.getItem(cacheTimeKey);
         
         if (cachedData && cachedTime && (Date.now() - parseInt(cachedTime)) < CACHE_DURATION) {
           const parsedData = JSON.parse(cachedData);
+          console.log(`📦 Usando caché para usuario ${user.rol} (ID: ${user.id})`);
           setData(parsedData);
           setCached(true);
           setLoading(false);
@@ -38,9 +62,9 @@ export const useDashboardCache = () => {
         }
       } catch (parseError) {
         console.error('Error parsing cached data:', parseError);
-        // ✅ Limpiar caché corrupta
-        localStorage.removeItem(CACHE_KEY);
-        localStorage.removeItem(CACHE_TIME_KEY);
+        // Limpiar caché corrupta
+        if (cacheKey) localStorage.removeItem(cacheKey);
+        if (cacheTimeKey) localStorage.removeItem(cacheTimeKey);
       }
     }
     
@@ -48,26 +72,31 @@ export const useDashboardCache = () => {
     setError(null);
     setCached(false);
     
-    // ✅ Crear nuevo AbortController
+    // Crear nuevo AbortController
     abortControllerRef.current = new AbortController();
     
     try {
+      console.log(`📡 Cargando dashboard para usuario ${user.rol} (ID: ${user.id})...`);
+      
       const response = await dashboardService.obtenerDashboardCompleto({
         signal: abortControllerRef.current.signal
       });
       
       if (response.success && response.data) {
+        console.log(`✅ Dashboard cargado para ${user.rol}: Personal: ${response.data.personal?.total}, Unidades: ${response.data.unidades?.total}`);
         setData(response.data);
-        // Guardar en caché
-        localStorage.setItem(CACHE_KEY, JSON.stringify(response.data));
-        localStorage.setItem(CACHE_TIME_KEY, Date.now().toString());
+        // Guardar en caché con clave específica del usuario
+        if (cacheKey && cacheTimeKey) {
+          localStorage.setItem(cacheKey, JSON.stringify(response.data));
+          localStorage.setItem(cacheTimeKey, Date.now().toString());
+        }
       } else if (response.aborted) {
         console.log('📡 Petición cancelada');
       } else {
         setError(response.error || 'Error al cargar datos');
       }
     } catch (err) {
-      // ✅ Manejar tanto AbortError como ERR_CANCELED
+      // Manejar tanto AbortError como ERR_CANCELED
       if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') {
         console.log('🛑 Petición cancelada');
         return;
@@ -77,22 +106,35 @@ export const useDashboardCache = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user, getCacheKey, getCacheTimeKey]);
 
   const recargar = useCallback(() => {
+    console.log('🔄 Recargando dashboard (force refresh)...');
     return cargarDatos(true);
   }, [cargarDatos]);
 
-  // ✅ Limpiar caché manualmente
+  // ✅ Limpiar caché del usuario actual
   const limpiarCache = useCallback(() => {
-    localStorage.removeItem(CACHE_KEY);
-    localStorage.removeItem(CACHE_TIME_KEY);
-    console.log('🧹 Caché del dashboard limpiada');
-  }, []);
+    const cacheKey = getCacheKey();
+    const cacheTimeKey = getCacheTimeKey();
+    if (cacheKey) localStorage.removeItem(cacheKey);
+    if (cacheTimeKey) localStorage.removeItem(cacheTimeKey);
+    console.log(`🧹 Caché del dashboard limpiada para usuario ${user?.rol} (ID: ${user?.id})`);
+  }, [getCacheKey, getCacheTimeKey, user]);
+
+  // ✅ Limpiar caché al cambiar de usuario (efecto crítico)
+  useEffect(() => {
+    if (user?.id) {
+      console.log(`👤 Usuario cambiado a ${user.rol} (ID: ${user.id}), recargando dashboard...`);
+      cargarDatos(true); // Force refresh al cambiar de usuario
+    }
+  }, [user?.id, user?.rol, cargarDatos]);
 
   // ✅ Cargar datos al montar con limpieza
   useEffect(() => {
-    cargarDatos();
+    if (user?.id) {
+      cargarDatos();
+    }
     
     return () => {
       if (abortControllerRef.current) {
@@ -100,7 +142,7 @@ export const useDashboardCache = () => {
         console.log('🛑 Componente desmontado - petición cancelada');
       }
     };
-  }, [cargarDatos]);
+  }, [cargarDatos, user?.id]);
 
   return {
     data,
@@ -108,16 +150,21 @@ export const useDashboardCache = () => {
     error,
     cached,
     recargar,
-    limpiarCache // ✅ Exponer función para limpiar caché manualmente
+    limpiarCache
   };
 };
 
-// ✅ Versión con múltiples cachés (para diferentes endpoints)
+// =====================================================
+// useMultiCache - CORREGIDO
+// =====================================================
 export const useMultiCache = (cacheConfigs = {}) => {
   const [caches, setCaches] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const abortControllersRef = useRef({});
+  
+  // ✅ Obtener usuario actual
+  const { user } = useAuthStore();
 
   const cargarTodos = useCallback(async (forceRefresh = false) => {
     // Cancelar todas las peticiones anteriores
@@ -131,11 +178,15 @@ export const useMultiCache = (cacheConfigs = {}) => {
     
     const results = {};
     const promises = Object.entries(cacheConfigs).map(async ([key, config]) => {
+      // ✅ Generar clave de caché por usuario
+      const userCacheKey = user?.id ? `${config.cacheKey}_${user.id}_${user.rol}` : config.cacheKey;
+      const userCacheTimeKey = user?.id ? `${config.cacheKey}_time_${user.id}_${user.rol}` : `${config.cacheKey}_time`;
+      
       // Verificar caché
       if (!forceRefresh) {
         try {
-          const cachedData = localStorage.getItem(config.cacheKey);
-          const cachedTime = localStorage.getItem(`${config.cacheKey}_time`);
+          const cachedData = localStorage.getItem(userCacheKey);
+          const cachedTime = localStorage.getItem(userCacheTimeKey);
           
           if (cachedData && cachedTime && (Date.now() - parseInt(cachedTime)) < (config.duration || 5 * 60 * 1000)) {
             results[key] = JSON.parse(cachedData);
@@ -157,9 +208,9 @@ export const useMultiCache = (cacheConfigs = {}) => {
         
         if (response.success) {
           results[key] = response.data;
-          // Guardar en caché
-          localStorage.setItem(config.cacheKey, JSON.stringify(response.data));
-          localStorage.setItem(`${config.cacheKey}_time`, Date.now().toString());
+          // Guardar en caché con clave por usuario
+          localStorage.setItem(userCacheKey, JSON.stringify(response.data));
+          localStorage.setItem(userCacheTimeKey, Date.now().toString());
         } else {
           results[key] = null;
         }
@@ -174,7 +225,7 @@ export const useMultiCache = (cacheConfigs = {}) => {
     await Promise.all(promises);
     setCaches(results);
     setLoading(false);
-  }, [cacheConfigs]);
+  }, [cacheConfigs, user]);
   
   const recargar = useCallback(() => cargarTodos(true), [cargarTodos]);
   
@@ -182,26 +233,34 @@ export const useMultiCache = (cacheConfigs = {}) => {
     if (key) {
       const config = cacheConfigs[key];
       if (config) {
-        localStorage.removeItem(config.cacheKey);
-        localStorage.removeItem(`${config.cacheKey}_time`);
+        const userCacheKey = user?.id ? `${config.cacheKey}_${user.id}_${user.rol}` : config.cacheKey;
+        const userCacheTimeKey = user?.id ? `${config.cacheKey}_time_${user.id}_${user.rol}` : `${config.cacheKey}_time`;
+        localStorage.removeItem(userCacheKey);
+        localStorage.removeItem(userCacheTimeKey);
       }
     } else {
       Object.values(cacheConfigs).forEach(config => {
-        localStorage.removeItem(config.cacheKey);
-        localStorage.removeItem(`${config.cacheKey}_time`);
+        const userCacheKey = user?.id ? `${config.cacheKey}_${user.id}_${user.rol}` : config.cacheKey;
+        const userCacheTimeKey = user?.id ? `${config.cacheKey}_time_${user.id}_${user.rol}` : `${config.cacheKey}_time`;
+        localStorage.removeItem(userCacheKey);
+        localStorage.removeItem(userCacheTimeKey);
       });
     }
-  }, [cacheConfigs]);
+  }, [cacheConfigs, user]);
   
   useEffect(() => {
-    cargarTodos();
+    if (user?.id) {
+      cargarTodos(true); // Force refresh al cambiar usuario
+    } else {
+      cargarTodos();
+    }
     
     return () => {
       Object.values(abortControllersRef.current).forEach(controller => {
         if (controller) controller.abort();
       });
     };
-  }, [cargarTodos]);
+  }, [cargarTodos, user]);
   
   return {
     caches,
@@ -212,7 +271,9 @@ export const useMultiCache = (cacheConfigs = {}) => {
   };
 };
 
-// ✅ Versión con polling automático
+// =====================================================
+// usePollingCache - CORREGIDO
+// =====================================================
 export const usePollingCache = (options = {}) => {
   const { 
     interval = 30000, // 30 segundos por defecto
