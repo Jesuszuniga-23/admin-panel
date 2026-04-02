@@ -98,6 +98,52 @@ const AlertasExpiradas = () => {
     total_paginas: 0
   });
 
+  // ✅ CORRECCIÓN: Mover aplicarFiltrosLocalDirecto ANTES de cargarAlertas
+  const aplicarFiltrosLocalDirecto = useCallback((datos) => {
+    if (!datos || datos.length === 0) return [];
+    
+    let datosFiltrados = [...datos];
+    
+    // ✅ APLICAR FILTRO DE SEGURIDAD LOCAL (doble capa de seguridad)
+    if (tipoAlertaPermitido) {
+      datosFiltrados = datosFiltrados.filter(item => item.tipo === tipoAlertaPermitido);
+    }
+    
+    if (filtros.search && filtros.search.trim() !== '') {
+      const termino = filtros.search.toLowerCase().trim();
+      datosFiltrados = datosFiltrados.filter(item => {
+        const idMatch = item.id?.toString().includes(termino);
+        const tipoMatch = item.tipo?.toLowerCase().includes(termino);
+        const ciudadanoMatch = item.ciudadano?.nombre?.toLowerCase().includes(termino);
+        return idMatch || tipoMatch || ciudadanoMatch;
+      });
+    }
+    
+    if (filtros.desde) {
+      const desdeParts = filtros.desde.split('-');
+      const desde = new Date(parseInt(desdeParts[0]), parseInt(desdeParts[1]) - 1, parseInt(desdeParts[2]), 0, 0, 0, 0);
+      datosFiltrados = datosFiltrados.filter(item => {
+        const fechaCreacion = new Date(item.fecha_creacion);
+        return fechaCreacion >= desde;
+      });
+    }
+    
+    if (filtros.hasta) {
+      const hastaParts = filtros.hasta.split('-');
+      const hasta = new Date(parseInt(hastaParts[0]), parseInt(hastaParts[1]) - 1, parseInt(hastaParts[2]), 23, 59, 59, 999);
+      datosFiltrados = datosFiltrados.filter(item => {
+        const fechaCreacion = new Date(item.fecha_creacion);
+        return fechaCreacion <= hasta;
+      });
+    }
+    
+    const inicio = (filtros.pagina - 1) * filtros.limite;
+    const fin = inicio + filtros.limite;
+    const datosPaginados = datosFiltrados.slice(inicio, fin);
+    
+    return datosPaginados;
+  }, [tipoAlertaPermitido, filtros.search, filtros.desde, filtros.hasta, filtros.pagina, filtros.limite]);
+
   // ✅ CORRECCIÓN #1: Usar tipoFiltro para filtro de seguridad
   const cargarAlertas = useCallback(async () => {
     if (abortControllerRef.current) {
@@ -158,52 +204,6 @@ const AlertasExpiradas = () => {
       setCargando(false);
     }
   }, [tipoAlertaPermitido, filtros.pagina, filtros.limite, aplicarFiltrosLocalDirecto]);
-
-  // ✅ CORRECCIÓN #2: Aplicar filtro de seguridad local
-  const aplicarFiltrosLocalDirecto = useCallback((datos) => {
-    if (!datos || datos.length === 0) return [];
-    
-    let datosFiltrados = [...datos];
-    
-    // ✅ APLICAR FILTRO DE SEGURIDAD LOCAL (doble capa de seguridad)
-    if (tipoAlertaPermitido) {
-      datosFiltrados = datosFiltrados.filter(item => item.tipo === tipoAlertaPermitido);
-    }
-    
-    if (filtros.search && filtros.search.trim() !== '') {
-      const termino = filtros.search.toLowerCase().trim();
-      datosFiltrados = datosFiltrados.filter(item => {
-        const idMatch = item.id?.toString().includes(termino);
-        const tipoMatch = item.tipo?.toLowerCase().includes(termino);
-        const ciudadanoMatch = item.ciudadano?.nombre?.toLowerCase().includes(termino);
-        return idMatch || tipoMatch || ciudadanoMatch;
-      });
-    }
-    
-    if (filtros.desde) {
-      const desdeParts = filtros.desde.split('-');
-      const desde = new Date(parseInt(desdeParts[0]), parseInt(desdeParts[1]) - 1, parseInt(desdeParts[2]), 0, 0, 0, 0);
-      datosFiltrados = datosFiltrados.filter(item => {
-        const fechaCreacion = new Date(item.fecha_creacion);
-        return fechaCreacion >= desde;
-      });
-    }
-    
-    if (filtros.hasta) {
-      const hastaParts = filtros.hasta.split('-');
-      const hasta = new Date(parseInt(hastaParts[0]), parseInt(hastaParts[1]) - 1, parseInt(hastaParts[2]), 23, 59, 59, 999);
-      datosFiltrados = datosFiltrados.filter(item => {
-        const fechaCreacion = new Date(item.fecha_creacion);
-        return fechaCreacion <= hasta;
-      });
-    }
-    
-    const inicio = (filtros.pagina - 1) * filtros.limite;
-    const fin = inicio + filtros.limite;
-    const datosPaginados = datosFiltrados.slice(inicio, fin);
-    
-    return datosPaginados;
-  }, [tipoAlertaPermitido, filtros.search, filtros.desde, filtros.hasta, filtros.pagina, filtros.limite]);
 
   useEffect(() => {
     if (alertasOriginal.length > 0) {
@@ -338,13 +338,19 @@ const AlertasExpiradas = () => {
 
   const formatearFecha = (fecha) => {
     if (!fecha) return '—';
-    return new Date(fecha).toLocaleString('es-MX', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    try {
+      const f = new Date(fecha);
+      if (isNaN(f.getTime())) return 'Fecha inválida';
+      return f.toLocaleString('es-MX', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (e) {
+      return '—';
+    }
   };
 
   const inicio = paginacion.total > 0 ? ((paginacion.pagina - 1) * paginacion.limite) + 1 : 0;
@@ -505,7 +511,7 @@ const AlertasExpiradas = () => {
                       <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-slate-500 uppercase">CIUDADANO</th>
                       <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-slate-500 uppercase">UBICACIÓN</th>
                       <th className="px-3 md:px-6 py-2 md:py-3 text-left text-xs font-medium text-slate-500 uppercase">FECHA</th>
-                     </tr>
+                      </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {alertas.map((alerta) => (
