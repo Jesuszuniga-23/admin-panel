@@ -28,6 +28,9 @@ import AnalisisGeografico from '../pages/admin/analisis/AnalisisGeografico';
 import AlertaExpiradaDetail from '../pages/admin/alertas/AlertaExpiradaDetail';
 import NotFound from '../pages/NotFound';
 //import AuditLogs from '../pages/admin/audit/AuditLogs';
+// Importaciones nuevas para superadmin
+import DashboardSuperAdmin from '../pages/superadmin/DashboardSuperAdmin';
+import TenantsList from '../pages/superadmin/TenantsList';
 
 
 // ✅ Logs condicionales solo en desarrollo
@@ -39,7 +42,7 @@ const AppRouter = () => {
   if (import.meta.env.DEV) {
     console.log("🔥 AppRouter renderizando - ruta:", window.location.pathname);
   }
-  
+
   return (
     <Routes>
       {/* Rutas públicas */}
@@ -48,8 +51,8 @@ const AppRouter = () => {
       <Route path="/verificar-2fa" element={<Verificar2FA />} />
 
       {/* ✅ Rutas admin - orden correcto: específicas primero, genéricas después */}
-      <Route 
-        path="/admin" 
+      <Route
+        path="/admin"
         element={
           <PrivateRoute allowedRoles={['admin', 'superadmin', 'operador_tecnico', 'operador_policial', 'operador_medico', 'operador_general']}>
             <AdminLayout />
@@ -60,13 +63,13 @@ const AppRouter = () => {
         <Route index element={<Navigate to="/admin/dashboard" />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="perfil" element={<Perfil />} />
-        
+
         {/* Personal */}
         <Route path="personal" element={<PersonalList />} />
         <Route path="personal/crear" element={<PersonalForm />} />
         <Route path="personal/editar/:id" element={<PersonalForm />} />
         <Route path="personal/:id" element={<PersonalDetail />} />
-        
+
         {/* Alertas - ORDEN CORRECTO: rutas específicas primero */}
         <Route path="alertas/activas" element={<AlertasActivas />} />
         <Route path="alertas/en-proceso" element={<AlertasEnProceso />} />
@@ -77,32 +80,32 @@ const AppRouter = () => {
         <Route path="alertas/expiradas/:id" element={<AlertaExpiradaDetail />} />
         {/* ✅ Ruta genérica para detalle de alerta - VA DESPUÉS de las específicas */}
         <Route path="alertas/:id" element={<AlertaPanelDetail />} />
-        
+
         {/* Recuperaciones 
         <Route path="recuperaciones/pendientes" element={<RecuperacionesPendientes />} />*/}
-        
+
         {/* Unidades */}
         <Route path="unidades" element={<UnidadesList />} />
         <Route path="unidades/crear" element={<UnidadForm />} />
         <Route path="unidades/editar/:id" element={<UnidadForm />} />
         <Route path="unidades/:id" element={<UnidadDetail />} />
-        
+
         {/* Reasignaciones */}
         <Route path="reasignaciones/pendientes" element={<ReasignacionesPendientes />} />
-        
+
         {/* Reportes */}
         <Route path="reportes" element={<ReportesMenu />} />
         <Route path="reportes/:tipo" element={<GeneradorReporte />} />
-        
+
         {/* Análisis */}
         <Route path="analisis/geografico" element={<AnalisisGeografico />} />
-         {/* Auditoría - Solo admin y superadmin
+        {/* Auditoría - Solo admin y superadmin
         <Route path="audit-logs" element={<AuditLogs />} /> */}
       </Route>
 
-      {/* ✅ Ruta para superadmin (opcional, puede redirigir a admin) */}
-      <Route 
-        path="/superadmin" 
+      {/* ✅ RUTAS DE SUPERADMIN - Dashboard de control y gestión de municipios */}
+      <Route
+        path="/superadmin"
         element={
           <PrivateRoute allowedRoles={['superadmin']}>
             <AdminLayout />
@@ -110,9 +113,12 @@ const AppRouter = () => {
         }
       >
         <Route index element={<Navigate to="/superadmin/dashboard" />} />
-        <Route path="dashboard" element={<Dashboard />} />
-        {/* ✅ Redirigir otras rutas de superadmin a admin para evitar duplicación */}
-        <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
+        <Route path="dashboard" element={<DashboardSuperAdmin />} />
+        <Route path="municipios" element={<TenantsList />} />
+        <Route path="municipios/nuevo" element={<div>Formulario de nuevo municipio (próximamente)</div>} />
+        <Route path="municipios/:id" element={<div>Detalle de municipio (próximamente)</div>} />
+        <Route path="municipios/:id/editar" element={<div>Editar municipio (próximamente)</div>} />
+        <Route path="municipios/:id/pagar" element={<div>Registrar pago (próximamente)</div>} />
       </Route>
 
       {/* ✅ Ruta 404 - No encontrada */}

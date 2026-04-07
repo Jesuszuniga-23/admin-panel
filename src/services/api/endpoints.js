@@ -88,6 +88,21 @@ AUDIT: {
     LOGS: `${BASE_URL}/admin/audit-logs/completo`,
     DETALLE: (id) => `${BASE_URL}/admin/audit-logs/${id}`
   },
+  // =====================================================
+// TENANTS (SUPERADMIN)
+// =====================================================
+TENANTS: {
+    LIST: `${BASE_URL}/admin/tenants`,
+    GET: (id) => `${BASE_URL}/admin/tenants/${id}`,
+    CREATE: `${BASE_URL}/admin/tenants`,
+    UPDATE: (id) => `${BASE_URL}/admin/tenants/${id}`,
+    TOGGLE: (id) => `${BASE_URL}/admin/tenants/${id}/toggle`,
+    MARK_PAID: (id) => `${BASE_URL}/admin/tenants/${id}/mark-paid`,
+    SUSPEND: (id) => `${BASE_URL}/admin/tenants/${id}/suspend`,
+    REACTIVATE: (id) => `${BASE_URL}/admin/tenants/${id}/reactivate`,
+    STATS: (id) => `${BASE_URL}/admin/tenants/${id}/stats`,
+    CREATE_ADMIN: (tenantId) => `${BASE_URL}/admin/tenants/${tenantId}/admin`
+},
 };
 
 // ✅ Función de utilidad para verificar endpoints
