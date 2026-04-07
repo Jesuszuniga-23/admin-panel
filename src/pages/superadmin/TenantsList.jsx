@@ -1,5 +1,5 @@
 // src/pages/superadmin/TenantsList.jsx
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Building2, Plus, Search, Eye, Edit, CreditCard, CheckCircle, XCircle, Clock, AlertTriangle } from 'lucide-react';
 import tenantService from '../../services/admin/tenant.service';
@@ -16,6 +16,7 @@ const TenantsList = () => {
     
     const searchDebounced = useDebounce(search, 500);
     const abortControllerRef = useRef(null);
+    const isMountedRef = useRef(true);
 
     const getStatusBadge = (status, activo) => {
         if (status === 'active' && activo) {
@@ -38,71 +39,79 @@ const TenantsList = () => {
         return new Date(date).toLocaleDateString('es-MX');
     };
 
-    useEffect(() => {
+    const cargarTenants = useCallback(async () => {
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
         }
         
         abortControllerRef.current = new AbortController();
+        
+        if (!isMountedRef.current) return;
         setLoading(true);
         
-        const fetchData = async () => {
-            try {
-                console.log('🔍 Fetching tenants...');
-                const response = await tenantService.listarTenants({
-                    signal: abortControllerRef.current.signal
-                });
+        try {
+            console.log('🔍 Fetching tenants...');
+            const response = await tenantService.listarTenants({
+                signal: abortControllerRef.current.signal
+            });
+            
+            if (!isMountedRef.current) return;
+            
+            if (response.success && response.data) {
+                let filteredTenants = [...response.data];
                 
-                console.log('📦 Response:', response);
-                
-                if (response.success && response.data) {
-                    let filteredTenants = [...response.data];
-                    
-                    // Filtrar por búsqueda
-                    if (searchDebounced && typeof searchDebounced === 'string' && searchDebounced.trim() !== '') {
-                        const searchLower = searchDebounced.toLowerCase().trim();
-                        filteredTenants = filteredTenants.filter(t => {
-                            const nombre = t.nombre ? String(t.nombre).toLowerCase() : '';
-                            const id = t.id ? String(t.id).toLowerCase() : '';
-                            return nombre.includes(searchLower) || id.includes(searchLower);
-                        });
-                    }
-                    
-                    // Filtrar por estado
-                    if (statusFilter && statusFilter !== '') {
-                        filteredTenants = filteredTenants.filter(t => t.status === statusFilter);
-                    }
-                    
-                    // Filtrar por plan
-                    if (planFilter && planFilter !== '') {
-                        filteredTenants = filteredTenants.filter(t => t.plan_id === planFilter);
-                    }
-                    
-                    // Excluir default
-                    filteredTenants = filteredTenants.filter(t => t.id !== 'default');
-                    
-                    setTenants(filteredTenants);
-                } else {
-                    toast.error(response.error || 'Error al cargar municipios');
+                // Filtrar por búsqueda
+                if (searchDebounced && typeof searchDebounced === 'string' && searchDebounced.trim() !== '') {
+                    const searchLower = searchDebounced.toLowerCase().trim();
+                    filteredTenants = filteredTenants.filter(t => {
+                        const nombre = t.nombre ? String(t.nombre).toLowerCase() : '';
+                        const id = t.id ? String(t.id).toLowerCase() : '';
+                        return nombre.includes(searchLower) || id.includes(searchLower);
+                    });
                 }
-            } catch (error) {
-                if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
-                    console.error('Error cargando tenants:', error);
+                
+                // Filtrar por estado
+                if (statusFilter && statusFilter !== '') {
+                    filteredTenants = filteredTenants.filter(t => t.status === statusFilter);
+                }
+                
+                // Filtrar por plan
+                if (planFilter && planFilter !== '') {
+                    filteredTenants = filteredTenants.filter(t => t.plan_id === planFilter);
+                }
+                
+                // Excluir default
+                filteredTenants = filteredTenants.filter(t => t.id !== 'default');
+                
+                setTenants(filteredTenants);
+            } else {
+                toast.error(response.error || 'Error al cargar municipios');
+            }
+        } catch (error) {
+            if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
+                console.error('Error cargando tenants:', error);
+                if (isMountedRef.current) {
                     toast.error('Error al cargar municipios');
                 }
-            } finally {
+            }
+        } finally {
+            if (isMountedRef.current) {
                 setLoading(false);
             }
-        };
-        
-        fetchData();
+        }
+    }, [searchDebounced, statusFilter, planFilter]);
+
+    useEffect(() => {
+        isMountedRef.current = true;
+        cargarTenants();
         
         return () => {
+            isMountedRef.current = false;
             if (abortControllerRef.current) {
                 abortControllerRef.current.abort();
             }
         };
-    }, [searchDebounced, statusFilter, planFilter]);
+    }, [cargarTenants]);
 
     if (loading) {
         return (
