@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Building2, Users, CreditCard, AlertTriangle, CheckCircle, XCircle, Clock, TrendingUp, TrendingDown } from 'lucide-react';
 import tenantService from '../../services/admin/tenant.service';
 import toast from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
 
 const StatCard = ({ title, value, icon, color, trend }) => {
     const colors = {
@@ -52,6 +53,7 @@ const DashboardSuperAdmin = () => {
     const [tenants, setTenants] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const navigate = useNavigate();
 
     const cargarDatos = useCallback(async () => {
         setLoading(true);
@@ -231,7 +233,7 @@ const DashboardSuperAdmin = () => {
                                     </td>
                                     <td className="px-6 py-4">
                                         <button
-                                            onClick={() => window.location.href = `/superadmin/municipios/${tenant.id}`}
+                                            onClick={() => navigate(`/superadmin/municipios/${tenant.id}`)}
                                             className="text-blue-600 hover:text-blue-800 text-sm font-medium"
                                         >
                                             Gestionar

@@ -31,6 +31,8 @@ import NotFound from '../pages/NotFound';
 // Importaciones nuevas para superadmin
 import DashboardSuperAdmin from '../pages/superadmin/DashboardSuperAdmin';
 import TenantsList from '../pages/superadmin/TenantsList';
+import TenantDetail from '../pages/superadmin/TenantDetail';
+import TenantForm from '../pages/superadmin/TenantForm';
 
 
 // ✅ Logs condicionales solo en desarrollo
@@ -115,10 +117,10 @@ const AppRouter = () => {
         <Route index element={<Navigate to="/superadmin/dashboard" />} />
         <Route path="dashboard" element={<DashboardSuperAdmin />} />
         <Route path="municipios" element={<TenantsList />} />
-        <Route path="municipios/nuevo" element={<div>Formulario de nuevo municipio (próximamente)</div>} />
-        <Route path="municipios/:id" element={<div>Detalle de municipio (próximamente)</div>} />
-        <Route path="municipios/:id/editar" element={<div>Editar municipio (próximamente)</div>} />
+        <Route path="municipios/nuevo" element={<TenantForm />} />
+        <Route path="municipios/:id/editar" element={<TenantForm />} />
         <Route path="municipios/:id/pagar" element={<div>Registrar pago (próximamente)</div>} />
+        <Route path="municipios/:id" element={<TenantDetail />} />
       </Route>
 
       {/* ✅ Ruta 404 - No encontrada */}
