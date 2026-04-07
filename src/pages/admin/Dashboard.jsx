@@ -153,6 +153,13 @@ const Dashboard = () => {
   const [alertasPorHora, setAlertasPorHora] = useState([]);
   const [actividadReciente, setActividadReciente] = useState({ personal: [], unidades: [], alertas: [] });
   const navigate = useNavigate();
+  // ✅ REDIRIGIR SUPERADMIN AL DASHBOARD DE CONTROL
+  useEffect(() => {
+    if (user?.rol === 'superadmin') {
+      console.log('🔴 Superadmin detectado, redirigiendo a /superadmin/dashboard');
+      navigate('/superadmin/dashboard', { replace: true });
+    }
+  }, [user, navigate]);
   
   // ✅ OBTENER FILTROS CORRECTOS
   const tipoAlertaPermitido = authService.getTipoAlertaPermitido();

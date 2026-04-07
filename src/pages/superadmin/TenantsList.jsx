@@ -1,7 +1,7 @@
 // src/pages/superadmin/TenantsList.jsx
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Building2, Plus, Search, Filter, Eye, Edit, Power, XCircle, CheckCircle, Clock, AlertTriangle, CreditCard } from 'lucide-react';
+import { Building2, Plus, Search, Eye, Edit, CreditCard, CheckCircle, XCircle, Clock, AlertTriangle } from 'lucide-react';
 import tenantService from '../../services/admin/tenant.service';
 import toast from 'react-hot-toast';
 import { useDebounce } from '../../hooks/useDebounce';
@@ -13,70 +13,9 @@ const TenantsList = () => {
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
     const [planFilter, setPlanFilter] = useState('');
-    const abortControllerRef = useRef(null);
-
+    
     const searchDebounced = useDebounce(search, 500);
-
-    const cargarTenants = useCallback(async () => {
-        if (abortControllerRef.current) {
-            abortControllerRef.current.abort();
-        }
-
-        abortControllerRef.current = new AbortController();
-        setLoading(true);
-
-        try {
-            const response = await tenantService.listarTenants({
-                signal: abortControllerRef.current.signal
-            });
-
-            if (response.success && response.data) {
-                let filteredTenants = [...response.data];
-
-                // Filtrar por búsqueda
-                if (searchDebounced) {
-                    filteredTenants = filteredTenants.filter(t =>
-                        (t.nombre && t.nombre.toLowerCase().includes(searchDebounced.toLowerCase())) ||
-                        (t.id && t.id.toLowerCase().includes(searchDebounced.toLowerCase()))
-                    );
-                }
-
-                // Filtrar por estado
-                // Filtrar por estado
-                if (statusFilter) {
-                    filteredTenants = filteredTenants.filter(t => t.status === statusFilter);
-                }
-
-                // Filtrar por plan
-                if (planFilter) {
-                    filteredTenants = filteredTenants.filter(t => t.plan_id === planFilter);
-                }
-
-                // Excluir default
-                filteredTenants = filteredTenants.filter(t => t.id !== 'default');
-
-                setTenants(filteredTenants);
-            } else {
-                toast.error(response.error || 'Error al cargar municipios');
-            }
-        } catch (error) {
-            if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
-                console.error('Error cargando tenants:', error);
-                toast.error('Error al cargar municipios');
-            }
-        } finally {
-            setLoading(false);
-        }
-    }, [searchDebounced, statusFilter, planFilter]);
-
-    useEffect(() => {
-        cargarTenants();
-        return () => {
-            if (abortControllerRef.current) {
-                abortControllerRef.current.abort();
-            }
-        };
-    }, [cargarTenants]);
+    const abortControllerRef = useRef(null);
 
     const getStatusBadge = (status, activo) => {
         if (status === 'active' && activo) {
@@ -96,18 +35,74 @@ const TenantsList = () => {
 
     const formatDate = (date) => {
         if (!date) return 'N/A';
-        const d = new Date(date);
-        return d.toLocaleDateString('es-MX');
+        return new Date(date).toLocaleDateString('es-MX');
     };
 
-    const getDaysRemaining = (expirationDate) => {
-        if (!expirationDate) return null;
-        const today = new Date();
-        const exp = new Date(expirationDate);
-        const diffTime = exp - today;
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        return diffDays;
-    };
+    useEffect(() => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+        
+        abortControllerRef.current = new AbortController();
+        setLoading(true);
+        
+        const fetchData = async () => {
+            try {
+                console.log('🔍 Fetching tenants...');
+                const response = await tenantService.listarTenants({
+                    signal: abortControllerRef.current.signal
+                });
+                
+                console.log('📦 Response:', response);
+                
+                if (response.success && response.data) {
+                    let filteredTenants = [...response.data];
+                    
+                    // Filtrar por búsqueda
+                    if (searchDebounced && typeof searchDebounced === 'string' && searchDebounced.trim() !== '') {
+                        const searchLower = searchDebounced.toLowerCase().trim();
+                        filteredTenants = filteredTenants.filter(t => {
+                            const nombre = t.nombre ? String(t.nombre).toLowerCase() : '';
+                            const id = t.id ? String(t.id).toLowerCase() : '';
+                            return nombre.includes(searchLower) || id.includes(searchLower);
+                        });
+                    }
+                    
+                    // Filtrar por estado
+                    if (statusFilter && statusFilter !== '') {
+                        filteredTenants = filteredTenants.filter(t => t.status === statusFilter);
+                    }
+                    
+                    // Filtrar por plan
+                    if (planFilter && planFilter !== '') {
+                        filteredTenants = filteredTenants.filter(t => t.plan_id === planFilter);
+                    }
+                    
+                    // Excluir default
+                    filteredTenants = filteredTenants.filter(t => t.id !== 'default');
+                    
+                    setTenants(filteredTenants);
+                } else {
+                    toast.error(response.error || 'Error al cargar municipios');
+                }
+            } catch (error) {
+                if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
+                    console.error('Error cargando tenants:', error);
+                    toast.error('Error al cargar municipios');
+                }
+            } finally {
+                setLoading(false);
+            }
+        };
+        
+        fetchData();
+        
+        return () => {
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+        };
+    }, [searchDebounced, statusFilter, planFilter]);
 
     if (loading) {
         return (
@@ -137,7 +132,6 @@ const TenantsList = () => {
             {/* Filtros */}
             <div className="bg-white rounded-xl shadow-lg p-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {/* Búsqueda */}
                     <div className="relative">
                         <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                         <input
@@ -148,8 +142,7 @@ const TenantsList = () => {
                             className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                     </div>
-
-                    {/* Filtro por estado */}
+                    
                     <select
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
@@ -161,8 +154,7 @@ const TenantsList = () => {
                         <option value="suspended">Suspendidos</option>
                         <option value="expired">Expirados</option>
                     </select>
-
-                    {/* Filtro por plan */}
+                    
                     <select
                         value={planFilter}
                         onChange={(e) => setPlanFilter(e.target.value)}
@@ -200,20 +192,12 @@ const TenantsList = () => {
                             ) : (
                                 tenants.map((tenant) => {
                                     const statusInfo = getStatusBadge(tenant.status, tenant.activo);
-                                    const daysRemaining = getDaysRemaining(tenant.fecha_expiracion);
-                                    const isExpiringSoon = daysRemaining !== null && daysRemaining <= 30 && daysRemaining > 0;
-
                                     return (
                                         <tr key={tenant.id} className="hover:bg-gray-50">
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-2">
                                                     <Building2 size={16} className="text-gray-400" />
                                                     <span className="font-medium text-gray-800">{tenant.nombre}</span>
-                                                    {isExpiringSoon && (
-                                                        <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">
-                                                            {daysRemaining} días
-                                                        </span>
-                                                    )}
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4">
