@@ -36,11 +36,12 @@ const TenantsList = () => {
                 // Filtrar por búsqueda
                 if (searchDebounced) {
                     filteredTenants = filteredTenants.filter(t =>
-                        t.nombre.toLowerCase().includes(searchDebounced.toLowerCase()) ||
-                        t.id.toLowerCase().includes(searchDebounced.toLowerCase())
+                        (t.nombre && t.nombre.toLowerCase().includes(searchDebounced.toLowerCase())) ||
+                        (t.id && t.id.toLowerCase().includes(searchDebounced.toLowerCase()))
                     );
                 }
 
+                // Filtrar por estado
                 // Filtrar por estado
                 if (statusFilter) {
                     filteredTenants = filteredTenants.filter(t => t.status === statusFilter);
