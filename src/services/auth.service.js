@@ -1,5 +1,7 @@
+// src/services/auth.service.js (MODIFICADO - AGREGAR TENANT)
 import axiosInstance from './api/axiosConfig';
 import { ENDPOINTS } from './api/endpoints';
+import { guardarTenant, obtenerTenantActual } from '../utils/storage';  // ✅ NUEVO
 
 class AuthService {
   #currentUser = null;
@@ -10,6 +12,10 @@ class AuthService {
         throw new Error('No se recibió el token de Google');
       }
 
+      // ✅ Obtener tenant actual (si existe)
+      const tenantId = obtenerTenantActual();
+      console.log(`🔐 Iniciando login con Google | Tenant: ${tenantId}`);
+
       console.log("📧 Enviando token al backend...");
       
       const config = {};
@@ -17,9 +23,17 @@ class AuthService {
         config.signal = options.signal;
       }
       
+      // ✅ Agregar tenant al body de la petición
       const response = await axiosInstance.post(ENDPOINTS.AUTH.GOOGLE_ADMIN_LOGIN, {
-        idToken: token
+        idToken: token,
+        tenant_id: tenantId  // ✅ NUEVO: enviar tenant
       }, config);
+      
+      // ✅ Guardar tenant si viene en la respuesta
+      if (response.data?.usuario?.tenant_id) {
+        guardarTenant(response.data.usuario.tenant_id);
+        console.log(`🏢 Tenant guardado: ${response.data.usuario.tenant_id}`);
+      }
       
       return response.data;
     } catch (error) {
@@ -41,7 +55,15 @@ class AuthService {
       const response = await axiosInstance.post(ENDPOINTS.AUTH.VERIFY_2FA, {
         codigo
       }, config);
+      
       console.log('🔐 Respuesta de verificar2FA:', response.data);
+      
+      // ✅ Guardar tenant si viene en la respuesta
+      if (response.data?.usuario?.tenant_id) {
+        guardarTenant(response.data.usuario.tenant_id);
+        console.log(`🏢 Tenant guardado: ${response.data.usuario.tenant_id}`);
+      }
+      
       return response.data;
     } catch (error) {
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
@@ -115,8 +137,8 @@ class AuthService {
       localStorage.removeItem('auth_timestamp');
       localStorage.removeItem('auth-storage');
       localStorage.removeItem('pending_2fa_token');
+      localStorage.removeItem('tenant_id');  // ✅ NUEVO: limpiar tenant
       
-      // ✅ LIMPIAR TODA LA CACHÉ DEL DASHBOARD
       const keysToRemove = [];
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
@@ -153,6 +175,10 @@ class AuthService {
       
       if (response.data?.user) {
         this.#currentUser = response.data.user;
+        // ✅ Asegurar que el tenant está sincronizado
+        if (response.data.user.tenant_id) {
+          guardarTenant(response.data.user.tenant_id);
+        }
         return true;
       }
       
@@ -164,6 +190,7 @@ class AuthService {
       console.error("Error verificando sesión:", error);
       this.#currentUser = null;
       localStorage.removeItem('user');
+      localStorage.removeItem('tenant_id');  // ✅ NUEVO
       return false;
     }
   }
@@ -184,6 +211,12 @@ class AuthService {
     }
     
     return null;
+  }
+
+  // ✅ NUEVO: Obtener tenant actual del usuario
+  getCurrentTenant() {
+    const user = this.getCurrentUser();
+    return user?.tenant_id || obtenerTenantActual() || 'default';
   }
 
   isAuthenticated() {
@@ -244,10 +277,6 @@ class AuthService {
     return null;
   }
 
-  // =====================================================
-  // ✅ FUNCIONES CORREGIDAS
-  // =====================================================
-
   puedeCrearPersonal(rolACrear) {
     const user = this.getCurrentUser();
     if (!user) return false;
@@ -257,17 +286,11 @@ class AuthService {
     const permisos = {
       superadmin: true,
       admin: [
-        'admin',              // Administradores
-        'operador_tecnico',   // Operadores técnicos
-        'operador_general',   // Operadores generales
-        'operador_policial',  // Operadores policiales
-        'operador_medico',    // Operadores médicos
-        'policia',            // Policías de campo
-        'paramedico'          // Paramédicos de campo
+        'admin', 'operador_tecnico', 'operador_general',
+        'operador_policial', 'operador_medico',
+        'policia', 'paramedico'
       ],
-      // ✅ CORREGIDO: Operador policial puede crear policías Y operadores policiales
       operador_policial: ['policia', 'operador_policial'],
-      // ✅ CORREGIDO: Operador médico puede crear paramédicos Y operadores médicos
       operador_medico: ['paramedico', 'operador_medico'],
       operador_tecnico: [],
       operador_general: []
@@ -308,21 +331,15 @@ class AuthService {
     const rolUsuario = user.rol;
     
     if (rolUsuario === 'superadmin') return true;
-    
     if (rolUsuario === 'admin') {
       return rolPersonal !== 'superadmin';
     }
-    
-    // ✅ CORREGIDO: Operador policial puede editar policías Y operadores policiales
     if (rolUsuario === 'operador_policial') {
       return rolPersonal === 'policia' || rolPersonal === 'operador_policial';
     }
-    
-    // ✅ CORREGIDO: Operador médico puede editar paramédicos Y operadores médicos
     if (rolUsuario === 'operador_medico') {
       return rolPersonal === 'paramedico' || rolPersonal === 'operador_medico';
     }
-    
     if (rolUsuario === 'operador_tecnico') return false;
     if (rolUsuario === 'operador_general') return false;
     
@@ -338,21 +355,15 @@ class AuthService {
     if (rolUsuario === 'superadmin') {
       return rolPersonal !== 'superadmin';
     }
-    
     if (rolUsuario === 'admin') {
       return rolPersonal !== 'superadmin';
     }
-    
-    // ✅ CORREGIDO: Operador policial puede eliminar policías Y operadores policiales
     if (rolUsuario === 'operador_policial') {
       return rolPersonal === 'policia' || rolPersonal === 'operador_policial';
     }
-    
-    // ✅ CORREGIDO: Operador médico puede eliminar paramédicos Y operadores médicos
     if (rolUsuario === 'operador_medico') {
       return rolPersonal === 'paramedico' || rolPersonal === 'operador_medico';
     }
-    
     if (rolUsuario === 'operador_tecnico') return false;
     if (rolUsuario === 'operador_general') return false;
     

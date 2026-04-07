@@ -1,11 +1,12 @@
-// src/components/layout/Header.jsx
+// src/components/layout/Header.jsx (MODIFICADO - AGREGAR TENANT SELECTOR)
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, UserCircle, LogOut
-} from 'lucide-react'; // ✅ Eliminados Settings y Bell (no usados)
+} from 'lucide-react';
 import useAuthStore from '../../store/authStore';
 import toast from 'react-hot-toast';
+import TenantSelector from '../common/TenantSelector';  // ✅ NUEVO
 
 // Función para formatear nombres
 const formatearNombre = (nombre) => {
@@ -95,7 +96,7 @@ const Header = ({ titulo = 'Panel de Administración', subtitulo = 'Gestión del
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isPersonalFormActive, setIsPersonalFormActive] = useState(false);
   const menuRef = useRef(null);
-  const logoutTimeoutRef = useRef(null); // ✅ Ref para timeout
+  const logoutTimeoutRef = useRef(null);
 
   // Escuchar eventos de cambios sin guardar
   useEffect(() => {
@@ -111,7 +112,7 @@ const Header = ({ titulo = 'Panel de Administración', subtitulo = 'Gestión del
     };
   }, []);
 
-  // ✅ Resetear estado cuando se sale de la ruta del formulario
+  // Resetear estado cuando se sale de la ruta del formulario
   useEffect(() => {
     if (!location.pathname.includes('/admin/personal')) {
       setHasUnsavedChanges(false);
@@ -133,7 +134,7 @@ const Header = ({ titulo = 'Panel de Administración', subtitulo = 'Gestión del
     };
   }, []);
 
-  // ✅ Limpiar timeout al desmontar
+  // Limpiar timeout al desmontar
   useEffect(() => {
     return () => {
       if (logoutTimeoutRef.current) {
@@ -157,7 +158,6 @@ const Header = ({ titulo = 'Panel de Administración', subtitulo = 'Gestión del
       toast.success('Sesión cerrada correctamente');
       navigate('/login', { replace: true });
     } catch (error) {
-      // ✅ Ignorar errores de cancelación
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         console.log('🛑 Logout cancelado');
         return;
@@ -172,7 +172,6 @@ const Header = ({ titulo = 'Panel de Administración', subtitulo = 'Gestión del
     const discardEvent = new CustomEvent('discardFormProgress');
     window.dispatchEvent(discardEvent);
     
-    // ✅ Limpiar timeout anterior si existe
     if (logoutTimeoutRef.current) {
       clearTimeout(logoutTimeoutRef.current);
     }
@@ -206,6 +205,9 @@ const Header = ({ titulo = 'Panel de Administración', subtitulo = 'Gestión del
             </div>
 
             <div className="flex items-center gap-2 sm:gap-4">
+              {/* ✅ TENANT SELECTOR - Solo visible para superadmin */}
+              <TenantSelector />
+              
               <div className="relative" ref={menuRef}>
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}

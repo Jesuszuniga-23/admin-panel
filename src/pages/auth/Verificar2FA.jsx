@@ -1,12 +1,11 @@
-// src/pages/auth/Verificar2FA.jsx
-// REEMPLAZAR TODO EL ARCHIVO CON ESTA VERSIÓN CORREGIDA
-
+// src/pages/auth/Verificar2FA.jsx (MODIFICADO - AGREGAR TENANT)
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Shield, ArrowLeft, Mail, Loader, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import authService from '../../services/auth.service';
 import useAuthStore from '../../store/authStore';
+import { obtenerTenantActual } from '../../utils/storage';  // ✅ NUEVO
 
 const Verificar2FA = () => {
   const navigate = useNavigate();
@@ -19,9 +18,17 @@ const Verificar2FA = () => {
   const [tiempoEspera, setTiempoEspera] = useState(0);
   const [error, setError] = useState('');
   const [errorDetalle, setErrorDetalle] = useState('');
+  const [currentTenant, setCurrentTenant] = useState('default');  // ✅ NUEVO
   
   const abortControllerRef = useRef(null);
   const timerRef = useRef(null);
+
+  // ✅ NUEVO: Cargar tenant actual
+  useEffect(() => {
+    const tenant = obtenerTenantActual();
+    setCurrentTenant(tenant);
+    console.log(`🏢 Verificar2FA - Tenant actual: ${tenant}`);
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -60,18 +67,15 @@ const Verificar2FA = () => {
     };
   }, []);
 
-  // ✅ Función para limpiar errores y resetear el estado
   const limpiarError = useCallback(() => {
     setError('');
     setErrorDetalle('');
     setCodigo('');
-    // No resetear el tiempo de espera para no permitir spam
   }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // ✅ Limpiar error anterior antes de nuevo intento
     limpiarError();
     
     if (codigo.length !== 6) {
@@ -88,7 +92,7 @@ const Verificar2FA = () => {
     
     setLoading(true);
     try {
-      console.log('🔐 Verificando código 2FA...');
+      console.log(`🔐 Verificando código 2FA... | Tenant: ${currentTenant}`);
       const response = await authService.verificar2FA(codigo, {
         signal: abortControllerRef.current.signal
       });
@@ -116,10 +120,8 @@ const Verificar2FA = () => {
         console.error('Error verificando código:', error);
         const errorMsg = error.response?.data?.error || 'Error al verificar código';
         
-        // ✅ Guardar error detallado para mostrar al usuario
         setError(errorMsg);
         
-        // ✅ Mensaje específico según tipo de error
         if (errorMsg.includes('expirado') || errorMsg.includes('expiró')) {
           setErrorDetalle('El código expiró. Usa el botón "Reenviar código" para obtener uno nuevo.');
           toast.error(errorMsg, { duration: 8000 });
@@ -127,7 +129,6 @@ const Verificar2FA = () => {
         } else if (errorMsg.includes('incorrecto')) {
           setErrorDetalle('Verifica que el código sea correcto. Puedes solicitar uno nuevo si lo necesitas.');
           toast.error(errorMsg);
-          // ✅ Mantener el código para que el usuario pueda corregirlo
         } else if (errorMsg.includes('bloqueado')) {
           setErrorDetalle('Demasiados intentos fallidos. Espera unos minutos antes de intentar nuevamente.');
           toast.error(errorMsg, { duration: 8000 });
@@ -147,7 +148,6 @@ const Verificar2FA = () => {
       return;
     }
 
-    // ✅ Limpiar error antes de reenviar
     limpiarError();
 
     if (abortControllerRef.current) {
@@ -159,7 +159,7 @@ const Verificar2FA = () => {
     
     setReenviando(true);
     try {
-      console.log('📧 Reenviando código 2FA...');
+      console.log(`📧 Reenviando código 2FA... | Tenant: ${currentTenant}`);
       const response = await authService.reenviarCodigo2FA({
         signal: abortControllerRef.current.signal
       });
@@ -192,7 +192,7 @@ const Verificar2FA = () => {
     } finally {
       setReenviando(false);
     }
-  }, [tiempoEspera, limpiarError]);
+  }, [tiempoEspera, limpiarError, currentTenant]);
 
   const handleVolverALogin = () => {
     navigate('/login', { replace: true });
@@ -219,6 +219,10 @@ const Verificar2FA = () => {
               Ingresa el código de verificación enviado a
             </p>
             <p className="font-medium text-gray-700 mt-1">{email}</p>
+            {/* ✅ NUEVO: Mostrar tenant actual */}
+            <div className="mt-2 inline-block px-3 py-1 bg-gray-100 rounded-full text-xs text-gray-600">
+              🏢 {currentTenant === 'default' ? 'Sistema Principal' : currentTenant}
+            </div>
           </div>
 
           {error ? (

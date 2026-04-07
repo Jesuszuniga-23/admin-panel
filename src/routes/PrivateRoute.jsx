@@ -1,22 +1,37 @@
-// src/routes/PrivateRoute.jsx
+// src/routes/PrivateRoute.jsx (MODIFICADO - AGREGAR VALIDACIÓN DE TENANT)
 import { Navigate } from 'react-router-dom';
 import useAuthStore from '../store/authStore';
 import { useEffect, useState, useCallback } from 'react';
 import authService from '../services/auth.service';
+import { obtenerTenantActual } from '../utils/storage';  // ✅ NUEVO
 
 const PrivateRoute = ({ children, allowedRoles = ['admin', 'superadmin'] }) => {
   const { user, isLoading, setUser } = useAuthStore();
   const [isVerifying, setIsVerifying] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(false);
+  const [tenantValid, setTenantValid] = useState(true);  // ✅ NUEVO
 
-  // ✅ Logs solo en desarrollo
   const log = useCallback((...args) => {
     if (import.meta.env.DEV) {
       console.log(...args);
     }
   }, []);
 
-  // ✅ Verificar sesión activa con el backend
+  // ✅ NUEVO: Verificar que el tenant del usuario coincide con el almacenado
+  const verificarTenant = useCallback(() => {
+    const storedTenant = obtenerTenantActual();
+    const userTenant = user?.tenant_id;
+    
+    if (userTenant && storedTenant !== userTenant) {
+      log('⚠️ PrivateRoute - Tenant mismatch:', { storedTenant, userTenant });
+      setTenantValid(false);
+      return false;
+    }
+    
+    setTenantValid(true);
+    return true;
+  }, [user, log]);
+
   const verificarSesion = useCallback(async () => {
     try {
       log('🔒 PrivateRoute - Verificando sesión...');
@@ -29,9 +44,10 @@ const PrivateRoute = ({ children, allowedRoles = ['admin', 'superadmin'] }) => {
         return false;
       }
       
-      // ✅ Si hay usuario en store pero la sesión está activa, mantenerlo
       if (user && estado.activa) {
         log('✅ PrivateRoute - Sesión activa, usuario:', user.email);
+        // ✅ Verificar tenant
+        verificarTenant();
         setIsAuthorized(allowedRoles.includes(user.rol));
         return true;
       }
@@ -44,10 +60,9 @@ const PrivateRoute = ({ children, allowedRoles = ['admin', 'superadmin'] }) => {
     } finally {
       setIsVerifying(false);
     }
-  }, [user, allowedRoles, setUser, log]);
+  }, [user, allowedRoles, setUser, log, verificarTenant]);
 
   useEffect(() => {
-    // ✅ Si ya hay usuario en store y no está cargando, verificar rápidamente
     if (user && !isLoading) {
       log('🔒 PrivateRoute - Usuario en store, verificando permisos...');
       log('🔒 PrivateRoute - user rol:', user.rol);
@@ -55,6 +70,7 @@ const PrivateRoute = ({ children, allowedRoles = ['admin', 'superadmin'] }) => {
       
       const tienePermiso = allowedRoles.includes(user.rol);
       setIsAuthorized(tienePermiso);
+      verificarTenant();  // ✅ Verificar tenant
       setIsVerifying(false);
       
       if (!tienePermiso) {
@@ -65,13 +81,17 @@ const PrivateRoute = ({ children, allowedRoles = ['admin', 'superadmin'] }) => {
       return;
     }
     
-    // ✅ Si no hay usuario, verificar sesión con el backend
     if (!user && !isLoading) {
       verificarSesion();
     }
-  }, [user, isLoading, allowedRoles, verificarSesion, log]);
+  }, [user, isLoading, allowedRoles, verificarSesion, log, verificarTenant]);
 
-  // ✅ Mostrar loading mientras se verifica
+  // ✅ NUEVO: Si el tenant no es válido, redirigir a login
+  if (!tenantValid) {
+    log('❌ PrivateRoute - Tenant inválido, redirigiendo a login');
+    return <Navigate to="/login" replace />;
+  }
+
   if (isLoading || isVerifying) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -83,7 +103,6 @@ const PrivateRoute = ({ children, allowedRoles = ['admin', 'superadmin'] }) => {
     );
   }
 
-  // ✅ Redirigir si no hay usuario autorizado
   if (!user || !isAuthorized) {
     log('❌ PrivateRoute - Redirigiendo a login');
     return <Navigate to="/login" replace />;

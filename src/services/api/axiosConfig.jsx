@@ -1,6 +1,7 @@
-// src/services/api/axiosConfig.jsx
+// src/services/api/axiosConfig.jsx (MODIFICADO - AGREGAR TENANT HEADER)
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import { obtenerTenantActual } from '../../utils/storage';  // ✅ NUEVO
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -12,13 +13,19 @@ const axiosInstance = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 30000, // 30 segundos timeout
+  timeout: 30000,
 });
 
-// Interceptor de petición para logs
+// =====================================================
+// ✅ INTERCEPTOR DE PETICIÓN - AGREGAR HEADER X-Tenant-ID
+// =====================================================
 axiosInstance.interceptors.request.use(
   (config) => {
-    console.log(`📡 [REQUEST] ${config.method?.toUpperCase()} ${config.url}`);
+    // ✅ Agregar tenant_id a cada petición
+    const tenantId = obtenerTenantActual();
+    config.headers['X-Tenant-ID'] = tenantId;
+    
+    console.log(`📡 [REQUEST] ${config.method?.toUpperCase()} ${config.url} | Tenant: ${tenantId}`);
     return config;
   },
   (error) => {
@@ -36,14 +43,11 @@ axiosInstance.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
     
-    // ✅ Manejar peticiones canceladas (AbortController)
     if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
       console.log(`🛑 [CANCELED] ${originalRequest?.url} - Petición cancelada`);
-      // No mostrar toast para cancelaciones, solo propagar el error
       return Promise.reject(error);
     }
     
-    // ✅ Manejar errores de red (sin conexión)
     if (error.message === 'Network Error' || !error.response) {
       console.error('🌐 [NETWORK ERROR] No hay conexión con el servidor');
       toast.error('Error de conexión. Verifica tu internet.', {
@@ -57,13 +61,34 @@ axiosInstance.interceptors.response.use(
       });
     }
     
-    // Log detallado del error para otros errores
     console.error('❌ [RESPONSE ERROR]', {
       url: error.config?.url,
       status: error.response?.status,
       data: error.response?.data,
       message: error.message
     });
+
+    // ✅ Manejo de error TENANT_MISMATCH
+    if (error.response?.status === 403 && error.response?.data?.code === 'TENANT_MISMATCH') {
+      console.error('🏢 Tenant mismatch detectado');
+      toast.error('No tienes permisos para acceder a este municipio', {
+        duration: 5000,
+        icon: '🏢'
+      });
+      // Opcional: redirigir a logout o recargar
+      setTimeout(() => {
+        window.location.href = '/login';
+      }, 2000);
+    }
+
+    // ✅ Manejo de error TENANT_NOT_FOUND
+    if (error.response?.status === 403 && error.response?.data?.code === 'TENANT_NOT_FOUND') {
+      console.error('🏢 Tenant no encontrado');
+      toast.error('Municipio no registrado o inactivo', {
+        duration: 5000,
+        icon: '🏢'
+      });
+    }
 
     // Manejo de rate limit (429)
     if (error.response?.status === 429) {
@@ -86,16 +111,13 @@ axiosInstance.interceptors.response.use(
       localStorage.setItem('rate_limit_info', JSON.stringify(rateLimitInfo));
       window.dispatchEvent(new CustomEvent('rate-limit-activated', { detail: rateLimitInfo }));
 
-      // ✅ Mostrar toast con tiempo de espera
       toast.error(`${mensaje} Espera ${retryAfter} segundos.`, { 
         duration: Math.min(retryAfter * 1000, 10000) 
       });
 
-      // ✅ Solo reintentar si es admin y no es un reintento ya
       if (!originalRequest._retry && esAdmin) {
         originalRequest._retry = true;
         
-        // ✅ Crear promesa de reintento con timeout
         const retryPromise = new Promise((resolve, reject) => {
           setTimeout(() => {
             console.log(`🔄 Reintentando petición a ${originalRequest.url}...`);
@@ -114,11 +136,9 @@ axiosInstance.interceptors.response.use(
       });
     }
 
-    // Manejo de errores de autenticación (401)
     if (error.response?.status === 401) {
       console.warn('⚠️ Sesión expirada o no autenticado');
       
-      // ✅ Verificar si hay información de rate limit activa
       const rateLimitInfo = checkRateLimit();
       if (rateLimitInfo) {
         console.log('⏱️ Rate limit activo, no mostrar error 401');
@@ -129,13 +149,10 @@ axiosInstance.interceptors.response.use(
         });
       }
       
-      // ✅ No redirigir automáticamente, dejar que el componente maneje
-      // Solo agregar información adicional al error
       error.authError = true;
       error.message = error.response?.data?.message || 'Sesión expirada';
     }
 
-    // ✅ Manejo de errores de timeout
     if (error.code === 'ECONNABORTED') {
       console.error('⏰ [TIMEOUT] La petición tardó demasiado tiempo');
       toast.error('La petición ha tardado demasiado. Intenta nuevamente.', {
@@ -148,7 +165,6 @@ axiosInstance.interceptors.response.use(
       });
     }
 
-    // ✅ Manejo de errores 500 (Internal Server Error)
     if (error.response?.status === 500) {
       console.error('🔥 [SERVER ERROR] Error interno del servidor');
       toast.error('Error en el servidor. Intenta más tarde.', {
@@ -160,7 +176,6 @@ axiosInstance.interceptors.response.use(
   }
 );
 
-// ✅ Función para verificar estado de rate limit
 export const checkRateLimit = () => {
   const stored = localStorage.getItem('rate_limit_info');
   if (!stored) return null;
@@ -168,7 +183,6 @@ export const checkRateLimit = () => {
   try {
     const info = JSON.parse(stored);
     if (Date.now() > info.expira) {
-      // ✅ Limpiar si expiró
       localStorage.removeItem('rate_limit_info');
       window.dispatchEvent(new CustomEvent('rate-limit-cleared'));
       return null;
@@ -180,14 +194,12 @@ export const checkRateLimit = () => {
   }
 };
 
-// ✅ Función para limpiar manualmente el rate limit (útil para logout)
 export const clearRateLimit = () => {
   localStorage.removeItem('rate_limit_info');
   window.dispatchEvent(new CustomEvent('rate-limit-cleared'));
   console.log('🧹 Rate limit info limpiado manualmente');
 };
 
-// ✅ Función para obtener tiempo restante de rate limit
 export const getRateLimitRemainingTime = () => {
   const info = checkRateLimit();
   if (!info) return 0;

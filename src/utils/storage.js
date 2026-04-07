@@ -1,12 +1,12 @@
-// utils/storage.js
+// src/utils/storage.js
 export const guardarSesion = (token, usuario) => {
-  // Guardar solo datos no sensibles
   localStorage.setItem('auth_token', token);
   localStorage.setItem('user', JSON.stringify({
     id: usuario.id,
     nombre: usuario.nombre,
     email: usuario.email,
-    rol: usuario.rol
+    rol: usuario.rol,
+    tenant_id: usuario.tenant_id || 'default'
   }));
 };
 
@@ -22,5 +22,22 @@ export const obtenerUsuario = () => {
 export const cerrarSesion = () => {
   localStorage.removeItem('auth_token');
   localStorage.removeItem('user');
+  localStorage.removeItem('tenant_id');
   window.location.href = '/';
+};
+
+export const guardarTenant = (tenantId) => {
+  if (tenantId) {
+    localStorage.setItem('tenant_id', tenantId);
+    console.log(`🏢 Tenant guardado: ${tenantId}`);
+  }
+};
+
+export const obtenerTenantActual = () => {
+  return localStorage.getItem('tenant_id') || 'default';
+};
+
+export const limpiarTenant = () => {
+  localStorage.removeItem('tenant_id');
+  console.log('🏢 Tenant limpiado');
 };
