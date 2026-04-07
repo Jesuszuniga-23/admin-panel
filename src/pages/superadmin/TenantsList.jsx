@@ -1,10 +1,9 @@
-// src/pages/superadmin/TenantsList.jsx
+// src/pages/superadmin/TenantsList.jsx - VERSIÓN CORREGIDA
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Building2, Plus, Search, Eye, Edit, CreditCard, CheckCircle, XCircle, Clock, AlertTriangle } from 'lucide-react';
 import tenantService from '../../services/admin/tenant.service';
 import toast from 'react-hot-toast';
-import { useDebounce } from '../../hooks/useDebounce';
 
 const TenantsList = () => {
     const navigate = useNavigate();
@@ -14,8 +13,8 @@ const TenantsList = () => {
     const [statusFilter, setStatusFilter] = useState('');
     const [planFilter, setPlanFilter] = useState('');
     
-    const searchDebounced = useDebounce(search, 500);
     const abortControllerRef = useRef(null);
+    const isMounted = useRef(true);
 
     const getStatusBadge = (status, activo) => {
         if (status === 'active' && activo) {
@@ -38,13 +37,14 @@ const TenantsList = () => {
         return new Date(date).toLocaleDateString('es-MX');
     };
 
-    // ✅ Función de carga SIMPLE - SIN useCallback
     const cargarTenants = async () => {
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
         }
         
         abortControllerRef.current = new AbortController();
+        
+        if (!isMounted.current) return;
         setLoading(true);
         
         try {
@@ -53,12 +53,15 @@ const TenantsList = () => {
                 signal: abortControllerRef.current.signal
             });
             
+            if (!isMounted.current) return;
+            
             if (response.success && response.data) {
                 let filteredTenants = [...response.data];
                 
-                // Filtrar por búsqueda
-                if (searchDebounced && searchDebounced.trim() !== '') {
-                    const searchLower = searchDebounced.toLowerCase().trim();
+                // ✅ FILTRADO SEGURO - search es string
+                const searchValue = typeof search === 'string' ? search.trim() : '';
+                if (searchValue !== '') {
+                    const searchLower = searchValue.toLowerCase();
                     filteredTenants = filteredTenants.filter(t => {
                         const nombre = t.nombre ? String(t.nombre).toLowerCase() : '';
                         const id = t.id ? String(t.id).toLowerCase() : '';
@@ -86,22 +89,34 @@ const TenantsList = () => {
         } catch (error) {
             if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
                 console.error('Error cargando tenants:', error);
-                toast.error('Error al cargar municipios');
+                if (isMounted.current) {
+                    toast.error('Error al cargar municipios');
+                }
             }
         } finally {
-            setLoading(false);
+            if (isMounted.current) {
+                setLoading(false);
+            }
         }
     };
 
-    // ✅ useEffect SIMPLE - se ejecuta cuando cambian los filtros
+    // ✅ useEffect SOLO UNA VEZ - sin dependencias problemáticas
     useEffect(() => {
+        isMounted.current = true;
         cargarTenants();
+        
         return () => {
+            isMounted.current = false;
             if (abortControllerRef.current) {
                 abortControllerRef.current.abort();
             }
         };
-    }, [searchDebounced, statusFilter, planFilter]); // ← Solo estas dependencias
+    }, []); // ← ARREGLO VACÍO - solo se ejecuta una vez
+
+    // ✅ Función para aplicar filtros (recarga manual)
+    const aplicarFiltros = () => {
+        cargarTenants();
+    };
 
     if (loading && tenants.length === 0) {
         return (
@@ -119,13 +134,22 @@ const TenantsList = () => {
                     <h1 className="text-2xl font-bold text-gray-800">Municipios</h1>
                     <p className="text-gray-500 mt-1">Gestión de todos los municipios del sistema</p>
                 </div>
-                <button
-                    onClick={() => navigate('/superadmin/municipios/nuevo')}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                    <Plus size={18} />
-                    Nuevo Municipio
-                </button>
+                <div className="flex gap-2">
+                    <button
+                        onClick={aplicarFiltros}
+                        className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                    >
+                        <Search size={16} />
+                        Aplicar filtros
+                    </button>
+                    <button
+                        onClick={() => navigate('/superadmin/municipios/nuevo')}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                        <Plus size={18} />
+                        Nuevo Municipio
+                    </button>
+                </div>
             </div>
 
             {/* Filtros */}
