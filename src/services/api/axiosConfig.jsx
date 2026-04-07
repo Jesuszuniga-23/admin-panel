@@ -19,12 +19,15 @@ const axiosInstance = axios.create({
 // =====================================================
 // ✅ INTERCEPTOR DE PETICIÓN - AGREGAR HEADER X-Tenant-ID
 // =====================================================
+// ✅ Agregar un interceptor para asegurar que las cookies se envían
 axiosInstance.interceptors.request.use(
   (config) => {
-    // ✅ Agregar tenant_id a cada petición
+    // Forzar que las cookies se incluyan
+    config.withCredentials = true;
+
     const tenantId = obtenerTenantActual();
     config.headers['X-Tenant-ID'] = tenantId;
-    
+
     console.log(`📡 [REQUEST] ${config.method?.toUpperCase()} ${config.url} | Tenant: ${tenantId}`);
     return config;
   },
@@ -42,12 +45,12 @@ axiosInstance.interceptors.response.use(
   },
   async (error) => {
     const originalRequest = error.config;
-    
+
     if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
       console.log(`🛑 [CANCELED] ${originalRequest?.url} - Petición cancelada`);
       return Promise.reject(error);
     }
-    
+
     if (error.message === 'Network Error' || !error.response) {
       console.error('🌐 [NETWORK ERROR] No hay conexión con el servidor');
       toast.error('Error de conexión. Verifica tu internet.', {
@@ -60,7 +63,7 @@ axiosInstance.interceptors.response.use(
         message: 'No hay conexión con el servidor'
       });
     }
-    
+
     console.error('❌ [RESPONSE ERROR]', {
       url: error.config?.url,
       status: error.response?.status,
@@ -107,17 +110,17 @@ axiosInstance.interceptors.response.use(
         retryAfter,
         esAdmin
       };
-      
+
       localStorage.setItem('rate_limit_info', JSON.stringify(rateLimitInfo));
       window.dispatchEvent(new CustomEvent('rate-limit-activated', { detail: rateLimitInfo }));
 
-      toast.error(`${mensaje} Espera ${retryAfter} segundos.`, { 
-        duration: Math.min(retryAfter * 1000, 10000) 
+      toast.error(`${mensaje} Espera ${retryAfter} segundos.`, {
+        duration: Math.min(retryAfter * 1000, 10000)
       });
 
       if (!originalRequest._retry && esAdmin) {
         originalRequest._retry = true;
-        
+
         const retryPromise = new Promise((resolve, reject) => {
           setTimeout(() => {
             console.log(`🔄 Reintentando petición a ${originalRequest.url}...`);
@@ -125,7 +128,7 @@ axiosInstance.interceptors.response.use(
             resolve(axiosInstance(originalRequest));
           }, retryAfter * 1000);
         });
-        
+
         return retryPromise;
       }
 
@@ -138,7 +141,7 @@ axiosInstance.interceptors.response.use(
 
     if (error.response?.status === 401) {
       console.warn('⚠️ Sesión expirada o no autenticado');
-      
+
       const rateLimitInfo = checkRateLimit();
       if (rateLimitInfo) {
         console.log('⏱️ Rate limit activo, no mostrar error 401');
@@ -148,7 +151,7 @@ axiosInstance.interceptors.response.use(
           rateLimitInfo
         });
       }
-      
+
       error.authError = true;
       error.message = error.response?.data?.message || 'Sesión expirada';
     }
@@ -179,7 +182,7 @@ axiosInstance.interceptors.response.use(
 export const checkRateLimit = () => {
   const stored = localStorage.getItem('rate_limit_info');
   if (!stored) return null;
-  
+
   try {
     const info = JSON.parse(stored);
     if (Date.now() > info.expira) {
@@ -203,7 +206,7 @@ export const clearRateLimit = () => {
 export const getRateLimitRemainingTime = () => {
   const info = checkRateLimit();
   if (!info) return 0;
-  
+
   const remaining = Math.max(0, Math.ceil((info.expira - Date.now()) / 1000));
   return remaining;
 };

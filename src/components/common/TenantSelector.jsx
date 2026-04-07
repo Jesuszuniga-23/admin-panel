@@ -25,24 +25,59 @@ const TenantSelector = () => {
   }, []);
 
   // Cargar lista de tenants (solo para superadmin)
-  const cargarTenants = async () => {
-    if (!isSuperAdmin) return;
-    
-    setCargandoTenants(true);
+ const cargarTenants = async () => {
+    setLoading(true);
     try {
-      const response = await axiosInstance.get('/admin/tenants');
-      if (response.data?.success) {
-        setTenants(response.data.data);
-      } else if (response.data?.data) {
-        setTenants(response.data.data);
-      }
+        console.log('🔍 Fetching tenants con fetch...');
+        
+        const response = await fetch('https://backend-emergencias.onrender.com/api/admin/tenants', {
+            credentials: 'include',
+            headers: {
+                'X-Tenant-ID': 'default',
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        console.log('📦 Respuesta fetch:', data);
+        
+        if (data.success && data.data) {
+            let filteredTenants = [...data.data];
+            
+            // Filtrar por búsqueda
+            if (searchDebounced && searchDebounced.trim() !== '') {
+                const searchLower = searchDebounced.toLowerCase().trim();
+                filteredTenants = filteredTenants.filter(t => {
+                    const nombre = t.nombre ? String(t.nombre).toLowerCase() : '';
+                    const id = t.id ? String(t.id).toLowerCase() : '';
+                    return nombre.includes(searchLower) || id.includes(searchLower);
+                });
+            }
+            
+            // Filtrar por estado
+            if (statusFilter) {
+                filteredTenants = filteredTenants.filter(t => t.status === statusFilter);
+            }
+            
+            // Filtrar por plan
+            if (planFilter) {
+                filteredTenants = filteredTenants.filter(t => t.plan_id === planFilter);
+            }
+            
+            // Excluir default
+            filteredTenants = filteredTenants.filter(t => t.id !== 'default');
+            
+            setTenants(filteredTenants);
+        } else {
+            toast.error(data.error || 'Error al cargar municipios');
+        }
     } catch (error) {
-      console.error('Error cargando tenants:', error);
-      toast.error('Error al cargar los municipios');
+        console.error('Error cargando tenants:', error);
+        toast.error('Error al cargar municipios');
     } finally {
-      setCargandoTenants(false);
+        setLoading(false);
     }
-  };
+};
 
   // Abrir dropdown y cargar tenants
   const handleOpen = () => {
