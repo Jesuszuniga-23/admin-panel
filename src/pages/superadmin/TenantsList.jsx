@@ -1,5 +1,5 @@
 // src/pages/superadmin/TenantsList.jsx
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Building2, Plus, Search, Eye, Edit, CreditCard, CheckCircle, XCircle, Clock, AlertTriangle } from 'lucide-react';
 import tenantService from '../../services/admin/tenant.service';
@@ -13,10 +13,9 @@ const TenantsList = () => {
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
     const [planFilter, setPlanFilter] = useState('');
-
+    
     const searchDebounced = useDebounce(search, 500);
     const abortControllerRef = useRef(null);
-    const isMountedRef = useRef(true);
 
     const getStatusBadge = (status, activo) => {
         if (status === 'active' && activo) {
@@ -39,29 +38,26 @@ const TenantsList = () => {
         return new Date(date).toLocaleDateString('es-MX');
     };
 
-    const cargarTenants = useCallback(async () => {
+    // ✅ Función de carga SIMPLE - SIN useCallback
+    const cargarTenants = async () => {
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
         }
-
+        
         abortControllerRef.current = new AbortController();
-
-        if (!isMountedRef.current) return;
         setLoading(true);
-
+        
         try {
             console.log('🔍 Fetching tenants...');
             const response = await tenantService.listarTenants({
                 signal: abortControllerRef.current.signal
             });
-
-            if (!isMountedRef.current) return;
-
+            
             if (response.success && response.data) {
                 let filteredTenants = [...response.data];
-
+                
                 // Filtrar por búsqueda
-                if (searchDebounced && typeof searchDebounced === 'string' && searchDebounced.trim() !== '') {
+                if (searchDebounced && searchDebounced.trim() !== '') {
                     const searchLower = searchDebounced.toLowerCase().trim();
                     filteredTenants = filteredTenants.filter(t => {
                         const nombre = t.nombre ? String(t.nombre).toLowerCase() : '';
@@ -69,20 +65,20 @@ const TenantsList = () => {
                         return nombre.includes(searchLower) || id.includes(searchLower);
                     });
                 }
-
+                
                 // Filtrar por estado
                 if (statusFilter && statusFilter !== '') {
                     filteredTenants = filteredTenants.filter(t => t.status === statusFilter);
                 }
-
+                
                 // Filtrar por plan
                 if (planFilter && planFilter !== '') {
                     filteredTenants = filteredTenants.filter(t => t.plan_id === planFilter);
                 }
-
+                
                 // Excluir default
                 filteredTenants = filteredTenants.filter(t => t.id !== 'default');
-
+                
                 setTenants(filteredTenants);
             } else {
                 toast.error(response.error || 'Error al cargar municipios');
@@ -90,30 +86,24 @@ const TenantsList = () => {
         } catch (error) {
             if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
                 console.error('Error cargando tenants:', error);
-                if (isMountedRef.current) {
-                    toast.error('Error al cargar municipios');
-                }
+                toast.error('Error al cargar municipios');
             }
         } finally {
-            if (isMountedRef.current) {
-                setLoading(false);
-            }
+            setLoading(false);
         }
-    }, [searchDebounced, statusFilter, planFilter]);
+    };
 
+    // ✅ useEffect SIMPLE - se ejecuta cuando cambian los filtros
     useEffect(() => {
-        isMountedRef.current = true;
         cargarTenants();
-
         return () => {
-            isMountedRef.current = false;
             if (abortControllerRef.current) {
                 abortControllerRef.current.abort();
             }
         };
-    }, [cargarTenants]);
+    }, [searchDebounced, statusFilter, planFilter]); // ← Solo estas dependencias
 
-    if (loading) {
+    if (loading && tenants.length === 0) {
         return (
             <div className="flex items-center justify-center h-64">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -151,7 +141,7 @@ const TenantsList = () => {
                             className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                     </div>
-
+                    
                     <select
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
@@ -163,7 +153,7 @@ const TenantsList = () => {
                         <option value="suspended">Suspendidos</option>
                         <option value="expired">Expirados</option>
                     </select>
-
+                    
                     <select
                         value={planFilter}
                         onChange={(e) => setPlanFilter(e.target.value)}
