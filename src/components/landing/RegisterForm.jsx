@@ -31,29 +31,35 @@ const RegisterForm = ({ selectedPlan, onBack }) => {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    // ✅ API SEPOMEX REAL
+    // ✅ API COPOMEX CON TOKEN SEGURO (variables de entorno)
     const validarCP = async (cp) => {
         if (cp.length !== 5) return;
-        
+
         setCpValidando(true);
         try {
-            const response = await fetch(`https://api-sepomex.azurewebsites.net/api/v1/zip-codes/${cp}`);
-            
+            // 🔑 Token seguro desde variables de entorno
+            const TOKEN = import.meta.env.VITE_COPOMEX_TOKEN;
+
+            const url = `https://api.copomex.com/query/info_cp/${cp}?token=${TOKEN}`;
+
+            const response = await fetch(url);
+
             if (!response.ok) {
                 toast.error('Código postal no encontrado');
                 return;
             }
-            
+
             const data = await response.json();
-            
-            if (data && data.length > 0) {
-                const asentamiento = data[0];
+
+            // COPOMEX devuelve un array, el primer elemento contiene la información
+            if (Array.isArray(data) && data.length > 0 && data[0].response) {
+                const info = data[0].response;
                 setFormData(prev => ({
                     ...prev,
-                    municipio_nombre: asentamiento.municipio,
-                    estado: asentamiento.estado
+                    municipio_nombre: info.municipio,
+                    estado: info.estado
                 }));
-                toast.success(`📍 ${asentamiento.municipio}, ${asentamiento.estado}`);
+                toast.success(`📍 ${info.municipio}, ${info.estado}`);
             } else {
                 toast.error('No se encontraron datos para este CP');
             }
@@ -68,28 +74,28 @@ const RegisterForm = ({ selectedPlan, onBack }) => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
-        
+
         try {
             const response = await registroService.registrarMunicipio(formData);
-            
+
             if (response.success) {
                 const { tenant_id, admin_email } = response.data;
-                
+
                 // Guardar tenant_id para el header X-Tenant-ID
                 localStorage.setItem('tenant_id', tenant_id);
-                
+
                 toast.success(
                     `✅ ¡Registro exitoso! Ahora inicia sesión con: ${admin_email}`,
                     { duration: 8000 }
                 );
-                
+
                 // ✅ REDIRIGIR A /login (flujo correcto)
-                navigate('/login', { 
-                    state: { 
+                navigate('/login', {
+                    state: {
                         message: 'Registro completado. Inicia sesión con tu cuenta de Google.',
                         admin_email: admin_email,
-                        tenant_id: tenant_id 
-                    } 
+                        tenant_id: tenant_id
+                    }
                 });
             } else {
                 toast.error(response.error || 'Error al enviar solicitud');
@@ -107,11 +113,11 @@ const RegisterForm = ({ selectedPlan, onBack }) => {
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 py-8 px-4">
             <div className="max-w-4xl mx-auto">
                 {/* Botón volver */}
-                <button 
-                    onClick={onBack} 
+                <button
+                    onClick={onBack}
                     className="flex items-center gap-2 text-slate-600 hover:text-slate-800 mb-6 transition-colors"
                 >
-                    <ArrowLeft size={20} /> 
+                    <ArrowLeft size={20} />
                     <span>Volver a planes</span>
                 </button>
 
@@ -140,7 +146,7 @@ const RegisterForm = ({ selectedPlan, onBack }) => {
                                 <Building2 size={20} className="text-blue-600" />
                                 <h3 className="font-semibold text-slate-800">Datos del Municipio</h3>
                             </div>
-                            
+
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="md:col-span-2">
                                     <label className="block text-sm font-medium text-slate-700 mb-1">
@@ -167,7 +173,7 @@ const RegisterForm = ({ selectedPlan, onBack }) => {
                                     </div>
                                     <p className="text-xs text-slate-500 mt-1">Ingresa 5 dígitos para autocompletar municipio y estado</p>
                                 </div>
-                                
+
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">
                                         Municipio <span className="text-red-500">*</span>
@@ -186,7 +192,7 @@ const RegisterForm = ({ selectedPlan, onBack }) => {
                                         />
                                     </div>
                                 </div>
-                                
+
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">
                                         Estado <span className="text-red-500">*</span>
@@ -201,7 +207,7 @@ const RegisterForm = ({ selectedPlan, onBack }) => {
                                         className="w-full px-4 py-3 border border-slate-300 rounded-xl bg-slate-50"
                                     />
                                 </div>
-                                
+
                                 <div className="md:col-span-2">
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Dirección</label>
                                     <input
@@ -222,7 +228,7 @@ const RegisterForm = ({ selectedPlan, onBack }) => {
                                 <User size={20} className="text-blue-600" />
                                 <h3 className="font-semibold text-slate-800">Datos del Solicitante (quien contrata)</h3>
                             </div>
-                            
+
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">
@@ -269,7 +275,7 @@ const RegisterForm = ({ selectedPlan, onBack }) => {
                                 <Shield size={20} className="text-blue-600" />
                                 <h3 className="font-semibold text-slate-800">Datos del Administrador (quien operará el sistema)</h3>
                             </div>
-                            
+
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">
