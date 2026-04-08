@@ -103,6 +103,14 @@ TENANTS: {
     STATS: (id) => `${BASE_URL}/admin/tenants/${id}/stats`,
     CREATE_ADMIN: (tenantId) => `${BASE_URL}/admin/tenants/${tenantId}/admin`
 },
+// Agregar al final del objeto ENDPOINTS:
+PUBLIC: {
+    PLANES: `${BASE_URL}/public/planes`,
+    REGISTER_MUNICIPIO: `${BASE_URL}/public/register-municipio`,
+},
+TENANT_DASHBOARD: {
+    ORDEN_PAGO: `${BASE_URL}/tenant/orden-pago`,
+}
 };
 
 // ✅ Función de utilidad para verificar endpoints

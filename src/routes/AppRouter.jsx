@@ -33,6 +33,7 @@ import DashboardSuperAdmin from '../pages/superadmin/DashboardSuperAdmin';
 import TenantsList from '../pages/superadmin/TenantsList';
 import TenantDetail from '../pages/superadmin/TenantDetail';
 import TenantForm from '../pages/superadmin/TenantForm';
+import LandingPage from '../pages/LandingPage';
 
 
 // ✅ Logs condicionales solo en desarrollo
@@ -48,7 +49,8 @@ const AppRouter = () => {
   return (
     <Routes>
       {/* Rutas públicas */}
-      <Route path="/" element={<Home />} />
+    {/*  <Route path="/" element={<Home />} /> */}
+      <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<Login />} />
       <Route path="/verificar-2fa" element={<Verificar2FA />} />
 
@@ -119,7 +121,6 @@ const AppRouter = () => {
         <Route path="municipios" element={<TenantsList />} />
         <Route path="municipios/nuevo" element={<TenantForm />} />
         <Route path="municipios/:id/editar" element={<TenantForm />} />
-        <Route path="municipios/:id/pagar" element={<div>Registrar pago (próximamente)</div>} />
         <Route path="municipios/:id" element={<TenantDetail />} />
       </Route>
 

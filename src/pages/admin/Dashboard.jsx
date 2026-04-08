@@ -6,6 +6,8 @@ import {
   ChevronRight, AlertCircle, CheckCircle, XCircle,
   TrendingUp, TrendingDown, Minus
 } from 'lucide-react';
+import TenantStatusBanner from '../../components/admin/TenantStatusBanner';
+import tenantService from '../../services/admin/tenant.service';
 import useAuthStore from '../../store/authStore';
 import { AreaChart, Area, PieChart as RePieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import IconoEntidad, { BadgeIcono } from '../../components/ui/IconoEntidad';
@@ -27,7 +29,7 @@ const rolToEntidad = {
 // Función para formatear nombres
 const formatearNombre = (nombre) => {
   if (!nombre) return '';
-  
+
   const reemplazos = [
     { de: 'Ã¡', para: 'á' }, { de: 'Ã©', para: 'é' }, { de: 'Ã­', para: 'í' },
     { de: 'Ã³', para: 'ó' }, { de: 'Ãº', para: 'ú' }, { de: 'Ã±', para: 'ñ' },
@@ -35,12 +37,12 @@ const formatearNombre = (nombre) => {
     { de: 'Ã“', para: 'Ó' }, { de: 'Ãš', para: 'Ú' }, { de: 'Ã‘', para: 'Ñ' },
     { de: '£', para: 'ú' }, { de: '¤', para: 'ñ' }
   ];
-  
+
   let nombreNormalizado = nombre;
   reemplazos.forEach(({ de, para }) => {
     nombreNormalizado = nombreNormalizado.split(de).join(para);
   });
-  
+
   return nombreNormalizado
     .toLowerCase()
     .split(' ')
@@ -152,6 +154,7 @@ const Dashboard = () => {
   const [stats, setStats] = useState(defaultData);
   const [alertasPorHora, setAlertasPorHora] = useState([]);
   const [actividadReciente, setActividadReciente] = useState({ personal: [], unidades: [], alertas: [] });
+  const [tenantInfo, setTenantInfo] = useState(null);
   const navigate = useNavigate();
   // ✅ REDIRIGIR SUPERADMIN AL DASHBOARD DE CONTROL
   useEffect(() => {
@@ -160,7 +163,31 @@ const Dashboard = () => {
       navigate('/superadmin/dashboard', { replace: true });
     }
   }, [user, navigate]);
-  
+  // ✅ NUEVO: Cargar información del tenant cuando el usuario está autenticado
+  useEffect(() => {
+    const cargarTenantInfo = async () => {
+      // Solo cargar si hay usuario y NO es superadmin (superadmin tiene su propio dashboard)
+      if (user && user.rol !== 'superadmin') {
+        try {
+          // Obtener tenant_id del usuario o del store
+          const tenantId = user.tenant_id || localStorage.getItem('tenant_id');
+
+          if (tenantId) {
+            const response = await tenantService.obtenerTenant(tenantId);
+            if (response.success && response.data) {
+              setTenantInfo(response.data);
+            }
+          }
+        } catch (error) {
+          console.error('Error cargando info del tenant:', error);
+          // No mostrar error al usuario, solo log
+        }
+      }
+    };
+
+    cargarTenantInfo();
+  }, [user]);
+
   // ✅ OBTENER FILTROS CORRECTOS
   const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
   const rolPersonalPermitido = authService.getRolPersonalPermitido();
@@ -262,7 +289,7 @@ const Dashboard = () => {
           }
         }
       });
-      
+
       setAlertasPorHora(data.alertasPorHora || []);
       setActividadReciente(data.actividadReciente || { personal: [], unidades: [], alertas: [] });
     }
@@ -314,25 +341,27 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <main className="p-4 sm:p-6 md:p-8">
+        {/* ✅ NUEVO: BANNER DE ESTADO DEL TENANT */}
+      <TenantStatusBanner tenant={tenantInfo} />
         {/* KPIs principales */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
           {stats?.kpis && Object.entries(stats.kpis).map(([key, data]) => {
-            const titulo = 
+            const titulo =
               key === 'personal' ? 'Personal' :
-              key === 'unidades' ? 'Unidades' :
-              key === 'alertas' ? 'Alertas cerradas/expiradas' :
-              key.charAt(0).toUpperCase() + key.slice(1);
-            
-            const icono = 
+                key === 'unidades' ? 'Unidades' :
+                  key === 'alertas' ? 'Alertas cerradas/expiradas' :
+                    key.charAt(0).toUpperCase() + key.slice(1);
+
+            const icono =
               key === 'personal' ? <Users size={20} className="md:w-6 md:h-6 text-white" /> :
-              key === 'unidades' ? <Truck size={20} className="md:w-6 md:h-6 text-white" /> :
-              <Bell size={20} className="md:w-6 md:h-6 text-white" />;
-            
-            const color = 
+                key === 'unidades' ? <Truck size={20} className="md:w-6 md:h-6 text-white" /> :
+                  <Bell size={20} className="md:w-6 md:h-6 text-white" />;
+
+            const color =
               key === 'personal' ? 'blue' :
-              key === 'unidades' ? 'purple' :
-              'amber';
-            
+                key === 'unidades' ? 'purple' :
+                  'amber';
+
             return (
               <KpiCard
                 key={key}
@@ -453,7 +482,7 @@ const Dashboard = () => {
             </div>
             <p className="text-xs md:text-sm text-slate-500 truncate">Personal Activo</p>
           </div>
-          
+
           {/* Unidades Activas */}
           <div className="bg-white rounded-xl md:rounded-2xl shadow-lg shadow-slate-200/50 p-4 md:p-6 hover:shadow-xl transition-all">
             <div className="flex items-start justify-between mb-2 md:mb-4">
@@ -467,7 +496,7 @@ const Dashboard = () => {
             </div>
             <p className="text-xs md:text-sm text-slate-500 truncate">Unidades Activas</p>
           </div>
-          
+
           {/* Alertas Activas */}
           <StatCard
             icon={<Bell size={20} className="text-white" />}
@@ -476,7 +505,7 @@ const Dashboard = () => {
             subtitle="Sin asignar"
             color="rose"
           />
-          
+
           {/* Alertas Cerradas Manual */}
           <StatCard
             icon={<XCircle size={20} className="text-white" />}
@@ -499,7 +528,7 @@ const Dashboard = () => {
               color="amber"
             />
           )}
-          
+
           {/* Alertas Cerradas Totales */}
           {mostrarTarjetaPanico && (
             <StatCard
@@ -510,7 +539,7 @@ const Dashboard = () => {
               color="emerald"
             />
           )}
-          
+
           {/* Alertas Expiradas */}
           <StatCard
             icon={<AlertTriangle size={20} className="text-white" />}
@@ -519,7 +548,7 @@ const Dashboard = () => {
             subtitle="Sin atender"
             color="gray"
           />
-          
+
           {/* Personal Total */}
           <div className="bg-white rounded-xl md:rounded-2xl shadow-lg shadow-slate-200/50 p-4 md:p-6 hover:shadow-xl transition-all">
             <div className="flex items-start justify-between mb-2 md:mb-4">
@@ -561,9 +590,8 @@ const Dashboard = () => {
                           <BadgeIcono entidad={rolToEntidad[p.rol] || 'ADMIN'} texto={p.rol} size={10} />
                         </div>
                       </div>
-                      <span className={`text-xs px-1.5 md:px-2 py-0.5 md:py-1 rounded-full whitespace-nowrap ${
-                        p.disponible ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                      }`}>
+                      <span className={`text-xs px-1.5 md:px-2 py-0.5 md:py-1 rounded-full whitespace-nowrap ${p.disponible ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                        }`}>
                         {p.disponible ? 'Disponible' : 'Ocupado'}
                       </span>
                     </div>
@@ -588,12 +616,11 @@ const Dashboard = () => {
                   .map((u) => (
                     <div key={u.id} className="flex items-center justify-between p-2 md:p-3 bg-slate-50 rounded-lg md:rounded-xl hover:bg-slate-100 transition-colors">
                       <div className="flex items-center gap-2 md:gap-3 min-w-0">
-                        <div className={`w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl flex items-center justify-center flex-shrink-0 ${
-                          u.tipo === 'patrulla' ? 'bg-blue-100' : 'bg-emerald-100'
-                        }`}>
-                          <IconoEntidad 
-                            entidad={u.tipo === 'patrulla' ? 'PATRULLA' : 'AMBULANCIA'} 
-                            size={16} 
+                        <div className={`w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl flex items-center justify-center flex-shrink-0 ${u.tipo === 'patrulla' ? 'bg-blue-100' : 'bg-emerald-100'
+                          }`}>
+                          <IconoEntidad
+                            entidad={u.tipo === 'patrulla' ? 'PATRULLA' : 'AMBULANCIA'}
+                            size={16}
                           />
                         </div>
                         <div className="min-w-0">
@@ -601,11 +628,10 @@ const Dashboard = () => {
                           <p className="text-xs text-slate-400 capitalize truncate">{u.tipo === 'patrulla' ? 'Patrulla' : 'Ambulancia'}</p>
                         </div>
                       </div>
-                      <span className={`text-xs px-1.5 md:px-2 py-0.5 md:py-1 rounded-full whitespace-nowrap ${
-                        u.estado === 'disponible' ? 'bg-emerald-100 text-emerald-700' :
-                        u.estado === 'ocupada' ? 'bg-rose-100 text-rose-700' :
-                        'bg-slate-100 text-slate-700'
-                      }`}>
+                      <span className={`text-xs px-1.5 md:px-2 py-0.5 md:py-1 rounded-full whitespace-nowrap ${u.estado === 'disponible' ? 'bg-emerald-100 text-emerald-700' :
+                          u.estado === 'ocupada' ? 'bg-rose-100 text-rose-700' :
+                            'bg-slate-100 text-slate-700'
+                        }`}>
                         {u.estado}
                       </span>
                     </div>

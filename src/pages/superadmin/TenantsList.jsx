@@ -1,7 +1,7 @@
 // src/pages/superadmin/TenantsList.jsx - VERSIÓN CORREGIDA
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Building2, Plus, Search, Eye, Edit, CreditCard, CheckCircle, XCircle, Clock, AlertTriangle } from 'lucide-react';
+import { Building2, Plus, Search, Eye, Edit, CreditCard, CheckCircle, XCircle, Clock, AlertTriangle, Unlock } from 'lucide-react';
 import tenantService from '../../services/admin/tenant.service';
 import toast from 'react-hot-toast';
 
@@ -12,7 +12,14 @@ const TenantsList = () => {
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
     const [planFilter, setPlanFilter] = useState('');
-    
+    const [showPayModal, setShowPayModal] = useState(false);
+    const [showSuspendModal, setShowSuspendModal] = useState(false);
+    const [selectedTenant, setSelectedTenant] = useState(null);
+    const [periodo, setPeriodo] = useState('anual');
+    const [monto, setMonto] = useState('');
+    const [motivo, setMotivo] = useState('');
+    const [actionLoading, setActionLoading] = useState(false);
+
     const abortControllerRef = useRef(null);
     const isMounted = useRef(true);
 
@@ -41,23 +48,23 @@ const TenantsList = () => {
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
         }
-        
+
         abortControllerRef.current = new AbortController();
-        
+
         if (!isMounted.current) return;
         setLoading(true);
-        
+
         try {
             console.log('🔍 Fetching tenants...');
             const response = await tenantService.listarTenants({
                 signal: abortControllerRef.current.signal
             });
-            
+
             if (!isMounted.current) return;
-            
+
             if (response.success && response.data) {
                 let filteredTenants = [...response.data];
-                
+
                 // ✅ FILTRADO SEGURO - search es string
                 const searchValue = typeof search === 'string' ? search.trim() : '';
                 if (searchValue !== '') {
@@ -68,20 +75,20 @@ const TenantsList = () => {
                         return nombre.includes(searchLower) || id.includes(searchLower);
                     });
                 }
-                
+
                 // Filtrar por estado
                 if (statusFilter && statusFilter !== '') {
                     filteredTenants = filteredTenants.filter(t => t.status === statusFilter);
                 }
-                
+
                 // Filtrar por plan
                 if (planFilter && planFilter !== '') {
                     filteredTenants = filteredTenants.filter(t => t.plan_id === planFilter);
                 }
-                
+
                 // Excluir default
                 filteredTenants = filteredTenants.filter(t => t.id !== 'default');
-                
+
                 setTenants(filteredTenants);
             } else {
                 toast.error(response.error || 'Error al cargar municipios');
@@ -104,7 +111,7 @@ const TenantsList = () => {
     useEffect(() => {
         isMounted.current = true;
         cargarTenants();
-        
+
         return () => {
             isMounted.current = false;
             if (abortControllerRef.current) {
@@ -165,7 +172,7 @@ const TenantsList = () => {
                             className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                     </div>
-                    
+
                     <select
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
@@ -177,7 +184,7 @@ const TenantsList = () => {
                         <option value="suspended">Suspendidos</option>
                         <option value="expired">Expirados</option>
                     </select>
-                    
+
                     <select
                         value={planFilter}
                         onChange={(e) => setPlanFilter(e.target.value)}
@@ -246,25 +253,67 @@ const TenantsList = () => {
                                                 <div className="flex items-center gap-2">
                                                     <button
                                                         onClick={() => navigate(`/superadmin/municipios/${tenant.id}`)}
-                                                        className="p-1 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                                                         title="Ver detalles"
                                                     >
                                                         <Eye size={18} />
                                                     </button>
                                                     <button
                                                         onClick={() => navigate(`/superadmin/municipios/${tenant.id}/editar`)}
-                                                        className="p-1 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                                                        className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
                                                         title="Editar"
                                                     >
                                                         <Edit size={18} />
                                                     </button>
-                                                    <button
-                                                        onClick={() => navigate(`/superadmin/municipios/${tenant.id}/pagar`)}
-                                                        className="p-1 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                                                        title="Registrar pago"
-                                                    >
-                                                        <CreditCard size={18} />
-                                                    </button>
+
+                                                    {/* Botón Pagar */}
+                                                    {(tenant.status === 'trial' || tenant.status === 'expired') && (
+                                                        <button
+                                                            onClick={() => {
+                                                                setSelectedTenant(tenant);
+                                                                setShowPayModal(true);
+                                                            }}
+                                                            className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                                                            title="Registrar pago"
+                                                        >
+                                                            <CreditCard size={18} />
+                                                        </button>
+                                                    )}
+
+                                                    {/* Botón Suspender */}
+                                                    {tenant.status === 'active' && tenant.id !== 'default' && (
+                                                        <button
+                                                            onClick={() => {
+                                                                setSelectedTenant(tenant);
+                                                                setShowSuspendModal(true);
+                                                            }}
+                                                            className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+                                                            title="Suspender"
+                                                        >
+                                                            <Lock size={18} />
+                                                        </button>
+                                                    )}
+
+                                                    {/* Botón Reactivar */}
+                                                    {tenant.status === 'suspended' && (
+                                                        <button
+                                                            onClick={async () => {
+                                                                if (confirm(`¿Reactivar ${tenant.nombre}?`)) {
+                                                                    try {
+                                                                        await tenantService.reactivarTenant(tenant.id);
+                                                                        toast.success('Municipio reactivado');
+                                                                        cargarTenants();
+                                                                    } catch (error) {
+                                                                        toast.error('Error al reactivar');
+                                                                    }
+                                                                }
+                                                            }}
+                                                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                            title="Reactivar"
+                                                        >
+                                                            <Unlock size={18} />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
@@ -275,6 +324,118 @@ const TenantsList = () => {
                     </table>
                 </div>
             </div>
+            {/* Modal de Pago */}
+            {showPayModal && selectedTenant && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl max-w-md w-full p-6">
+                        <h3 className="text-xl font-bold mb-4">💰 Registrar Pago</h3>
+                        <p className="text-gray-600 mb-4">Municipio: <strong>{selectedTenant.nombre}</strong></p>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Período</label>
+                                <select
+                                    value={periodo}
+                                    onChange={(e) => setPeriodo(e.target.value)}
+                                    className="w-full px-4 py-2 border rounded-lg"
+                                >
+                                    <option value="mensual">Mensual</option>
+                                    <option value="anual">Anual</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Monto</label>
+                                <input
+                                    type="number"
+                                    value={monto}
+                                    onChange={(e) => setMonto(e.target.value)}
+                                    placeholder="Ej: 499"
+                                    className="w-full px-4 py-2 border rounded-lg"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3 mt-6">
+                            <button
+                                onClick={async () => {
+                                    setActionLoading(true);
+                                    try {
+                                        await tenantService.marcarComoPagado(selectedTenant.id, periodo, monto);
+                                        toast.success('✅ Pago registrado');
+                                        setShowPayModal(false);
+                                        setMonto('');
+                                        cargarTenants();
+                                    } catch (error) {
+                                        toast.error('Error al registrar pago');
+                                    } finally {
+                                        setActionLoading(false);
+                                    }
+                                }}
+                                disabled={actionLoading}
+                                className="flex-1 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                            >
+                                {actionLoading ? 'Procesando...' : 'Confirmar'}
+                            </button>
+                            <button
+                                onClick={() => { setShowPayModal(false); setMonto(''); }}
+                                className="flex-1 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                            >
+                                Cancelar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de Suspensión */}
+            {showSuspendModal && selectedTenant && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl max-w-md w-full p-6">
+                        <h3 className="text-xl font-bold mb-4">🔒 Suspender Municipio</h3>
+                        <p className="text-gray-600 mb-4">Municipio: <strong>{selectedTenant.nombre}</strong></p>
+
+                        <div>
+                            <label className="block text-sm font-medium mb-1">Motivo</label>
+                            <textarea
+                                value={motivo}
+                                onChange={(e) => setMotivo(e.target.value)}
+                                placeholder="Motivo de la suspensión"
+                                className="w-full px-4 py-2 border rounded-lg"
+                                rows="3"
+                            />
+                        </div>
+
+                        <div className="flex gap-3 mt-6">
+                            <button
+                                onClick={async () => {
+                                    setActionLoading(true);
+                                    try {
+                                        await tenantService.suspenderTenant(selectedTenant.id, motivo);
+                                        toast.success('🔒 Municipio suspendido');
+                                        setShowSuspendModal(false);
+                                        setMotivo('');
+                                        cargarTenants();
+                                    } catch (error) {
+                                        toast.error('Error al suspender');
+                                    } finally {
+                                        setActionLoading(false);
+                                    }
+                                }}
+                                disabled={actionLoading}
+                                className="flex-1 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
+                            >
+                                {actionLoading ? 'Procesando...' : 'Confirmar'}
+                            </button>
+                            <button
+                                onClick={() => { setShowSuspendModal(false); setMotivo(''); }}
+                                className="flex-1 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                            >
+                                Cancelar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
