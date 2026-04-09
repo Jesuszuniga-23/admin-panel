@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCircle, Building2, User, Shield, MapPin, Mail, Phone, CreditCard, Loader2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Building2, User, Shield, MapPin, Mail, Phone, Loader2 } from 'lucide-react';
 import registroService from '../../services/public/registro.service';
 import toast from 'react-hot-toast';
 
@@ -37,11 +37,8 @@ const RegisterForm = ({ selectedPlan, onBack }) => {
 
         setCpValidando(true);
         try {
-            // 🔑 Token seguro desde variables de entorno
             const TOKEN = import.meta.env.VITE_COPOMEX_TOKEN;
-
             const url = `https://api.copomex.com/query/info_cp/${cp}?token=${TOKEN}`;
-
             const response = await fetch(url);
 
             if (!response.ok) {
@@ -51,7 +48,6 @@ const RegisterForm = ({ selectedPlan, onBack }) => {
 
             const data = await response.json();
 
-            // COPOMEX devuelve un array, el primer elemento contiene la información
             if (Array.isArray(data) && data.length > 0 && data[0].response) {
                 const info = data[0].response;
                 setFormData(prev => ({
@@ -80,8 +76,6 @@ const RegisterForm = ({ selectedPlan, onBack }) => {
 
             if (response.success) {
                 const { tenant_id, admin_email } = response.data;
-
-                // Guardar tenant_id para el header X-Tenant-ID
                 localStorage.setItem('tenant_id', tenant_id);
 
                 toast.success(
@@ -89,7 +83,6 @@ const RegisterForm = ({ selectedPlan, onBack }) => {
                     { duration: 8000 }
                 );
 
-                // ✅ REDIRIGIR A /login (flujo correcto)
                 navigate('/login', {
                     state: {
                         message: 'Registro completado. Inicia sesión con tu cuenta de Google.',
@@ -234,17 +227,40 @@ const RegisterForm = ({ selectedPlan, onBack }) => {
                                     <label className="block text-sm font-medium text-slate-700 mb-1">
                                         Nombre <span className="text-red-500">*</span>
                                     </label>
-                                    <input type="text" name="solicitante_nombre" value={formData.solicitante_nombre} onChange={handleChange} required className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500" />
+                                    <input 
+                                        type="text" 
+                                        name="solicitante_nombre" 
+                                        value={formData.solicitante_nombre} 
+                                        onChange={handleChange} 
+                                        required 
+                                        pattern="[A-Za-zÁ-Úá-úñÑ ]+"
+                                        className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500" 
+                                    />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">
                                         Apellido Paterno <span className="text-red-500">*</span>
                                     </label>
-                                    <input type="text" name="solicitante_apellido_paterno" value={formData.solicitante_apellido_paterno} onChange={handleChange} required className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500" />
+                                    <input 
+                                        type="text" 
+                                        name="solicitante_apellido_paterno" 
+                                        value={formData.solicitante_apellido_paterno} 
+                                        onChange={handleChange} 
+                                        required 
+                                        pattern="[A-Za-zÁ-Úá-úñÑ ]+"
+                                        className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500" 
+                                    />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Apellido Materno</label>
-                                    <input type="text" name="solicitante_apellido_materno" value={formData.solicitante_apellido_materno} onChange={handleChange} className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500" />
+                                    <input 
+                                        type="text" 
+                                        name="solicitante_apellido_materno" 
+                                        value={formData.solicitante_apellido_materno} 
+                                        onChange={handleChange} 
+                                        pattern="[A-Za-zÁ-Úá-úñÑ ]+"
+                                        className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500" 
+                                    />
                                 </div>
                                 <div className="md:col-span-2">
                                     <label className="block text-sm font-medium text-slate-700 mb-1">
@@ -252,19 +268,43 @@ const RegisterForm = ({ selectedPlan, onBack }) => {
                                     </label>
                                     <div className="relative">
                                         <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                        <input type="email" name="solicitante_email" value={formData.solicitante_email} onChange={handleChange} required className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500" />
+                                        <input 
+                                            type="email" 
+                                            name="solicitante_email" 
+                                            value={formData.solicitante_email} 
+                                            onChange={handleChange} 
+                                            required 
+                                            className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500" 
+                                        />
                                     </div>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Teléfono</label>
                                     <div className="relative">
                                         <Phone size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                        <input type="tel" name="solicitante_telefono" value={formData.solicitante_telefono} onChange={handleChange} className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500" />
+                                        <input 
+                                            type="tel" 
+                                            name="solicitante_telefono" 
+                                            value={formData.solicitante_telefono} 
+                                            onChange={handleChange}
+                                            maxLength="10"
+                                            pattern="\d{10}"
+                                            placeholder="5512345678"
+                                            className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500" 
+                                        />
                                     </div>
+                                    <p className="text-xs text-slate-400 mt-1">10 dígitos</p>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Cargo</label>
-                                    <input type="text" name="solicitante_cargo" value={formData.solicitante_cargo} onChange={handleChange} placeholder="Ej: Presidente Municipal" className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500" />
+                                    <input 
+                                        type="text" 
+                                        name="solicitante_cargo" 
+                                        value={formData.solicitante_cargo} 
+                                        onChange={handleChange} 
+                                        placeholder="Ej: Presidente Municipal" 
+                                        className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500" 
+                                    />
                                 </div>
                             </div>
                         </div>
@@ -281,24 +321,57 @@ const RegisterForm = ({ selectedPlan, onBack }) => {
                                     <label className="block text-sm font-medium text-slate-700 mb-1">
                                         Nombre <span className="text-red-500">*</span>
                                     </label>
-                                    <input type="text" name="admin_nombre" value={formData.admin_nombre} onChange={handleChange} required className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500" />
+                                    <input 
+                                        type="text" 
+                                        name="admin_nombre" 
+                                        value={formData.admin_nombre} 
+                                        onChange={handleChange} 
+                                        required 
+                                        pattern="[A-Za-zÁ-Úá-úñÑ ]+"
+                                        className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500" 
+                                    />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">
                                         Apellido Paterno <span className="text-red-500">*</span>
                                     </label>
-                                    <input type="text" name="admin_apellido_paterno" value={formData.admin_apellido_paterno} onChange={handleChange} required className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500" />
+                                    <input 
+                                        type="text" 
+                                        name="admin_apellido_paterno" 
+                                        value={formData.admin_apellido_paterno} 
+                                        onChange={handleChange} 
+                                        required 
+                                        pattern="[A-Za-zÁ-Úá-úñÑ ]+"
+                                        className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500" 
+                                    />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Apellido Materno</label>
-                                    <input type="text" name="admin_apellido_materno" value={formData.admin_apellido_materno} onChange={handleChange} className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500" />
+                                    <input 
+                                        type="text" 
+                                        name="admin_apellido_materno" 
+                                        value={formData.admin_apellido_materno} 
+                                        onChange={handleChange} 
+                                        pattern="[A-Za-zÁ-Úá-úñÑ ]+"
+                                        className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500" 
+                                    />
                                 </div>
                                 <div className="md:col-span-3">
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Teléfono</label>
                                     <div className="relative max-w-md">
                                         <Phone size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                        <input type="tel" name="admin_telefono" value={formData.admin_telefono} onChange={handleChange} className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500" />
+                                        <input 
+                                            type="tel" 
+                                            name="admin_telefono" 
+                                            value={formData.admin_telefono} 
+                                            onChange={handleChange}
+                                            maxLength="10"
+                                            pattern="\d{10}"
+                                            placeholder="5512345678"
+                                            className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500" 
+                                        />
                                     </div>
+                                    <p className="text-xs text-slate-400 mt-1">10 dígitos</p>
                                 </div>
                             </div>
                         </div>
