@@ -1,4 +1,4 @@
-// src/pages/admin/alertas/AlertasCerradas.jsx
+// src/pages/admin/alertas/AlertasCerradas.jsx (CORREGIDO - ORDEN DESCENDENTE)
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -114,7 +114,7 @@ const AlertasCerradas = () => {
     total_paginas: 1
   });
 
-  // ✅ CORRECCIÓN #1: Usar whereExtra para filtro de seguridad
+  // ✅ Cargar alertas desde el backend
   const cargarAlertas = useCallback(async () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -162,9 +162,12 @@ const AlertasCerradas = () => {
     }
   }, [tipoAlertaPermitido]);
 
+  // ✅ FUNCIÓN CORREGIDA - CON ORDEN DESCENDENTE POR FECHA DE CIERRE
   const aplicarFiltrosLocal = (datos = alertasOriginal) => {
-    let datosFiltrados = datos;
+    // Crear una copia para no mutar el array original
+    let datosFiltrados = [...datos];
 
+    // 1. FILTRO POR RANGO DE FECHAS
     if (filtros.desde && filtros.hasta) {
       datosFiltrados = datosFiltrados.filter(item => {
         const fechaCierre = new Date(item.fecha_cierre);
@@ -190,10 +193,12 @@ const AlertasCerradas = () => {
       });
     }
 
+    // 2. FILTRO POR TIPO DE ALERTA
     if (tipoFiltro !== 'todos') {
       datosFiltrados = datosFiltrados.filter(item => item.tipo === tipoFiltro);
     }
 
+    // 3. FILTRO POR BÚSQUEDA (nombre o teléfono)
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase().trim();
       datosFiltrados = datosFiltrados.filter(item => 
@@ -202,12 +207,15 @@ const AlertasCerradas = () => {
       );
     }
 
+    // 4. FILTRO POR TIEMPO MÍNIMO DE ATENCIÓN
     if (tiempoMinimo) {
       datosFiltrados = datosFiltrados.filter(item => 
         item.tiempoAtencionMinutos !== null && 
         item.tiempoAtencionMinutos >= parseInt(tiempoMinimo)
       );
     }
+    
+    // 5. FILTRO POR TIEMPO MÁXIMO DE ATENCIÓN
     if (tiempoMaximo) {
       datosFiltrados = datosFiltrados.filter(item => 
         item.tiempoAtencionMinutos !== null && 
@@ -215,12 +223,21 @@ const AlertasCerradas = () => {
       );
     }
 
+    // ✅ 6. ORDENAR POR FECHA DE CIERRE: MÁS RECIENTES PRIMERO (HOY → AYER → ANTIGUAS)
+    datosFiltrados.sort((a, b) => {
+      const fechaA = new Date(a.fecha_cierre);
+      const fechaB = new Date(b.fecha_cierre);
+      return fechaB - fechaA; // DESCENDENTE: más reciente primero
+    });
+
+    // 7. PAGINACIÓN
     const total = datosFiltrados.length;
     const totalPaginas = Math.ceil(total / filtros.limite);
     const inicio = (filtros.pagina - 1) * filtros.limite;
     const fin = inicio + filtros.limite;
     const datosPaginados = datosFiltrados.slice(inicio, fin);
 
+    // 8. ACTUALIZAR ESTADOS
     setAlertas(datosPaginados);
     setPaginacion({
       total,
@@ -250,13 +267,14 @@ const AlertasCerradas = () => {
     setFiltros(prev => ({ ...prev, pagina: nuevaPagina }));
   };
 
+  // ✅ Efecto para re-aplicar filtros cuando cambian
   useEffect(() => {
     if (alertasOriginal.length) {
-      aplicarFiltrosLocal();
+      aplicarFiltrosLocal(alertasOriginal);
     }
   }, [filtros.desde, filtros.hasta, filtros.pagina, searchTerm, tipoFiltro, tiempoMinimo, tiempoMaximo]);
 
-  // Efecto con limpieza
+  // ✅ Efecto para cargar datos al montar
   useEffect(() => {
     cargarAlertas();
     
@@ -401,7 +419,7 @@ const AlertasCerradas = () => {
           </button>
         </div>
 
-        {/* Buscador y Filtros Mejorados */}
+        {/* Buscador y Filtros */}
         <div className="bg-white rounded-xl shadow-lg p-5 mb-6 border border-gray-100">
           <div className="relative mb-5">
             <Search size={18} className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
