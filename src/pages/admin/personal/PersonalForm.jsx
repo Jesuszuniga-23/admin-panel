@@ -519,6 +519,13 @@ const PersonalForm = () => {
       case 'email':
         duplicado = otrosPersonales.find(p => p.email?.toLowerCase() === valor.toLowerCase());
         break;
+      case 'nombre_completo':
+        duplicado = otrosPersonales.find(p =>
+          p.nombre?.toLowerCase() === formData.nombre?.toLowerCase() &&
+          p.apellido_paterno?.toLowerCase() === formData.apellido_paterno?.toLowerCase() &&
+          (p.apellido_materno?.toLowerCase() || '') === (formData.apellido_materno?.toLowerCase() || '')
+        );
+        break;
       case 'telefono':
         duplicado = otrosPersonales.find(p => p.telefono === valor);
         break;
@@ -578,10 +585,11 @@ const PersonalForm = () => {
       }
     }
     else if (name === 'email' && !isEditing) {
-      setFormData(prev => ({ ...prev, email: value }));
-      const error = validarCampo(name, value);
+      const emailNormalizado = value.toLowerCase().trim();
+      setFormData(prev => ({ ...prev, email: emailNormalizado }));
+      const error = validarCampo(name, emailNormalizado);
       setErrors(prev => ({ ...prev, [name]: error }));
-      verificarDuplicado(name, value);
+      verificarDuplicado(name, emailNormalizado);
     }
     else if (name === 'activo') {
       if (!checked) {
@@ -727,7 +735,28 @@ const PersonalForm = () => {
       navigate('/admin/personal');
     } catch (error) {
       console.error('Error guardando personal:', error);
-      toast.error(error.message || 'Error al guardar');
+
+      // ✅ Mejor manejo de mensajes de error
+      let mensajeError = 'Error al guardar';
+
+      // Prioridad 1: Mensaje del backend en response.data
+      if (error.response?.data?.error) {
+        mensajeError = error.response.data.error;
+      } else if (error.response?.data?.message) {
+        mensajeError = error.response.data.message;
+      } else if (error.message && error.message !== 'Request failed with status code 500') {
+        mensajeError = error.message;
+      }
+
+      // Si es error de límite de plan, mostrar por más tiempo
+      if (mensajeError.includes('límite') || mensajeError.includes('plan')) {
+        toast.error(mensajeError, {
+          duration: 7000,
+          icon: <AlertTriangle size={18} className="text-amber-600" />  // ✅ Icono puro de Lucide React
+        });
+      } else {
+        toast.error(mensajeError);
+      }
     } finally {
       setLoading(false);
     }

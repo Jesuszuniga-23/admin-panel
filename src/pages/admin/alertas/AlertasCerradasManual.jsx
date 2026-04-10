@@ -1,4 +1,4 @@
-// src/pages/admin/alertas/AlertasCerradasManual.jsx
+// src/pages/admin/alertas/AlertasCerradasManual.jsx (CORREGIDO - ORDEN DESCENDENTE)
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -102,15 +102,13 @@ const AlertasCerradasManual = () => {
     total_paginas: 0
   });
 
-  // ✅ CORRECCIÓN #1: Usar tipoFiltro para filtro de seguridad
+  // ✅ Cargar todas las alertas desde el backend
   const cargarTodasLasAlertas = useCallback(async () => {
-    // Cancelar petición anterior si existe
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       console.log('🛑 Petición anterior cancelada en AlertasCerradasManual');
     }
     
-    // Crear nuevo AbortController
     abortControllerRef.current = new AbortController();
     
     setCargando(true);
@@ -120,7 +118,6 @@ const AlertasCerradasManual = () => {
         signal: abortControllerRef.current.signal 
       };
       
-      // ✅ APLICAR FILTRO DE SEGURIDAD como tipoFiltro
       if (tipoAlertaPermitido) {
         params.tipoFiltro = tipoAlertaPermitido;
       }
@@ -140,7 +137,6 @@ const AlertasCerradasManual = () => {
       }));
       setTodasLasAlertas(alertasFormateadas);
     } catch (error) {
-      // ✅ Ignorar errores de cancelación
       if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
         console.error("Error:", error);
       }
@@ -165,14 +161,17 @@ const AlertasCerradasManual = () => {
     };
   }, [cargarTodasLasAlertas]);
 
+  // ✅ Re-aplicar filtros cuando cambian
   useEffect(() => {
     if (todasLasAlertas.length === 0) return;
     aplicarFiltrosYOrden();
   }, [filtros, todasLasAlertas]);
 
+  // ✅ FUNCIÓN CORREGIDA - CON ORDEN DESCENDENTE POR FECHA DE CIERRE
   const aplicarFiltrosYOrden = () => {
     let datosFiltrados = [...todasLasAlertas];
     
+    // 1. FILTRO POR BÚSQUEDA
     if (filtros.search) {
       const busqueda = filtros.search.toLowerCase().trim();
       datosFiltrados = datosFiltrados.filter(alerta => {
@@ -185,6 +184,7 @@ const AlertasCerradasManual = () => {
       });
     }
     
+    // 2. FILTRO POR RANGO DE FECHAS
     if (filtros.desde && filtros.hasta) {
       const desde = new Date(filtros.desde);
       desde.setHours(0, 0, 0, 0);
@@ -197,6 +197,14 @@ const AlertasCerradasManual = () => {
       });
     }
     
+    // ✅ 3. ORDENAR POR FECHA DE CIERRE: MÁS RECIENTES PRIMERO (HOY → AYER → ANTIGUAS)
+    datosFiltrados.sort((a, b) => {
+      const fechaA = new Date(a.fecha_cierre);
+      const fechaB = new Date(b.fecha_cierre);
+      return fechaB - fechaA; // DESCENDENTE: más reciente primero
+    });
+    
+    // 4. PAGINACIÓN
     const total = datosFiltrados.length;
     const totalPaginas = Math.ceil(total / filtros.limite);
     const inicio = (filtros.pagina - 1) * filtros.limite;
@@ -244,13 +252,11 @@ const AlertasCerradasManual = () => {
 
   // Manejar clic en alerta con AbortController
   const handleRowClick = useCallback(async (alerta) => {
-    // Cancelar petición de detalle anterior si existe
     if (detalleAbortControllerRef.current) {
       detalleAbortControllerRef.current.abort();
       console.log('🛑 Petición de detalle anterior cancelada');
     }
     
-    // Crear nuevo AbortController para detalle
     detalleAbortControllerRef.current = new AbortController();
     
     setDetalleLoading(true);
@@ -272,7 +278,6 @@ const AlertasCerradasManual = () => {
         toast.error('Error al cargar la alerta');
       }
     } catch (error) {
-      // ✅ Ignorar errores de cancelación
       if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
         console.error('Error al cargar detalle:', error);
         toast.error('Error al cargar la alerta');

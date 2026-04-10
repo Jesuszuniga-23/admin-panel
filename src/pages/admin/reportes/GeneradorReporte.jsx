@@ -37,18 +37,18 @@ const GeneradorReporte = () => {
   const navigate = useNavigate();
   const { tipo } = useParams();
   const { user } = useAuthStore();
-  
+
   // ✅ OBTENER TODOS LOS FILTROS DE SEGURIDAD
   const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
   const rolPersonalPermitido = authService.getRolPersonalPermitido();
   const tipoUnidadPermitido = authService.getTipoUnidadPermitido();
-  
+
   const [cargando, setCargando] = useState(true);
   const [exportando, setExportando] = useState(false);
   const [datos, setDatos] = useState([]);
   const [datosFiltrados, setDatosFiltrados] = useState([]);
   const [estadisticas, setEstadisticas] = useState(null);
-  
+
   const getInitialTipo = () => {
     if (tipo === 'personal' && rolPersonalPermitido) {
       return rolPersonalPermitido;
@@ -61,7 +61,7 @@ const GeneradorReporte = () => {
     }
     return 'todos';
   };
-  
+
   const [filtros, setFiltros] = useState({
     fechaInicio: '',
     fechaFin: '',
@@ -149,18 +149,18 @@ const GeneradorReporte = () => {
       abortControllerRef.current.abort();
       console.log('🛑 Petición anterior cancelada en GeneradorReporte');
     }
-    
+
     abortControllerRef.current = new AbortController();
     const signal = abortControllerRef.current.signal;
-    
+
     setCargando(true);
     try {
       let data = [];
       let params = { signal, limite: 1000 };
-      
+
       if (filtros.fechaInicio) params.desde = filtros.fechaInicio;
       if (filtros.fechaFin) params.hasta = filtros.fechaFin;
-      
+
       // ✅ APLICAR FILTROS DE SEGURIDAD SEGÚN EL TIPO
       if (tipo === 'personal' && rolPersonalPermitido) {
         params.rol = rolPersonalPermitido;
@@ -174,7 +174,7 @@ const GeneradorReporte = () => {
         params.tipo = tipoAlertaPermitido;
         console.log(`📊 Aplicando filtro de alertas: ${tipoAlertaPermitido}`);
       }
-      
+
       if (tipo === 'personal') {
         const res = await personalService.listarPersonal(params);
         data = res.data || [];
@@ -240,30 +240,34 @@ const GeneradorReporte = () => {
   const aplicarFiltrosYEstadisticas = () => {
     let filtrados = [...datos];
 
-    if (filtros.fechaInicio && filtros.fechaFin) {
-      const inicio = new Date(filtros.fechaInicio);
-      inicio.setHours(0, 0, 0, 0);
-      const fin = new Date(filtros.fechaFin);
-      fin.setHours(23, 59, 59, 999);
+    if (filtros.fechaInicio || filtros.fechaFin) {
       filtrados = filtrados.filter(item => {
-        const fecha = new Date(item.fecha_creacion || item.creado_en);
-        return fecha >= inicio && fecha <= fin;
-      });
-    } else if (filtros.fechaInicio) {
-      const inicio = new Date(filtros.fechaInicio);
-      inicio.setHours(0, 0, 0, 0);
-      filtrados = filtrados.filter(item => {
-        const fecha = new Date(item.fecha_creacion || item.creado_en);
-        return fecha >= inicio;
-      });
-    } else if (filtros.fechaFin) {
-      const fin = new Date(filtros.fechaFin);
-      fin.setHours(23, 59, 59, 999);
-      filtrados = filtrados.filter(item => {
-        const fecha = new Date(item.fecha_creacion || item.creado_en);
-        return fecha <= fin;
+        // Obtener la fecha del item (diferentes campos según tipo)
+        const fechaStr = item.fecha_creacion || item.creado_en || item.fecha;
+        if (!fechaStr) return true; // Si no tiene fecha, no filtrar
+
+        const fechaItem = new Date(fechaStr);
+        if (isNaN(fechaItem.getTime())) return true; // Fecha inválida, no filtrar
+
+        if (filtros.fechaInicio && filtros.fechaFin) {
+          const inicio = new Date(filtros.fechaInicio);
+          inicio.setHours(0, 0, 0, 0);
+          const fin = new Date(filtros.fechaFin);
+          fin.setHours(23, 59, 59, 999);
+          return fechaItem >= inicio && fechaItem <= fin;
+        } else if (filtros.fechaInicio) {
+          const inicio = new Date(filtros.fechaInicio);
+          inicio.setHours(0, 0, 0, 0);
+          return fechaItem >= inicio;
+        } else if (filtros.fechaFin) {
+          const fin = new Date(filtros.fechaFin);
+          fin.setHours(23, 59, 59, 999);
+          return fechaItem <= fin;
+        }
+        return true;
       });
     }
+
 
     if (filtros.tipo !== 'todos') {
       if (tipo === 'personal') {
@@ -296,15 +300,15 @@ const GeneradorReporte = () => {
       filtrados = filtrados.filter(item => {
         if (tipo === 'personal') {
           return item.nombre?.toLowerCase().includes(busqueda) ||
-                 item.email?.toLowerCase().includes(busqueda) ||
-                 item.placa?.toLowerCase().includes(busqueda);
+            item.email?.toLowerCase().includes(busqueda) ||
+            item.placa?.toLowerCase().includes(busqueda);
         }
         if (tipo === 'unidades') {
           return item.codigo?.toLowerCase().includes(busqueda);
         }
         if (tipo === 'alertas') {
           return item.id?.toString().includes(busqueda) ||
-                 item.ciudadano?.nombre?.toLowerCase().includes(busqueda);
+            item.ciudadano?.nombre?.toLowerCase().includes(busqueda);
         }
         return true;
       });
@@ -316,7 +320,7 @@ const GeneradorReporte = () => {
 
   const calcularEstadisticas = (datosFiltrados) => {
     const stats = {};
-    
+
     if (tipo === 'personal') {
       stats.total = datosFiltrados.length;
       stats.activos = datosFiltrados.filter(d => d.activo).length;
@@ -349,18 +353,18 @@ const GeneradorReporte = () => {
       stats.enProceso = datosFiltrados.filter(d => ['asignada', 'atendiendo'].includes(d.estado)).length;
       stats.cerradas = datosFiltrados.filter(d => d.estado === 'cerrada').length;
       stats.expiradas = datosFiltrados.filter(d => d.estado === 'expirada').length;
-      
+
       const tiempos = datosFiltrados
         .filter(d => d.fecha_creacion && d.fecha_cierre)
         .map(d => (new Date(d.fecha_cierre) - new Date(d.fecha_creacion)) / 60000);
-      stats.tiempoPromedio = tiempos.length > 0 
-        ? Math.round(tiempos.reduce((a, b) => a + b, 0) / tiempos.length) 
+      stats.tiempoPromedio = tiempos.length > 0
+        ? Math.round(tiempos.reduce((a, b) => a + b, 0) / tiempos.length)
         : 0;
       stats.porTipo = {
         panico: datosFiltrados.filter(d => d.tipo === 'panico').length,
         medica: datosFiltrados.filter(d => d.tipo === 'medica').length
       };
-      
+
       const zonas = {};
       datosFiltrados.forEach(d => {
         const zona = calcularZona(d.lat, d.lng);
@@ -368,7 +372,7 @@ const GeneradorReporte = () => {
       });
       stats.porZona = zonas;
     }
-    
+
     setEstadisticas(stats);
   };
 
@@ -408,7 +412,7 @@ const GeneradorReporte = () => {
 
   const renderValorCelda = (item, campo) => {
     let valor = item[campo.key];
-    
+
     if (campo.key === 'tiempo_respuesta' && item.fecha_creacion && item.fecha_cierre) {
       valor = calcularTiempoRespuesta(item.fecha_creacion, item.fecha_cierre);
     } else if (campo.key === 'zona' && item.lat && item.lng) {
@@ -428,21 +432,21 @@ const GeneradorReporte = () => {
     } else if (campo.key === 'creado_en' || campo.key === 'fecha_creacion') {
       valor = new Date(item[campo.key]).toLocaleDateString('es-MX');
     }
-    
+
     return valor?.toString() || '-';
   };
 
   const renderBadgeRol = (rol) => {
     const entidad = rolToEntidad[rol] || 'ADMIN';
-    const texto = 
+    const texto =
       rol === 'policia' ? 'Policía' :
-      rol === 'paramedico' ? 'Paramédico' :
-      rol === 'admin' ? 'Admin' :
-      rol === 'superadmin' ? 'Superadmin' :
-      rol === 'operador_tecnico' ? 'Op. Técnico' :
-      rol === 'operador_policial' ? 'Op. Policial' :
-      rol === 'operador_medico' ? 'Op. Médico' :
-      rol === 'operador_general' ? 'Op. General' : rol;
+        rol === 'paramedico' ? 'Paramédico' :
+          rol === 'admin' ? 'Admin' :
+            rol === 'superadmin' ? 'Superadmin' :
+              rol === 'operador_tecnico' ? 'Op. Técnico' :
+                rol === 'operador_policial' ? 'Op. Policial' :
+                  rol === 'operador_medico' ? 'Op. Médico' :
+                    rol === 'operador_general' ? 'Op. General' : rol;
     return <BadgeIcono entidad={entidad} texto={texto} size={12} />;
   };
 
@@ -568,9 +572,9 @@ const GeneradorReporte = () => {
             <select
               value={filtros.tipo}
               onChange={(e) => setFiltros(prev => ({ ...prev, tipo: e.target.value }))}
-              disabled={(tipo === 'personal' && rolPersonalPermitido) || 
-                       (tipo === 'unidades' && tipoUnidadPermitido) ||
-                       (tipo === 'alertas' && tipoAlertaPermitido)}
+              disabled={(tipo === 'personal' && rolPersonalPermitido) ||
+                (tipo === 'unidades' && tipoUnidadPermitido) ||
+                (tipo === 'alertas' && tipoAlertaPermitido)}
               className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white disabled:bg-gray-100"
             >
               <option value="todos">Todos</option>
@@ -617,9 +621,9 @@ const GeneradorReporte = () => {
             <Search size={14} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <input
               type="text"
-              placeholder={`Buscar por ${tipo === 'personal' ? 'nombre, email o placa' : 
-                                 tipo === 'unidades' ? 'código' : 
-                                 'ID o ciudadano'}`}
+              placeholder={`Buscar por ${tipo === 'personal' ? 'nombre, email o placa' :
+                tipo === 'unidades' ? 'código' :
+                  'ID o ciudadano'}`}
               value={filtros.busqueda}
               onChange={(e) => setFiltros(prev => ({ ...prev, busqueda: e.target.value }))}
               className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
@@ -688,7 +692,7 @@ const GeneradorReporte = () => {
                   <tr key={idx} className="hover:bg-gray-50">
                     {info.campos.map(campo => {
                       const valor = renderValorCelda(item, campo);
-                      
+
                       if (campo.key === 'rol' && tipo === 'personal') {
                         return (
                           <td key={campo.key} className="px-4 py-3">
@@ -710,7 +714,7 @@ const GeneradorReporte = () => {
                           </td>
                         );
                       }
-                      
+
                       return (
                         <td key={campo.key} className="px-4 py-3 text-sm text-gray-600">
                           {valor}
@@ -722,6 +726,26 @@ const GeneradorReporte = () => {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {/* ✅ NUEVO: Mensaje cuando hay datos pero vista previa oculta */}
+      {!vistaPrevia && datosFiltrados.length > 0 && (
+        <div className="bg-blue-50 rounded-xl p-4 mb-6 border border-blue-200">
+          <p className="text-sm text-blue-700 flex items-center gap-2">
+            <Eye size={16} />
+            Vista previa oculta. Haz clic en "Ver vista" para previsualizar los datos.
+          </p>
+        </div>
+      )}
+
+      {/* ✅ NUEVO: Mensaje cuando no hay datos después de filtrar */}
+      {datos.length > 0 && datosFiltrados.length === 0 && (
+        <div className="bg-amber-50 rounded-xl p-4 mb-6 border border-amber-200">
+          <p className="text-sm text-amber-700 flex items-center gap-2">
+            <Filter size={16} />
+            No hay registros que coincidan con los filtros aplicados.
+          </p>
         </div>
       )}
 

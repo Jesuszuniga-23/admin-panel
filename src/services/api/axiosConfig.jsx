@@ -2,6 +2,8 @@
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { obtenerTenantActual } from '../../utils/storage';  // ✅ NUEVO
+// Agregar al inicio de axiosConfig.js
+import { AlertTriangle } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -168,12 +170,30 @@ axiosInstance.interceptors.response.use(
       });
     }
 
-    if (error.response?.status === 500) {
-      console.error('🔥 [SERVER ERROR] Error interno del servidor');
-      toast.error('Error en el servidor. Intenta más tarde.', {
-        duration: 5000
-      });
+   if (error.response?.status === 500) {
+    console.error('[SERVER ERROR] Error interno del servidor');
+    
+    // ✅ Extraer mensaje real del backend
+    const mensajeBackend = error.response?.data?.error || error.response?.data?.message;
+    
+    if (mensajeBackend) {
+        // Si es error de límite de plan, mostrar mensaje específico
+        if (mensajeBackend.includes('límite') || mensajeBackend.includes('plan')) {
+            toast.error(mensajeBackend, {
+                duration: 6000,
+                icon: <AlertTriangle size={18} className="text-amber-600" />  // ✅ Icono puro de Lucide React
+            });
+        } else {
+            toast.error(mensajeBackend, {
+                duration: 5000
+            });
+        }
+    } else {
+        toast.error('Error en el servidor. Intenta más tarde.', {
+            duration: 5000
+        });
     }
+}
 
     return Promise.reject(error);
   }

@@ -527,11 +527,13 @@ const PersonalList = () => {
             >
               <option value="">Todos los roles</option>
 
-              {/* Admin y superadmin ven todos los roles */}
               {(!rolPersonalPermitido || currentUser?.rol === 'admin' || currentUser?.rol === 'superadmin') && (
                 <>
                   <option value="admin">Admin</option>
-                  <option value="superadmin">Superadmin</option>
+                  {/* ✅ SOLO SUPERADMIN VE ESTA OPCIÓN */}
+                  {currentUser?.rol === 'superadmin' && (
+                    <option value="superadmin">Superadmin</option>
+                  )}
                   <option value="operador_policial">Operador Policial</option>
                   <option value="operador_medico">Operador Médico</option>
                   <option value="operador_tecnico">Operador Técnico</option>

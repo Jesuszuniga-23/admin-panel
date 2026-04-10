@@ -1,4 +1,4 @@
-// src/pages/admin/alertas/AlertasEnProceso.jsx
+// src/pages/admin/alertas/AlertasEnProceso.jsx (CORREGIDO - ORDEN DESCENDENTE)
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -101,15 +101,13 @@ const AlertasEnProceso = () => {
   const [unidadesDisponibles, setUnidadesDisponibles] = useState([]);
   const [filtrosActivos, setFiltrosActivos] = useState(false);
 
-  // ✅ CORRECCIÓN #1 y #2: Función cargarAlertas corregida con whereExtra
+  // ✅ Cargar alertas desde el backend
   const cargarAlertas = useCallback(async () => {
-    // Cancelar petición anterior si existe
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       console.log('🛑 Petición anterior cancelada en AlertasEnProceso');
     }
     
-    // Crear nuevo AbortController
     abortControllerRef.current = new AbortController();
     
     setLoading(true);
@@ -119,7 +117,6 @@ const AlertasEnProceso = () => {
         signal: abortControllerRef.current.signal 
       };
       
-      // ✅ APLICAR FILTRO DE SEGURIDAD como whereExtra
       if (tipoAlertaPermitido) {
         params.whereExtra = { tipo: tipoAlertaPermitido };
       }
@@ -145,7 +142,6 @@ const AlertasEnProceso = () => {
         aplicarFiltrosLocal(alertasFormateadas);
       }
     } catch (error) {
-      // ✅ Ignorar errores de cancelación
       if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
         console.error('Error:', error);
         toast.error('Error al cargar alertas');
@@ -155,27 +151,30 @@ const AlertasEnProceso = () => {
     }
   }, [tipoAlertaPermitido]);
 
-  // ✅ CORRECCIÓN #3: Función aplicarFiltrosLocal con filtro de seguridad local
+  // ✅ FUNCIÓN CORREGIDA - CON ORDEN DESCENDENTE POR FECHA DE ASIGNACIÓN
   const aplicarFiltrosLocal = (datos = alertasOriginal) => {
-    let datosFiltrados = datos;
+    let datosFiltrados = [...datos];
     let filtrosAplicados = false;
     
-    // ✅ APLICAR FILTRO DE SEGURIDAD LOCAL (doble capa de seguridad)
+    // 1. FILTRO DE SEGURIDAD LOCAL
     if (tipoAlertaPermitido) {
       datosFiltrados = datosFiltrados.filter(a => a.tipo === tipoAlertaPermitido);
       filtrosAplicados = true;
     }
     
+    // 2. FILTRO POR TIPO
     if (filtros.tipo !== 'todos' && filtros.tipo && !tipoAlertaPermitido) {
       filtrosAplicados = true;
       datosFiltrados = datosFiltrados.filter(a => a.tipo === filtros.tipo);
     }
     
+    // 3. FILTRO POR UNIDAD
     if (filtros.unidad !== 'todas') {
       filtrosAplicados = true;
       datosFiltrados = datosFiltrados.filter(a => a.unidad?.codigo === filtros.unidad);
     }
     
+    // 4. FILTRO POR RANGO DE FECHAS
     if (filtros.desde && filtros.hasta) {
       filtrosAplicados = true;
       
@@ -203,8 +202,16 @@ const AlertasEnProceso = () => {
       });
     }
     
+    // ✅ 5. ORDENAR POR FECHA DE ASIGNACIÓN: MÁS RECIENTES PRIMERO (HOY → AYER → ANTIGUAS)
+    datosFiltrados.sort((a, b) => {
+      const fechaA = new Date(a.fecha_asignacion);
+      const fechaB = new Date(b.fecha_asignacion);
+      return fechaB - fechaA; // DESCENDENTE: más reciente primero
+    });
+    
     setFiltrosActivos(filtrosAplicados);
     
+    // 6. PAGINACIÓN
     const total = datosFiltrados.length;
     const totalPaginas = Math.ceil(total / filtros.limite);
     const inicio = (filtros.pagina - 1) * filtros.limite;
@@ -235,13 +242,14 @@ const AlertasEnProceso = () => {
     setFiltrosActivos(false);
   };
 
+  // ✅ Re-aplicar filtros cuando cambian
   useEffect(() => {
     if (alertasOriginal.length) {
-      aplicarFiltrosLocal();
+      aplicarFiltrosLocal(alertasOriginal);
     }
   }, [filtros.tipo, filtros.unidad, filtros.desde, filtros.hasta, filtros.pagina, alertasOriginal, tipoAlertaPermitido]);
 
-  // Efecto con limpieza
+  // ✅ Efecto para cargar datos al montar
   useEffect(() => {
     cargarAlertas();
     
@@ -259,13 +267,11 @@ const AlertasEnProceso = () => {
 
   // Manejar clic en alerta con AbortController
   const handleRowClick = useCallback(async (alerta) => {
-    // Cancelar petición de detalle anterior si existe
     if (detalleAbortControllerRef.current) {
       detalleAbortControllerRef.current.abort();
       console.log('🛑 Petición de detalle anterior cancelada');
     }
     
-    // Crear nuevo AbortController para detalle
     detalleAbortControllerRef.current = new AbortController();
     
     setDetalleLoading(true);
@@ -287,7 +293,6 @@ const AlertasEnProceso = () => {
         toast.error('Error al cargar la alerta');
       }
     } catch (error) {
-      // ✅ Ignorar errores de cancelación
       if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
         console.error('Error al cargar detalle:', error);
         toast.error('Error al cargar la alerta');

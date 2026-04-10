@@ -1,4 +1,4 @@
-// src/pages/admin/alertas/AlertasExpiradas.jsx
+// src/pages/admin/alertas/AlertasExpiradas.jsx (CORREGIDO - ORDEN DESCENDENTE)
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -98,17 +98,18 @@ const AlertasExpiradas = () => {
     total_paginas: 0
   });
 
-  // ✅ CORRECCIÓN: Mover aplicarFiltrosLocalDirecto ANTES de cargarAlertas
+  // ✅ FUNCIÓN CORREGIDA - CON ORDEN DESCENDENTE POR FECHA DE CREACIÓN
   const aplicarFiltrosLocalDirecto = useCallback((datos) => {
     if (!datos || datos.length === 0) return [];
     
     let datosFiltrados = [...datos];
     
-    // ✅ APLICAR FILTRO DE SEGURIDAD LOCAL (doble capa de seguridad)
+    // 1. FILTRO DE SEGURIDAD LOCAL
     if (tipoAlertaPermitido) {
       datosFiltrados = datosFiltrados.filter(item => item.tipo === tipoAlertaPermitido);
     }
     
+    // 2. FILTRO POR BÚSQUEDA
     if (filtros.search && filtros.search.trim() !== '') {
       const termino = filtros.search.toLowerCase().trim();
       datosFiltrados = datosFiltrados.filter(item => {
@@ -119,6 +120,7 @@ const AlertasExpiradas = () => {
       });
     }
     
+    // 3. FILTRO POR FECHA DESDE
     if (filtros.desde) {
       const desdeParts = filtros.desde.split('-');
       const desde = new Date(parseInt(desdeParts[0]), parseInt(desdeParts[1]) - 1, parseInt(desdeParts[2]), 0, 0, 0, 0);
@@ -128,6 +130,7 @@ const AlertasExpiradas = () => {
       });
     }
     
+    // 4. FILTRO POR FECHA HASTA
     if (filtros.hasta) {
       const hastaParts = filtros.hasta.split('-');
       const hasta = new Date(parseInt(hastaParts[0]), parseInt(hastaParts[1]) - 1, parseInt(hastaParts[2]), 23, 59, 59, 999);
@@ -137,6 +140,14 @@ const AlertasExpiradas = () => {
       });
     }
     
+    // ✅ 5. ORDENAR POR FECHA DE CREACIÓN: MÁS RECIENTES PRIMERO (HOY → AYER → ANTIGUAS)
+    datosFiltrados.sort((a, b) => {
+      const fechaA = new Date(a.fecha_creacion);
+      const fechaB = new Date(b.fecha_creacion);
+      return fechaB - fechaA; // DESCENDENTE: más reciente primero
+    });
+    
+    // 6. PAGINACIÓN
     const inicio = (filtros.pagina - 1) * filtros.limite;
     const fin = inicio + filtros.limite;
     const datosPaginados = datosFiltrados.slice(inicio, fin);
@@ -144,7 +155,7 @@ const AlertasExpiradas = () => {
     return datosPaginados;
   }, [tipoAlertaPermitido, filtros.search, filtros.desde, filtros.hasta, filtros.pagina, filtros.limite]);
 
-  // ✅ CORRECCIÓN #1: Usar tipoFiltro para filtro de seguridad
+  // ✅ Cargar alertas desde el backend
   const cargarAlertas = useCallback(async () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -160,7 +171,6 @@ const AlertasExpiradas = () => {
         signal: abortControllerRef.current.signal 
       };
       
-      // ✅ APLICAR FILTRO DE SEGURIDAD como tipoFiltro
       if (tipoAlertaPermitido) {
         params.tipoFiltro = tipoAlertaPermitido;
       }
@@ -189,10 +199,16 @@ const AlertasExpiradas = () => {
       
       setAlertas(datosFiltrados);
       setPaginacion({
-        total: datosFiltrados.length,
+        total: alertasFormateadas.filter(item => {
+          if (tipoAlertaPermitido && item.tipo !== tipoAlertaPermitido) return false;
+          return true;
+        }).length,
         pagina: filtros.pagina,
         limite: filtros.limite,
-        total_paginas: Math.ceil(datosFiltrados.length / filtros.limite)
+        total_paginas: Math.ceil(alertasFormateadas.filter(item => {
+          if (tipoAlertaPermitido && item.tipo !== tipoAlertaPermitido) return false;
+          return true;
+        }).length / filtros.limite)
       });
       
     } catch (error) {
@@ -205,18 +221,24 @@ const AlertasExpiradas = () => {
     }
   }, [tipoAlertaPermitido, filtros.pagina, filtros.limite, aplicarFiltrosLocalDirecto]);
 
+  // ✅ Re-aplicar filtros cuando cambian
   useEffect(() => {
     if (alertasOriginal.length > 0) {
       const datosFiltrados = aplicarFiltrosLocalDirecto(alertasOriginal);
       setAlertas(datosFiltrados);
-      setPaginacion({
-        total: datosFiltrados.length,
-        pagina: filtros.pagina,
-        limite: filtros.limite,
-        total_paginas: Math.ceil(datosFiltrados.length / filtros.limite)
-      });
+      setPaginacion(prev => ({
+        ...prev,
+        total: alertasOriginal.filter(item => {
+          if (tipoAlertaPermitido && item.tipo !== tipoAlertaPermitido) return false;
+          return true;
+        }).length,
+        total_paginas: Math.ceil(alertasOriginal.filter(item => {
+          if (tipoAlertaPermitido && item.tipo !== tipoAlertaPermitido) return false;
+          return true;
+        }).length / filtros.limite)
+      }));
     }
-  }, [filtros.search, filtros.desde, filtros.hasta, filtros.pagina, alertasOriginal, aplicarFiltrosLocalDirecto]);
+  }, [filtros.search, filtros.desde, filtros.hasta, filtros.pagina, alertasOriginal, aplicarFiltrosLocalDirecto, tipoAlertaPermitido, filtros.limite]);
 
   const handleSearchChange = (e) => {
     const value = e.target.value;
@@ -227,10 +249,6 @@ const AlertasExpiradas = () => {
   const handleLimpiarBusqueda = () => {
     setSearchInput('');
     setFiltros(prev => ({ ...prev, search: '', pagina: 1 }));
-  };
-
-  const aplicarFiltros = () => {
-    setFiltros(prev => ({ ...prev, pagina: 1 }));
   };
 
   const limpiarFiltros = () => {
@@ -321,6 +339,7 @@ const AlertasExpiradas = () => {
     });
   };
 
+  // ✅ Efecto para cargar datos al montar
   useEffect(() => {
     cargarAlertas();
     

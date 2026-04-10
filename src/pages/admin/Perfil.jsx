@@ -15,7 +15,7 @@ import authService from '../../services/auth.service';
 // Función para formatear nombres
 const formatearNombre = (nombre) => {
   if (!nombre) return '';
-  
+
   const reemplazos = [
     { de: 'Ã¡', para: 'á' }, { de: 'Ã©', para: 'é' }, { de: 'Ã­', para: 'í' },
     { de: 'Ã³', para: 'ó' }, { de: 'Ãº', para: 'ú' }, { de: 'Ã�', para: 'Á' },
@@ -23,12 +23,12 @@ const formatearNombre = (nombre) => {
     { de: 'Ãš', para: 'Ú' }, { de: 'Ã±', para: 'ñ' }, { de: 'Ã‘', para: 'Ñ' },
     { de: '£', para: 'ú' }, { de: '¤', para: 'ñ' }
   ];
-  
+
   let nombreNormalizado = nombre;
   reemplazos.forEach(({ de, para }) => {
     nombreNormalizado = nombreNormalizado.split(de).join(para);
   });
-  
+
   return nombreNormalizado
     .toLowerCase()
     .split(' ')
@@ -75,46 +75,46 @@ const Perfil = () => {
   const [loading, setLoading] = useState(false);
   const [totalCerradasManual, setTotalCerradasManual] = useState(0);
   const [cargandoEstadisticas, setCargandoEstadisticas] = useState(true);
-  
+
   // ✅ REF para AbortController
   const abortControllerRef = useRef(null);
 
   const nombreFormateado = user?.nombre ? formatearNombre(user.nombre) : '';
-  
+
   // Obtener tipo de alerta permitido según rol
   const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
 
   // ✅ Función para cargar total de alertas cerradas con AbortController
   const cargarTotalCerradasManual = useCallback(async () => {
     if (!user?.id) return;
-    
+
     // Cancelar petición anterior si existe
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       console.log('🛑 Petición anterior cancelada en Perfil');
     }
-    
+
     // Crear nuevo AbortController
     abortControllerRef.current = new AbortController();
-    
+
     try {
       setCargandoEstadisticas(true);
-      
+
       console.log('Cargando total de alertas cerradas por usuario:', user.id);
-      
+
       const params = { signal: abortControllerRef.current.signal };
       if (tipoAlertaPermitido) {
         params.tipo = tipoAlertaPermitido;
       }
-      
-      const response = await alertasService.obtenerCerradasManual({ 
+
+      const response = await alertasService.obtenerCerradasManual({
         admin_id: user.id,
         limite: 1000,
         ...params
       });
-      
+
       console.log('Respuesta:', response);
-      
+
       if (response && response.data) {
         const total = response.data.length;
         setTotalCerradasManual(total);
@@ -135,7 +135,7 @@ const Perfil = () => {
   // ✅ Efecto con limpieza
   useEffect(() => {
     cargarTotalCerradasManual();
-    
+
     return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -200,16 +200,15 @@ const Perfil = () => {
         {/* Tarjeta de perfil */}
         <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 overflow-hidden mb-6">
           {/* Cabecera con gradiente según rol */}
-          <div className={`bg-gradient-to-r ${
-            user.rol === 'policia' ? 'from-blue-600 to-blue-700' :
-            user.rol === 'ambulancia' ? 'from-green-600 to-emerald-700' :
-            user.rol === 'admin' ? 'from-purple-600 to-indigo-700' :
-            user.rol === 'superadmin' ? 'from-red-600 to-rose-700' :
-            user.rol === 'operador_tecnico' ? 'from-cyan-600 to-teal-700' :
-            user.rol === 'operador_policial' ? 'from-indigo-600 to-blue-700' :
-            user.rol === 'operador_medico' ? 'from-emerald-600 to-green-700' :
-            'from-gray-600 to-gray-700'
-          } px-6 py-8 text-center`}>
+          <div className={`bg-gradient-to-r ${user.rol === 'policia' ? 'from-blue-600 to-blue-700' :
+              user.rol === 'ambulancia' ? 'from-green-600 to-emerald-700' :
+                user.rol === 'admin' ? 'from-purple-600 to-indigo-700' :
+                  user.rol === 'superadmin' ? 'from-red-600 to-rose-700' :
+                    user.rol === 'operador_tecnico' ? 'from-cyan-600 to-teal-700' :
+                      user.rol === 'operador_policial' ? 'from-indigo-600 to-blue-700' :
+                        user.rol === 'operador_medico' ? 'from-emerald-600 to-green-700' :
+                          'from-gray-600 to-gray-700'
+            } px-6 py-8 text-center`}>
             <div className="w-24 h-24 bg-white rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg">
               <span className="text-3xl font-bold text-blue-600">
                 {nombreFormateado?.charAt(0).toUpperCase()}
@@ -233,7 +232,18 @@ const Perfil = () => {
               <InfoItem label="Rol" value={rolDisplay[user.rol] || user.rol} icon={Shield} />
               <InfoItem label="Placa" value={user.placa || 'No asignada'} icon={Hash} />
               <InfoItem label="Teléfono" value={user.telefono || 'No registrado'} icon={Phone} />
-              <InfoItem label="Miembro desde" value={new Date().toLocaleDateString('es-MX')} icon={Calendar} />
+              <InfoItem
+                label="Miembro desde"
+                value={user?.creado_en
+                  ? new Date(user.creado_en).toLocaleDateString('es-MX', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric'
+                  })
+                  : 'No disponible'
+                }
+                icon={Calendar}
+              />
             </div>
           </div>
         </div>
@@ -250,7 +260,7 @@ const Perfil = () => {
               {tipoAlertaPermitido && ` (${tipoAlertaPermitido === 'panico' ? 'Solo Pánico' : 'Solo Médicas'})`}
             </p>
           </div>
-          
+
           <div className="p-6">
             {cargandoEstadisticas ? (
               <div className="text-center py-8">
@@ -259,9 +269,9 @@ const Perfil = () => {
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <StatCard 
-                  label="Alertas cerradas manualmente" 
-                  value={totalCerradasManual} 
+                <StatCard
+                  label="Alertas cerradas manualmente"
+                  value={totalCerradasManual}
                   icon={CheckCircle}
                   color="green"
                 />

@@ -1,6 +1,6 @@
 // src/pages/admin/alertas/AlertaPanelDetail.jsx
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom'; 
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft, MapPin, Phone, Mail, AlertTriangle,
   Shield, Lock, CheckCircle, XCircle,
@@ -51,19 +51,19 @@ const formatearFecha = (fecha) => {
 // Normalizar texto
 const normalizarTexto = (texto) => {
   if (!texto) return '';
-  
+
   const reemplazos = [
     { de: 'Ã¡', para: 'á' }, { de: 'Ã©', para: 'é' }, { de: 'Ã­', para: 'í' },
     { de: 'Ã³', para: 'ó' }, { de: 'Ãº', para: 'ú' }, { de: 'Ã±', para: 'ñ' },
     { de: 'Ã�', para: 'Á' }, { de: 'Ã‰', para: 'É' }, { de: 'Ã“', para: 'Ó' },
     { de: 'Ãš', para: 'Ú' }, { de: 'Ã‘', para: 'Ñ' }
   ];
-  
+
   let textoNormalizado = texto;
   reemplazos.forEach(({ de, para }) => {
     textoNormalizado = textoNormalizado.split(de).join(para);
   });
-  
+
   return textoNormalizado;
 };
 
@@ -92,15 +92,15 @@ const AlertaPanelDetail = () => {
 
   const cargarAlerta = useCallback(async () => {
     if (!id) return;
-    
+
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
-    
+
     abortControllerRef.current = new AbortController();
     setLoading(true);
     setError(null);
-    
+
     try {
       const response = await alertasPanelService.obtenerDetalle(id, {
         signal: abortControllerRef.current.signal
@@ -108,7 +108,7 @@ const AlertaPanelDetail = () => {
 
       if (response.data) {
         const alertaData = response.data;
-        
+
         // Verificar permiso del usuario
         if (tipoAlertaPermitido && alertaData.tipo !== tipoAlertaPermitido) {
           setError('No tienes permiso para ver esta alerta');
@@ -116,7 +116,7 @@ const AlertaPanelDetail = () => {
           setLoading(false);
           return;
         }
-        
+
         const alertaFormateada = {
           ...alertaData,
           ciudadano: alertaData.ciudadano ? {
@@ -159,7 +159,7 @@ const AlertaPanelDetail = () => {
     } else {
       cargarAlerta();
     }
-    
+
     return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -214,10 +214,10 @@ const AlertaPanelDetail = () => {
             <h2 className="text-2xl font-bold text-red-800 mb-2">Error</h2>
             <p className="text-red-600 mb-6">{error || 'No se encontró la alerta'}</p>
             <button
-              onClick={() => navigate('/admin/alertas/activas')}
+              onClick={() => navigate(-1)}
               className="px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors font-medium"
             >
-              Volver a alertas activas
+              Volver
             </button>
           </div>
         </div>
@@ -235,7 +235,7 @@ const AlertaPanelDetail = () => {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => navigate('/admin/alertas/activas')}
+              onClick={() => navigate(-1)}
               className="p-2 hover:bg-white rounded-xl transition-colors"
               title="Volver"
             >
@@ -264,8 +264,8 @@ const AlertaPanelDetail = () => {
               <div className={`bg-gradient-to-r ${getTipoGradient(alerta.tipo)} px-6 py-4`}>
                 <div className="flex items-center gap-4">
                   <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
-                    <IconoEntidad 
-                      entidad={alerta.tipo === 'panico' ? 'ALERTA_PANICO' : 'ALERTA_MEDICA'} 
+                    <IconoEntidad
+                      entidad={alerta.tipo === 'panico' ? 'ALERTA_PANICO' : 'ALERTA_MEDICA'}
                       size={28}
                       color="text-white"
                     />
@@ -275,7 +275,7 @@ const AlertaPanelDetail = () => {
                       Alerta de {alerta.tipo === 'panico' ? 'Pánico' : 'Emergencia Médica'}
                     </h2>
                     <p className="text-white/80 text-sm mt-1">
-                      {alerta.tipo === 'panico' 
+                      {alerta.tipo === 'panico'
                         ? 'Activada por el ciudadano en situación de peligro'
                         : 'Solicitud de asistencia médica urgente'}
                     </p>
@@ -291,7 +291,7 @@ const AlertaPanelDetail = () => {
                     value={formatearFecha(alerta.fecha_creacion)}
                     color="blue"
                   />
-                  
+
                   {alerta.fecha_asignacion && (
                     <InfoCard
                       icon={Truck}
@@ -300,7 +300,7 @@ const AlertaPanelDetail = () => {
                       color="purple"
                     />
                   )}
-                  
+
                   {alerta.fecha_cierre && (
                     <InfoCard
                       icon={CheckCircle}
@@ -309,7 +309,7 @@ const AlertaPanelDetail = () => {
                       color="green"
                     />
                   )}
-                  
+
                   {alerta.unidad && (
                     <InfoCard
                       icon={Truck}
@@ -326,14 +326,14 @@ const AlertaPanelDetail = () => {
                       <UserCircle size={20} className="text-purple-600" />
                       Información del Ciudadano
                     </h3>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <ContactCard
                         icon={User}
                         label="Nombre completo"
                         value={alerta.ciudadano.nombre || 'No disponible'}
                       />
-                      
+
                       {alerta.ciudadano.telefono && (
                         <ContactCard
                           icon={Phone}
@@ -343,7 +343,7 @@ const AlertaPanelDetail = () => {
                           actionIcon={PhoneCall}
                         />
                       )}
-                      
+
                       {alerta.ciudadano.email && (
                         <ContactCard
                           icon={Mail}

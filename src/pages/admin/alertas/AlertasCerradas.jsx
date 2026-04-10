@@ -490,34 +490,12 @@ const AlertasCerradas = () => {
                 />
               </div>
             </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Tiempo atención (min)</label>
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  placeholder="Mínimo"
-                  value={tiempoMinimo}
-                  onChange={(e) => setTiempoMinimo(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all text-sm"
-                />
-                <span className="text-gray-400 self-center">-</span>
-                <input
-                  type="number"
-                  placeholder="Máximo"
-                  value={tiempoMaximo}
-                  onChange={(e) => setTiempoMaximo(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all text-sm"
-                />
-              </div>
-            </div>
-
             <div className="flex items-end gap-2">
               <button
                 onClick={limpiarFiltros}
                 className="w-full px-6 py-2 border border-gray-200 bg-white rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all text-sm font-medium text-gray-600 flex items-center justify-center gap-2"
               >
-                <X size={14} />
+                
                 Limpiar filtros
               </button>
             </div>

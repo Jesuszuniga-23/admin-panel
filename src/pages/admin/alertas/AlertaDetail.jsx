@@ -5,7 +5,7 @@ import {
   AlertTriangle, Clock, MapPin, User, Calendar, ChevronLeft,
   Loader, AlertCircle, CheckCircle, XCircle, FileText,
   Shield, Phone, Mail, MessageSquare, X, MapPinned,
-  PhoneCall, Mail as MailIcon, UserCircle, Activity
+  PhoneCall, Mail as MailIcon, UserCircle, Activity,Info
 } from 'lucide-react';
 import alertasPanelService from '../../../services/admin/alertasPanel.service';
 import toast from 'react-hot-toast';
@@ -16,7 +16,7 @@ import authService from '../../../services/auth.service';
 // Función para normalizar texto
 const normalizarTexto = (texto) => {
   if (!texto) return '';
-  
+
   const reemplazos = [
     { de: 'Ã¡', para: 'á' }, { de: 'Ã©', para: 'é' }, { de: 'Ã­', para: 'í' },
     { de: 'Ã³', para: 'ó' }, { de: 'Ãº', para: 'ú' }, { de: 'Ã±', para: 'ñ' },
@@ -25,12 +25,12 @@ const normalizarTexto = (texto) => {
     { de: 'Â¿', para: '¿' }, { de: 'Â¡', para: '¡' },
     { de: '£', para: 'ú' }, { de: '¤', para: 'ñ' }
   ];
-  
+
   let textoNormalizado = texto;
   reemplazos.forEach(({ de, para }) => {
     textoNormalizado = textoNormalizado.split(de).join(para);
   });
-  
+
   return textoNormalizado;
 };
 
@@ -124,15 +124,15 @@ const AlertaDetail = () => {
   const [mostrarModalCierre, setMostrarModalCierre] = useState(false);
   const [motivoCierre, setMotivoCierre] = useState('');
   const [cerrando, setCerrando] = useState(false);
-  
+
   // ✅ Obtener tipo de alerta permitido según rol
   const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
-  
+
   // REF para AbortController
   const abortControllerRef = useRef(null);
-  
+
   const puedeCerrarAlerta = authService.puedeGestionarAlerta(alerta?.tipo);
-  
+
   const [mapaModal, setMapaModal] = useState({
     abierto: false,
     lat: null,
@@ -145,25 +145,25 @@ const AlertaDetail = () => {
   // ✅ CORRECCIÓN #1: Función cargarAlerta con validación de permisos
   const cargarAlerta = useCallback(async () => {
     if (!id) return;
-    
+
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       console.log('🛑 Petición anterior cancelada en AlertaDetail');
     }
-    
+
     abortControllerRef.current = new AbortController();
-    
+
     setLoading(true);
     setError(null);
-    
+
     try {
       console.log("Cargando alerta ID:", id);
-      
+
       const response = await alertasPanelService.obtenerDetalle(id, {
         signal: abortControllerRef.current.signal
       });
       console.log("Respuesta del backend:", response);
-      
+
       if (response.success && response.data) {
         // ✅ VERIFICAR PERMISO DEL USUARIO
         if (tipoAlertaPermitido && response.data.tipo !== tipoAlertaPermitido) {
@@ -171,7 +171,7 @@ const AlertaDetail = () => {
           setLoading(false);
           return;
         }
-        
+
         const alertaFormateada = {
           ...response.data,
           ciudadano: response.data.ciudadano ? {
@@ -199,7 +199,7 @@ const AlertaDetail = () => {
   // Efecto con limpieza
   useEffect(() => {
     cargarAlerta();
-    
+
     return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -213,7 +213,7 @@ const AlertaDetail = () => {
       toast.error('No tienes permisos para cerrar esta alerta');
       return;
     }
-    
+
     if (!motivoCierre.trim()) {
       toast.error('Debes proporcionar un motivo para el cierre');
       return;
@@ -223,7 +223,7 @@ const AlertaDetail = () => {
     try {
       const { default: alertasService } = await import('../../../services/admin/alertas.service');
       const response = await alertasService.cerrarManual(id, motivoCierre);
-      
+
       if (response.success) {
         toast.success('Alerta cerrada manualmente');
         setMostrarModalCierre(false);
@@ -262,7 +262,7 @@ const AlertaDetail = () => {
   };
 
   const getEstadoColor = (estado) => {
-    switch(estado) {
+    switch (estado) {
       case 'activa': return 'bg-red-100 text-red-700 border-red-200';
       case 'asignada': return 'bg-blue-100 text-blue-700 border-blue-200';
       case 'atendiendo': return 'bg-purple-100 text-purple-700 border-purple-200';
@@ -273,7 +273,7 @@ const AlertaDetail = () => {
   };
 
   const getEstadoIcon = (estado) => {
-    switch(estado) {
+    switch (estado) {
       case 'activa': return <AlertTriangle size={16} />;
       case 'asignada': return <Shield size={16} />;
       case 'atendiendo': return <Activity size={16} />;
@@ -344,13 +344,13 @@ const AlertaDetail = () => {
           <div className="flex items-center gap-3">
             <span className={`px-4 py-2 rounded-full text-sm flex items-center gap-2 font-medium ${getEstadoColor(alerta.estado)}`}>
               {getEstadoIcon(alerta.estado)}
-              {alerta.estado === 'activa' ? 'ACTIVA' : 
-               alerta.estado === 'asignada' ? 'ASIGNADA' :
-               alerta.estado === 'atendiendo' ? 'ATENDIENDO' :
-               alerta.estado === 'expirada' ? 'EXPIRADA' : 
-               alerta.estado === 'cerrada' ? 'CERRADA' : alerta.estado.toUpperCase()}
+              {alerta.estado === 'activa' ? 'ACTIVA' :
+                alerta.estado === 'asignada' ? 'ASIGNADA' :
+                  alerta.estado === 'atendiendo' ? 'ATENDIENDO' :
+                    alerta.estado === 'expirada' ? 'EXPIRADA' :
+                      alerta.estado === 'cerrada' ? 'CERRADA' : alerta.estado.toUpperCase()}
             </span>
-            
+
             {alerta.estado !== 'cerrada' && alerta.estado !== 'cancelada' && puedeCerrarAlerta && (
               <button
                 onClick={() => setMostrarModalCierre(true)}
@@ -371,8 +371,8 @@ const AlertaDetail = () => {
               <div className={`bg-gradient-to-r ${getTipoGradient(alerta.tipo)} px-6 py-4`}>
                 <div className="flex items-center gap-4">
                   <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
-                    <IconoEntidad 
-                      entidad={alerta.tipo === 'panico' ? 'ALERTA_PANICO' : 'ALERTA_MEDICA'} 
+                    <IconoEntidad
+                      entidad={alerta.tipo === 'panico' ? 'ALERTA_PANICO' : 'ALERTA_MEDICA'}
                       size={28}
                       color="text-white"
                     />
@@ -382,7 +382,7 @@ const AlertaDetail = () => {
                       Alerta de {alerta.tipo === 'panico' ? 'Pánico' : 'Emergencia Médica'}
                     </h2>
                     <p className="text-white/80 text-sm mt-1">
-                      {alerta.tipo === 'panico' 
+                      {alerta.tipo === 'panico'
                         ? 'Activada por el ciudadano en situación de riesgo'
                         : 'Solicitud de asistencia médica de emergencia'}
                     </p>
@@ -399,7 +399,7 @@ const AlertaDetail = () => {
                     value={formatearFecha(alerta.fecha_creacion)}
                     color="blue"
                   />
-                  
+
                   {alerta.fecha_asignacion && (
                     <InfoCard
                       icon={Clock}
@@ -408,7 +408,7 @@ const AlertaDetail = () => {
                       color="amber"
                     />
                   )}
-                  
+
                   {alerta.fecha_expiracion && (
                     <InfoCard
                       icon={Clock}
@@ -417,7 +417,7 @@ const AlertaDetail = () => {
                       color="amber"
                     />
                   )}
-                  
+
                   {alerta.fecha_cierre && (
                     <InfoCard
                       icon={CheckCircle}
@@ -426,7 +426,7 @@ const AlertaDetail = () => {
                       color="green"
                     />
                   )}
-                  
+
                   {/* ✅ CORRECCIÓN #2: Tipo de unidad correcto */}
                   {alerta.unidad && (
                     <InfoCard
@@ -444,14 +444,14 @@ const AlertaDetail = () => {
                       <UserCircle size={20} className="text-purple-600" />
                       Información del Ciudadano
                     </h3>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <ContactCard
                         icon={User}
                         label="Nombre completo"
                         value={alerta.ciudadano.nombre || 'No disponible'}
                       />
-                      
+
                       {alerta.ciudadano.telefono && (
                         <ContactCard
                           icon={Phone}
@@ -461,7 +461,7 @@ const AlertaDetail = () => {
                           actionIcon={PhoneCall}
                         />
                       )}
-                      
+
                       {alerta.ciudadano.email && (
                         <ContactCard
                           icon={Mail}
@@ -471,6 +471,26 @@ const AlertaDetail = () => {
                           actionIcon={MailIcon}
                         />
                       )}
+                    </div>
+                  </div>
+                )}
+                {/* SECCIÓN DE MOTIVO DE REASIGNACIÓN */}
+                {alerta.motivo_reasignacion && (
+                  <div className="mt-6 p-4 bg-amber-50 rounded-xl border border-amber-200">
+                    <div className="flex items-start gap-3">
+                      <Info size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs font-semibold text-amber-700 uppercase tracking-wider">
+                          Motivo de reasignación
+                        </p>
+                        <p className="text-sm text-amber-800 mt-1">{alerta.motivo_reasignacion}</p>
+                        {alerta.reasignado_por && (
+                          <p className="text-xs text-amber-600 mt-2">
+                            Reasignado por: {alerta.reasignado_por.nombre}
+                            {alerta.fecha_reasignacion && ` • ${new Date(alerta.fecha_reasignacion).toLocaleString('es-MX')}`}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}

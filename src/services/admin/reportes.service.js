@@ -201,7 +201,7 @@ class ReportesService {
           nombre: corregirTexto(item.nombre || '—'),
           email: item.email || '—',
           rol: item.rol === 'policia' ? 'Policía' :
-                item.rol === 'paramedico' ? 'paramedico' :
+                item.rol === 'paramedico' ? 'Paramédico' :
                  item.rol === 'admin' ? 'Admin' :
          item.rol === 'superadmin' ? 'Superadmin' : item.rol,
           placa: item.placa || '—',
