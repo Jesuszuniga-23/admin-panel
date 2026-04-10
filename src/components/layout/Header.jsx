@@ -205,8 +205,7 @@ const Header = ({ titulo = 'Panel de Administración', subtitulo = 'Gestión del
             </div>
 
             <div className="flex items-center gap-2 sm:gap-4">
-              {/* ✅ TENANT SELECTOR - Solo visible para superadmin */}
-              <TenantSelector />
+             
               
               <div className="relative" ref={menuRef}>
                 <button
