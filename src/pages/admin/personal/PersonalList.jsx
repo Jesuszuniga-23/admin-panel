@@ -177,7 +177,7 @@ const PersonalList = () => {
     cargarLimites();
   }, []);
 
- 
+
 
   // Función puedeCrearPersonal usando authService
   const puedeCrearPersonal = () => {
@@ -460,19 +460,30 @@ const PersonalList = () => {
           </div>
           {puedeCrearPersonal() && (
             <div className="flex items-center gap-2">
+              {/* ✅ Mostrar badges de advertencia para roles que alcanzaron su límite */}
               {limiteInfo && Object.entries(limiteInfo.roles || {})
                 .filter(([_, data]) => data.limite > 0 && data.actual >= data.limite)
-                .map(([rol]) => (
-                  <span key={rol} className="bg-red-100 text-red-700 text-xs px-3 py-1 rounded-full flex items-center gap-1">
-                    <AlertTriangle size={12} />
-                    Límite alcanzado
-                  </span>
-                ))
+                .map(([rol]) => {
+                  const nombresRol = {
+                    admin: 'Administradores',
+                    operador_tecnico: 'Op. Técnicos',
+                    operador_medico: 'Op. Médicos',
+                    operador_policial: 'Op. Policiales',
+                    operador_general: 'Op. Generales'
+                  };
+                  return (
+                    <span key={rol} className="bg-orange-100 text-orange-700 text-xs px-3 py-1 rounded-full flex items-center gap-1">
+                      <AlertTriangle size={12} />
+                      {nombresRol[rol] || rol} lleno
+                    </span>
+                  );
+                })
               }
+
+              {/* ✅ BOTÓN SIEMPRE HABILITADO */}
               <button
                 onClick={() => navigate('/admin/personal/crear')}
-                className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap disabled:opacity-50"
-                disabled={limiteInfo && Object.values(limiteInfo.roles || {}).some(r => r.actual >= r.limite && r.limite > 0)}
+                className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap"
               >
                 <Plus size={18} />
                 <span>Nuevo Personal</span>
