@@ -9,7 +9,7 @@ const ConsumoPlan = ({ tenantId }) => {
     useEffect(() => {
         const cargarLimites = async () => {
             try {
-                const response = await axiosInstance.get('/admin/plan/limites');
+                const response = await axiosInstance.get('/admin/tenants/plan/limites');
                 if (response.data.success) {
                     setLimites(response.data.data);
                 }

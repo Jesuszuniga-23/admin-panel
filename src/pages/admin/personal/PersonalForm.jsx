@@ -12,6 +12,7 @@ import toast from 'react-hot-toast';
 import IconoEntidad, { BadgeIcono } from '../../../components/ui/IconoEntidad';
 import authService from '../../../services/auth.service';
 import useAuthStore from '../../../store/authStore';
+import axiosInstance from '../../../services/api/axiosConfig';
 
 // ✅ Función para obtener icono según rol (para preview)
 const getIconoPorRolPreview = (rol, size = 20) => {
@@ -212,7 +213,7 @@ const PersonalForm = () => {
   useEffect(() => {
     const verificarLimites = async () => {
       try {
-        const response = await axiosInstance.get('/admin/plan/limites');
+        const response = await axiosInstance.get('/admin/tenants/plan/limites');
         if (response.data.success) {
           const limites = response.data.data;
           const rolSeleccionado = formData.rol;
