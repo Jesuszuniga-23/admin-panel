@@ -1,7 +1,7 @@
 // src/pages/superadmin/TenantsList.jsx - VERSIÓN CORREGIDA
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Building2, Plus, Search, Eye, Edit, CreditCard, CheckCircle, XCircle, Clock, AlertTriangle, Unlock } from 'lucide-react';
+import { Building2, Plus, Search, Eye, Edit, CreditCard, CheckCircle, XCircle, Clock, AlertTriangle, Unlock, Lock } from 'lucide-react';
 import tenantService from '../../services/admin/tenant.service';
 import toast from 'react-hot-toast';
 
@@ -23,12 +23,13 @@ const TenantsList = () => {
     const abortControllerRef = useRef(null);
     const isMounted = useRef(true);
 
+    // ✅ CORREGIDO: Estados correctos (trial, active, suspended, expired)
     const getStatusBadge = (status, activo) => {
         if (status === 'active' && activo) {
             return { text: 'Activo', color: 'bg-green-100 text-green-700', icon: <CheckCircle size={12} className="mr-1" /> };
         }
-        if (status === 'pending') {
-            return { text: 'Pendiente', color: 'bg-yellow-100 text-yellow-700', icon: <Clock size={12} className="mr-1" /> };
+        if (status === 'trial') {
+            return { text: 'Prueba', color: 'bg-amber-100 text-amber-700', icon: <Clock size={12} className="mr-1" /> };
         }
         if (status === 'suspended') {
             return { text: 'Suspendido', color: 'bg-red-100 text-red-700', icon: <XCircle size={12} className="mr-1" /> };
@@ -173,18 +174,20 @@ const TenantsList = () => {
                         />
                     </div>
 
+                    {/* ✅ CORREGIDO: Estados correctos */}
                     <select
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
                         className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                         <option value="">Todos los estados</option>
+                        <option value="trial">Prueba</option>
                         <option value="active">Activos</option>
-                        <option value="pending">Pendientes</option>
                         <option value="suspended">Suspendidos</option>
                         <option value="expired">Expirados</option>
                     </select>
 
+                    {/* ✅ CORREGIDO: Planes correctos */}
                     <select
                         value={planFilter}
                         onChange={(e) => setPlanFilter(e.target.value)}
@@ -192,8 +195,8 @@ const TenantsList = () => {
                     >
                         <option value="">Todos los planes</option>
                         <option value="basico">Básico</option>
-                        <option value="premium">Premium</option>
-                        <option value="enterprise">Enterprise</option>
+                        <option value="premium">Estándar</option>
+                        <option value="enterprise">Avanzado</option>
                     </select>
                 </div>
             </div>
@@ -207,6 +210,7 @@ const TenantsList = () => {
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Municipio</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Plan</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Población</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Expiración</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acciones</th>
@@ -215,7 +219,7 @@ const TenantsList = () => {
                         <tbody className="divide-y divide-gray-200">
                             {tenants.length === 0 ? (
                                 <tr>
-                                    <td colSpan="6" className="px-6 py-8 text-center text-gray-500">
+                                    <td colSpan="7" className="px-6 py-8 text-center text-gray-500">
                                         No hay municipios registrados
                                     </td>
                                 </tr>
@@ -235,7 +239,16 @@ const TenantsList = () => {
                                             </td>
                                             <td className="px-6 py-4">
                                                 <span className="text-sm text-gray-600 capitalize">
-                                                    {tenant.plan_id || 'Sin plan'}
+                                                    {tenant.plan_id === 'premium' ? 'Estándar' : 
+                                                     tenant.plan_id === 'enterprise' ? 'Avanzado' : 
+                                                     tenant.plan_id === 'basico' ? 'Básico' : 
+                                                     tenant.plan_id || 'Sin plan'}
+                                                </span>
+                                            </td>
+                                            {/* ✅ NUEVA COLUMNA: Población */}
+                                            <td className="px-6 py-4">
+                                                <span className="text-sm text-gray-600">
+                                                    {tenant.poblacion?.toLocaleString() || 'N/A'}
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4">
@@ -324,6 +337,7 @@ const TenantsList = () => {
                     </table>
                 </div>
             </div>
+
             {/* Modal de Pago */}
             {showPayModal && selectedTenant && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -349,7 +363,7 @@ const TenantsList = () => {
                                     type="number"
                                     value={monto}
                                     onChange={(e) => setMonto(e.target.value)}
-                                    placeholder="Ej: 499"
+                                    placeholder="Ej: 4500"
                                     className="w-full px-4 py-2 border rounded-lg"
                                 />
                             </div>
