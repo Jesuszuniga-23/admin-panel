@@ -1,7 +1,7 @@
 // src/pages/superadmin/TenantForm.jsx
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Building2, Save, X, ArrowLeft, Plus } from 'lucide-react';
+import { Building2, Save, X, ArrowLeft, Users } from 'lucide-react';
 import tenantService from '../../services/admin/tenant.service';
 import toast from 'react-hot-toast';
 
@@ -16,9 +16,8 @@ const TenantForm = () => {
         nombre: '',
         slug: '',
         activo: true,
-        max_usuarios: 0,
-        max_unidades: 0,
-        max_alertas_mensuales: 0,
+        poblacion: '',
+        plan_id: '',
         fecha_expiracion: '',
         configuracion: {},
         notes: ''
@@ -41,9 +40,8 @@ const TenantForm = () => {
                     nombre: tenant.nombre,
                     slug: tenant.slug || '',
                     activo: tenant.activo,
-                    max_usuarios: tenant.max_usuarios || 0,
-                    max_unidades: tenant.max_unidades || 0,
-                    max_alertas_mensuales: tenant.max_alertas_mensuales || 0,
+                    poblacion: tenant.poblacion || '',
+                    plan_id: tenant.plan_id || '',
                     fecha_expiracion: tenant.fecha_expiracion ? new Date(tenant.fecha_expiracion).toISOString().split('T')[0] : '',
                     configuracion: tenant.configuracion || {},
                     notes: tenant.notes || ''
@@ -70,6 +68,13 @@ const TenantForm = () => {
         setSaving(true);
 
         try {
+            // Validar población
+            if (!formData.poblacion || parseInt(formData.poblacion) <= 0) {
+                toast.error('La población debe ser un número mayor a 0');
+                setSaving(false);
+                return;
+            }
+
             let response;
             if (isEditing) {
                 response = await tenantService.actualizarTenant(id, formData);
@@ -169,40 +174,44 @@ const TenantForm = () => {
                     />
                 </div>
 
-                {/* Límites */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* ✅ NUEVOS CAMPOS: Población y Plan */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Max Usuarios</label>
-                        <input
-                            type="number"
-                            name="max_usuarios"
-                            value={formData.max_usuarios}
-                            onChange={handleChange}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        />
-                        <p className="text-xs text-gray-500 mt-1">0 = ilimitado</p>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Población <span className="text-red-500">*</span>
+                        </label>
+                        <div className="relative">
+                            <Users size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                            <input
+                                type="number"
+                                name="poblacion"
+                                value={formData.poblacion}
+                                onChange={handleChange}
+                                placeholder="Ej: 15000"
+                                min="1"
+                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                required
+                            />
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">Número de habitantes</p>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Max Unidades</label>
-                        <input
-                            type="number"
-                            name="max_unidades"
-                            value={formData.max_unidades}
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Plan <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                            name="plan_id"
+                            value={formData.plan_id}
                             onChange={handleChange}
                             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        />
-                        <p className="text-xs text-gray-500 mt-1">0 = ilimitado</p>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Max Alertas/mes</label>
-                        <input
-                            type="number"
-                            name="max_alertas_mensuales"
-                            value={formData.max_alertas_mensuales}
-                            onChange={handleChange}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        />
-                        <p className="text-xs text-gray-500 mt-1">0 = ilimitado</p>
+                            required
+                        >
+                            <option value="">Selecciona un plan</option>
+                            <option value="basico">Básico (hasta 10,000 hab) - $4,500/mes</option>
+                            <option value="premium">Estándar (10,001 - 50,000 hab) - $8,500/mes</option>
+                            <option value="enterprise">Avanzado (más de 50,000 hab) - $14,000/mes</option>
+                        </select>
+                        <p className="text-xs text-gray-500 mt-1">Plan asignado según población</p>
                     </div>
                 </div>
 
@@ -217,6 +226,7 @@ const TenantForm = () => {
                             onChange={handleChange}
                             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                         />
+                        <p className="text-xs text-gray-500 mt-1">Dejar vacío para plan de prueba</p>
                     </div>
                     <div className="flex items-center pt-6">
                         <label className="flex items-center gap-2 cursor-pointer">
