@@ -4,8 +4,9 @@ import {
     Shield, Building2, Users, Truck, Bell, CheckCircle, ArrowRight,
     Zap, Lock, Activity, BarChart3, ChevronRight, Loader2,
     MapPin, FileText, Smartphone, LayoutDashboard, TrendingUp,
-    Hexagon, BadgeCheck, Siren
+    Hexagon, BadgeCheck, Siren, Calculator, Target, Award
 } from 'lucide-react';
+
 import RegisterForm from '../components/landing/RegisterForm';
 import registroService from '../services/public/registro.service';
 import toast from 'react-hot-toast';
@@ -79,11 +80,14 @@ const getPlanColors = (index) => {
     return colorSchemes[index % colorSchemes.length];
 };
 
+
 const LandingPage = () => {
     const [planes, setPlanes] = useState([]);
     const [loadingPlanes, setLoadingPlanes] = useState(true);
     const [selectedPlan, setSelectedPlan] = useState(null);
     const [showForm, setShowForm] = useState(false);
+    const [poblacionConsulta, setPoblacionConsulta] = useState('');
+    const [planRecomendado, setPlanRecomendado] = useState(null);
     const { scrollY } = useScroll();
     const heroY = useTransform(scrollY, [0, 500], [0, 150]);
 
@@ -105,12 +109,32 @@ const LandingPage = () => {
         };
         cargarPlanes();
     }, []);
-
     const handleSelectPlan = (plan) => {
-        setSelectedPlan(plan);
+        setSelectedPlan({
+            ...plan,
+            poblacionRecomendada: poblacionConsulta || null
+        });
         setShowForm(true);
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
+
+    // ✅ FUNCIÓN CORRECTA - DENTRO DEL COMPONENTE
+    const calcularPlanRecomendado = () => {
+        const pob = parseInt(poblacionConsulta) || 0;
+        if (pob <= 0) {
+            toast.error('Ingresa una población válida');
+            return;
+        }
+        const plan = planes.find(p => pob >= p.poblacion_min && pob <= p.poblacion_max);
+        if (plan) {
+            setPlanRecomendado(plan);
+            toast.success(`Plan recomendado: ${plan.nombre}`);
+        } else {
+            toast.error('No hay un plan disponible para esa población');
+        }
+    };
+
+
 
     if (showForm && selectedPlan) {
         return <RegisterForm selectedPlan={selectedPlan} onBack={() => setShowForm(false)} />;
@@ -281,6 +305,112 @@ const LandingPage = () => {
                             </motion.div>
                         </FadeInSection>
                     </div>
+                </div>
+            </section>
+            <section className="py-16 px-6 lg:px-8 bg-gradient-to-r from-[#1E3A5F]/5 to-[#0F2440]/5">
+                <div className="container mx-auto max-w-4xl">
+                    <FadeInSection>
+                        <div className="bg-white rounded-2xl shadow-xl p-8 border border-[#1E3A5F]/20">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="bg-[#1E3A5F] p-3 rounded-xl">
+                                    <Calculator size={24} className="text-white" />
+                                </div>
+                                <h2 className="text-2xl md:text-3xl font-bold text-gray-900">
+                                    Descubre el plan ideal para tu municipio
+                                </h2>
+                            </div>
+                            <p className="text-gray-600 mb-6">
+                                Ingresa la población y te recomendaremos el plan que mejor se adapta a tus necesidades operativas.
+                            </p>
+
+                            <div className="flex flex-col sm:flex-row gap-4">
+                                <div className="flex-1">
+                                    <div className="relative">
+                                        <Users size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                        <input
+                                            type="number"
+                                            value={poblacionConsulta}
+                                            onChange={(e) => setPoblacionConsulta(e.target.value)}
+                                            onKeyDown={(e) => e.key === 'Enter' && calcularPlanRecomendado()}
+                                            placeholder="Ej: 15000"
+                                            min="1"
+                                            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#1E3A5F] focus:border-[#1E3A5F]"
+                                        />
+                                    </div>
+                                    <p className="text-xs text-gray-500 mt-1">Número de habitantes</p>
+                                </div>
+                                <button
+                                    onClick={calcularPlanRecomendado}
+                                    className="bg-[#1E3A5F] text-white px-8 py-3 rounded-xl font-semibold hover:bg-[#2A4E7A] transition-all shadow-md inline-flex items-center justify-center gap-2"
+                                >
+                                    <Target size={18} />
+                                    Calcular plan recomendado
+                                </button>
+                            </div>
+
+                            {planRecomendado && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.5 }}
+                                    className="mt-6 p-6 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl"
+                                >
+                                    <div className="flex items-start gap-4">
+                                        <div className="bg-green-100 p-3 rounded-full">
+                                            <Award size={24} className="text-green-700" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <p className="text-lg font-semibold text-green-800 flex items-center gap-2">
+                                                <Target size={18} />
+                                                Tu plan recomendado es: {planRecomendado.nombre}
+                                            </p>
+                                            <p className="text-3xl font-bold text-gray-900 mt-2">
+                                                ${planRecomendado.precio_mensual?.toLocaleString()} MXN
+                                                <span className="text-lg font-normal text-gray-500"> /mes</span>
+                                            </p>
+                                            <p className="text-sm text-gray-600 mt-1 flex items-center gap-2">
+                                                <MapPin size={14} />
+                                                Para municipios de {planRecomendado.poblacion_min?.toLocaleString()}
+                                                a {planRecomendado.poblacion_max === 999999999 ? 'más de 50,000' : planRecomendado.poblacion_max?.toLocaleString()} habitantes
+                                            </p>
+
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+                                                <div className="bg-white rounded-lg p-3 text-center shadow-sm">
+                                                    <Shield size={16} className="text-[#1E3A5F] mx-auto mb-1" />
+                                                    <p className="text-xs text-gray-500">Administradores</p>
+                                                    <p className="font-bold text-gray-800">{planRecomendado.max_admin || '∞'}</p>
+                                                </div>
+                                                <div className="bg-white rounded-lg p-3 text-center shadow-sm">
+                                                    <Users size={16} className="text-green-600 mx-auto mb-1" />
+                                                    <p className="text-xs text-gray-500">Policías/Paramédicos</p>
+                                                    <p className="font-bold text-green-600">ILIMITADOS</p>
+                                                </div>
+                                                <div className="bg-white rounded-lg p-3 text-center shadow-sm">
+                                                    <Truck size={16} className="text-green-600 mx-auto mb-1" />
+                                                    <p className="text-xs text-gray-500">Unidades</p>
+                                                    <p className="font-bold text-green-600">ILIMITADAS</p>
+                                                </div>
+                                                <div className="bg-white rounded-lg p-3 text-center shadow-sm">
+                                                    <Zap size={16} className="text-green-600 mx-auto mb-1" />
+                                                    <p className="text-xs text-gray-500">Prueba gratuita</p>
+                                                    <p className="font-bold text-green-600">{planRecomendado.trial_dias} días</p>
+                                                </div>
+                                            </div>
+
+                                            <button
+                                                onClick={() => handleSelectPlan(planRecomendado)}
+                                                className="mt-6 bg-green-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-green-700 transition-all inline-flex items-center gap-2 shadow-md"
+                                            >
+                                                <CheckCircle size={18} />
+                                                Seleccionar Plan {planRecomendado.nombre}
+                                                <ArrowRight size={18} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            )}
+                        </div>
+                    </FadeInSection>
                 </div>
             </section>
 
