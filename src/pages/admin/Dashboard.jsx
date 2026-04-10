@@ -241,18 +241,35 @@ const Dashboard = () => {
   }, []);
 
   const getPersonalDistributionData = useCallback(() => {
+    const porRol = stats?.personal?.porRol || {};
+
+    // Si hay filtro por rol, mostrar solo ese
     if (rolPersonalPermitido === 'policia') {
-      return [{ name: 'Policía', value: stats?.personal?.porRol?.policia || 0 }];
+      return [{ name: 'Policía', value: porRol.policia || 0 }];
     }
     if (rolPersonalPermitido === 'paramedico') {
-      return [{ name: 'Paramédico', value: stats?.personal?.porRol?.paramedico || 0 }];
+      return [{ name: 'Paramédico', value: porRol.paramedico || 0 }];
     }
-    return [
-      { name: 'Policía', value: stats?.personal?.porRol?.policia || 0 },
-      { name: 'Paramédico', value: stats?.personal?.porRol?.paramedico || 0 },
-      { name: 'Admin', value: stats?.personal?.porRol?.admin || 0 },
-      { name: 'Super Admin', value: stats?.personal?.porRol?.superadmin || 0 }
-    ];
+
+    // ✅ MOSTRAR TODOS LOS ROLES QUE TIENEN PERSONAL
+    const nombresRol = {
+      'policia': 'Policía',
+      'paramedico': 'Paramédico',
+      'admin': 'Admin',
+      'superadmin': 'Super Admin',
+      'operador_tecnico': 'Op. Técnico',
+      'operador_medico': 'Op. Médico',
+      'operador_policial': 'Op. Policial',
+      'operador_general': 'Op. General'
+    };
+
+    // Convertir el objeto porRol a array y filtrar los que tienen valor > 0
+    return Object.entries(porRol)
+      .filter(([_, value]) => value > 0)
+      .map(([rol, value]) => ({
+        name: nombresRol[rol] || rol,
+        value
+      }));
   }, [rolPersonalPermitido, stats?.personal?.porRol]);
 
   const COLORS = useMemo(() => ['#3b82f6', '#ef4444', '#f59e0b', '#10b981', '#8b5cf6'], []);
@@ -344,10 +361,10 @@ const Dashboard = () => {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <main className="p-4 sm:p-6 md:p-8">
         {/* ✅ NUEVO: BANNER DE ESTADO DEL TENANT */}
-      <TenantStatusBanner tenant={tenantInfo} />
-      {/* ✅ NUEVO: CONSUMO DEL PLAN */}
-    {tenantInfo && <ConsumoPlan tenantId={tenantInfo.id} />}
-    
+        <TenantStatusBanner tenant={tenantInfo} />
+        {/* ✅ NUEVO: CONSUMO DEL PLAN */}
+        {tenantInfo && <ConsumoPlan tenantId={tenantInfo.id} />}
+
         {/* KPIs principales */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
           {stats?.kpis && Object.entries(stats.kpis).map(([key, data]) => {
@@ -634,8 +651,8 @@ const Dashboard = () => {
                         </div>
                       </div>
                       <span className={`text-xs px-1.5 md:px-2 py-0.5 md:py-1 rounded-full whitespace-nowrap ${u.estado === 'disponible' ? 'bg-emerald-100 text-emerald-700' :
-                          u.estado === 'ocupada' ? 'bg-rose-100 text-rose-700' :
-                            'bg-slate-100 text-slate-700'
+                        u.estado === 'ocupada' ? 'bg-rose-100 text-rose-700' :
+                          'bg-slate-100 text-slate-700'
                         }`}>
                         {u.estado}
                       </span>

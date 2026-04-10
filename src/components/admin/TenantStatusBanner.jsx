@@ -70,7 +70,7 @@ const TenantStatusBanner = ({ tenant }) => {
                         disabled={loading}
                         className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm font-medium disabled:opacity-50"
                     >
-                        {loading ? 'Descargando...' : 'Ver Planes'}
+                        {loading ? 'Descargando...' : 'Orden de pago'}
                         {!loading && <Download size={16} />}
                     </button>
                 </div>
