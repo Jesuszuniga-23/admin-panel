@@ -209,6 +209,26 @@ const PersonalForm = () => {
       setOriginalFormData(JSON.parse(JSON.stringify(formData)));
     }
   }, [formData, originalFormData, cargandoDatos]);
+  useEffect(() => {
+    const verificarLimites = async () => {
+      try {
+        const response = await axiosInstance.get('/admin/plan/limites');
+        if (response.data.success) {
+          const limites = response.data.data;
+          const rolSeleccionado = formData.rol;
+          const limiteRol = limites.roles[rolSeleccionado];
+
+          if (limiteRol && limiteRol.limite > 0 && limiteRol.actual >= limiteRol.limite) {
+            toast.error(`Has alcanzado el límite de ${rolSeleccionado} para tu plan. Considera actualizar a un plan superior.`);
+          }
+        }
+      } catch (error) {
+        console.error('Error verificando límites:', error);
+      }
+    };
+
+    if (!isEditing) verificarLimites();
+  }, [formData.rol, isEditing]);
 
   // Función para verificar si hay cambios
   const hasUnsavedChanges = () => {
@@ -1061,7 +1081,7 @@ const PersonalForm = () => {
                   </label>
 
                   <label className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all cursor-pointer ${!formData.activo ? 'border-gray-200 bg-gray-100 opacity-50 cursor-not-allowed' :
-                      formData.disponible ? 'border-blue-200 bg-blue-50 hover:bg-blue-100' : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
+                    formData.disponible ? 'border-blue-200 bg-blue-50 hover:bg-blue-100' : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
                     }`}>
                     <input
                       type="checkbox"

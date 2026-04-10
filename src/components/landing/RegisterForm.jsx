@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-    ArrowLeft, ArrowRight, CheckCircle, Building2, User, Shield, MapPin, Mail, Phone, Loader2, Users, 
+import {
+    ArrowLeft, ArrowRight, CheckCircle, Building2, User, Shield, MapPin, Mail, Phone, Loader2, Users,
     CreditCard, Check
 } from 'lucide-react';
 import registroService from '../../services/public/registro.service';
@@ -12,7 +12,7 @@ const RegisterForm = ({ selectedPlan, onBack }) => {
     const [currentStep, setCurrentStep] = useState(1);
     const [loading, setLoading] = useState(false);
     const [cpValidando, setCpValidando] = useState(false);
-    
+
     const [formData, setFormData] = useState({
         // Paso 2: Municipio
         municipio_nombre: '',
@@ -101,7 +101,7 @@ const RegisterForm = ({ selectedPlan, onBack }) => {
                 localStorage.setItem('tenant_id', tenant_id);
 
                 toast.success(
-                    `¡Registro exitoso! Plan ${plan_asignado || 'asignado'}`,
+                    `✅ ¡Registro exitoso! Plan ${plan_asignado || 'asignado'}`,
                     { duration: 8000 }
                 );
 
@@ -113,11 +113,36 @@ const RegisterForm = ({ selectedPlan, onBack }) => {
                     }
                 });
             } else {
-                toast.error(response.error || 'Error al enviar solicitud');
+                // ✅ MENSAJE CLARO DESDE EL BACKEND
+                const errorMsg = response.error || 'Error al enviar solicitud';
+                if (errorMsg.includes('ya está registrado')) {
+                    toast.error('Este municipio ya está registrado en el sistema.');
+                } else if (errorMsg.includes('poblacion')) {
+                    toast.error('La población no es válida o no hay plan disponible.');
+                } else {
+                    toast.error(errorMsg);
+                }
             }
         } catch (error) {
             console.error('Error:', error);
-            toast.error('Error al procesar el registro');
+
+            // ✅ EXTRAER MENSAJE DEL ERROR
+            const errorData = error?.response?.data || error;
+            const errorMsg = errorData?.error || errorData?.message || 'Error al procesar el registro';
+
+            if (errorMsg.includes('ya está registrado')) {
+                toast.error('Este municipio ya está registrado en el sistema.');
+            } else if (errorMsg.includes('poblacion') || errorMsg.includes('población')) {
+                toast.error('La población ingresada no es válida.');
+            } else if (errorMsg.includes('email')) {
+                toast.error('El email no es válido o ya está registrado.');
+            } else if (errorMsg.includes('CP') || errorMsg.includes('postal')) {
+                toast.error('El código postal no es válido.');
+            } else if (errorMsg.includes('plan')) {
+                toast.error('No hay plan disponible para esa población.');
+            } else {
+                toast.error(errorMsg);
+            }
         } finally {
             setLoading(false);
         }
@@ -160,8 +185,8 @@ const RegisterForm = ({ selectedPlan, onBack }) => {
                             <div key={step} className="flex flex-col items-center">
                                 <div className={`
                                     w-10 h-10 rounded-full flex items-center justify-center font-semibold
-                                    ${currentStep === step ? 'bg-[#1E3A5F] text-white' : 
-                                      currentStep > step ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'}
+                                    ${currentStep === step ? 'bg-[#1E3A5F] text-white' :
+                                        currentStep > step ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'}
                                 `}>
                                     {currentStep > step ? <Check size={20} /> : step}
                                 </div>
@@ -176,7 +201,7 @@ const RegisterForm = ({ selectedPlan, onBack }) => {
                     </div>
                     <div className="relative mt-2">
                         <div className="absolute top-0 h-1 bg-gray-200 w-full rounded"></div>
-                        <div 
+                        <div
                             className="absolute top-0 h-1 bg-[#1E3A5F] rounded transition-all duration-300"
                             style={{ width: `${((currentStep - 1) / (totalSteps - 1)) * 100}%` }}
                         ></div>
@@ -204,7 +229,7 @@ const RegisterForm = ({ selectedPlan, onBack }) => {
                                         ${selectedPlan.precio_mensual?.toLocaleString()} MXN <span className="text-lg font-normal opacity-80">/mes</span>
                                     </p>
                                     <p className="text-sm opacity-80 mt-1">
-                                        Para municipios de {selectedPlan.poblacion_min?.toLocaleString()} 
+                                        Para municipios de {selectedPlan.poblacion_min?.toLocaleString()}
                                         a {selectedPlan.poblacion_max === 999999999 ? 'más de 50,000' : selectedPlan.poblacion_max?.toLocaleString()} habitantes
                                     </p>
                                 </div>
