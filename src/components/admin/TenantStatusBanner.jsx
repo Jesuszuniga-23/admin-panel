@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 const TenantStatusBanner = ({ tenant }) => {
     const [diasRestantes, setDiasRestantes] = useState(0);
     const [loading, setLoading] = useState(false);
-    
+
     useEffect(() => {
         if (tenant?.fecha_expiracion) {
             const expiracion = new Date(tenant.fecha_expiracion);
@@ -16,7 +16,7 @@ const TenantStatusBanner = ({ tenant }) => {
             setDiasRestantes(diff);
         }
     }, [tenant]);
-    
+
     const handleDescargarOrdenPago = async () => {
         setLoading(true);
         try {
@@ -28,9 +28,9 @@ const TenantStatusBanner = ({ tenant }) => {
             setLoading(false);
         }
     };
-    
+
     if (!tenant) return null;
-    
+
     // Banner para TRIAL
     if (tenant.status === 'trial') {
         return (
@@ -45,12 +45,12 @@ const TenantStatusBanner = ({ tenant }) => {
                                 Período de prueba activo
                             </p>
                             <p className="text-sm text-amber-700">
-                                {diasRestantes} {diasRestantes === 1 ? 'día' : 'días'} restantes de tu prueba gratuita
+                                {diasRestantes} {diasRestantes === 1 ? 'día' : 'días'} restantes • Plan {tenant?.plan?.nombre || 'contratado'}
                             </p>
                         </div>
                     </div>
                 </div>
-                
+
                 <div className="bg-blue-50 border-l-4 border-blue-500 rounded-r-xl p-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <div className="bg-blue-100 p-2 rounded-lg">
@@ -77,7 +77,7 @@ const TenantStatusBanner = ({ tenant }) => {
             </div>
         );
     }
-    
+
     // Banner para EXPIRED
     if (tenant.status === 'expired') {
         return (
@@ -98,7 +98,7 @@ const TenantStatusBanner = ({ tenant }) => {
             </div>
         );
     }
-    
+
     // Banner para SUSPENDED
     if (tenant.status === 'suspended') {
         return (
@@ -119,13 +119,13 @@ const TenantStatusBanner = ({ tenant }) => {
             </div>
         );
     }
-    
+
     // Banner para ACTIVE (mostrar vigencia)
     if (tenant.status === 'active' && tenant.fecha_expiracion) {
         const fechaFin = new Date(tenant.fecha_expiracion).toLocaleDateString('es-MX', {
             day: '2-digit', month: 'long', year: 'numeric'
         });
-        
+
         return (
             <div className="bg-green-50 border-l-4 border-green-500 rounded-r-xl p-4 mb-6">
                 <div className="flex items-center gap-3">
@@ -144,7 +144,7 @@ const TenantStatusBanner = ({ tenant }) => {
             </div>
         );
     }
-    
+
     return null;
 };
 

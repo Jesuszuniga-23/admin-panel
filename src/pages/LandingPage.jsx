@@ -142,8 +142,15 @@ const LandingPage = () => {
             </motion.header>
 
             {/* --- HERO CON NUEVA IMAGEN --- */}
+            {/* --- HERO CON NUEVA IMAGEN --- */}
             <section className="relative h-screen flex items-center overflow-hidden">
-                <motion.div style={{ y: heroY }} className="absolute inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: `url(${heroBg})` }} />
+                <motion.div
+                    style={{
+                        y: heroY,
+                        backgroundImage: `url(${heroBg})`
+                    }}
+                    className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+                />
                 <div className="absolute inset-0 bg-gradient-to-r from-black via-black/70 to-transparent" />
                 <div className="relative z-10 max-w-6xl mx-auto px-6 lg:px-8 w-full">
                     <FadeInSection>
@@ -301,15 +308,53 @@ const LandingPage = () => {
                                                 <h3 className="text-2xl font-semibold">{plan.nombre}</h3>
                                                 <div className="mt-4"><span className="text-4xl font-bold">{plan.precio_mensual ? `$${plan.precio_mensual}` : 'Personalizado'}</span>{plan.precio_mensual && <span className="text-sm opacity-80">/mes</span>}</div>
                                                 <p className="text-sm opacity-80 mt-1">+ IVA</p>
+                                                {/* ✅ NUEVO: Población objetivo */}
+                                                <p className="text-xs bg-white/20 rounded px-2 py-1 mt-2 inline-block">
+                                                    {plan.poblacion_min === 0 ? 'Hasta' : 'Desde'} {plan.poblacion_max === 999999999 ? 'más de 50,000' : `${plan.poblacion_max?.toLocaleString()}`} hab.
+                                                </p>
                                             </div>
                                             <div className="p-8 flex-1 flex flex-col">
                                                 <div className="bg-gray-100 p-5 rounded-lg mb-6 border border-gray-200">
-                                                    <h4 className="font-semibold text-gray-700 mb-3 text-sm uppercase flex items-center gap-2"><CheckCircle size={16} className="text-emerald-700" />Capacidades</h4>
+                                                    <h4 className="font-semibold text-gray-700 mb-3 text-sm uppercase flex items-center gap-2">
+                                                        <CheckCircle size={16} className="text-emerald-700" />Capacidades del plan
+                                                    </h4>
                                                     <ul className="space-y-3">
-                                                        <li className="flex justify-between text-sm"><span>Usuarios:</span><span className="font-semibold">{plan.max_usuarios || 'Ilimitado'}</span></li>
-                                                        <li className="flex justify-between text-sm"><span>Unidades:</span><span className="font-semibold">{plan.max_unidades || 'Ilimitado'}</span></li>
-                                                        <li className="flex justify-between text-sm"><span>Alertas/mes:</span><span className="font-semibold">{plan.max_alertas_mensuales || 'Ilimitado'}</span></li>
-                                                        <li className="flex justify-between text-sm"><span>Evaluación:</span><span className="font-semibold text-emerald-700">{plan.trial_dias || 30} días</span></li>
+                                                        <li className="flex justify-between text-sm">
+                                                            <span>Administradores:</span>
+                                                            <span className="font-semibold">{plan.max_admin || 'Ilimitado'}</span>
+                                                        </li>
+                                                        <li className="flex justify-between text-sm">
+                                                            <span>Operadores Técnicos:</span>
+                                                            <span className="font-semibold">{plan.max_tecnico || 'Ilimitado'}</span>
+                                                        </li>
+                                                        <li className="flex justify-between text-sm">
+                                                            <span>Operadores Médicos:</span>
+                                                            <span className="font-semibold">{plan.max_medico || 'Ilimitado'}</span>
+                                                        </li>
+                                                        <li className="flex justify-between text-sm">
+                                                            <span>Operadores Policiales:</span>
+                                                            <span className="font-semibold">{plan.max_policial || 'Ilimitado'}</span>
+                                                        </li>
+                                                        <li className="flex justify-between text-sm">
+                                                            <span>Operadores Generales:</span>
+                                                            <span className="font-semibold">{plan.max_general || 'Ilimitado'}</span>
+                                                        </li>
+                                                        <li className="flex justify-between text-sm">
+                                                            <span>Prueba gratuita:</span>
+                                                            <span className="font-semibold text-emerald-700">{plan.trial_dias || 30} días</span>
+                                                        </li>
+                                                        <li className="flex justify-between text-sm pt-2 border-t border-gray-200">
+                                                            <span>Policías / Paramédicos:</span>
+                                                            <span className="font-semibold text-green-600">ILIMITADOS</span>
+                                                        </li>
+                                                        <li className="flex justify-between text-sm">
+                                                            <span>Unidades:</span>
+                                                            <span className="font-semibold text-green-600">ILIMITADAS</span>
+                                                        </li>
+                                                        <li className="flex justify-between text-sm">
+                                                            <span>Alertas:</span>
+                                                            <span className="font-semibold text-green-600">ILIMITADAS</span>
+                                                        </li>
                                                     </ul>
                                                 </div>
                                                 <button onClick={() => handleSelectPlan(plan)} className={`w-full py-3.5 rounded font-semibold flex items-center justify-center gap-2 mt-auto ${colors.button} group`}>Solicitar Demostración <ArrowRight size={18} className="group-hover:translate-x-1" /></button>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCircle, Building2, User, Shield, MapPin, Mail, Phone, Loader2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Building2, User, Shield, MapPin, Mail, Phone, Loader2, Users } from 'lucide-react';
 import registroService from '../../services/public/registro.service';
 import toast from 'react-hot-toast';
 
@@ -13,6 +13,7 @@ const RegisterForm = ({ selectedPlan, onBack }) => {
         cp: '',
         estado: '',
         direccion: '',
+        poblacion: '',  // ✅ NUEVO
         solicitante_nombre: '',
         solicitante_apellido_paterno: '',
         solicitante_apellido_materno: '',
@@ -75,11 +76,11 @@ const RegisterForm = ({ selectedPlan, onBack }) => {
             const response = await registroService.registrarMunicipio(formData);
 
             if (response.success) {
-                const { tenant_id, admin_email } = response.data;
+                const { tenant_id, admin_email, plan_asignado } = response.data;
                 localStorage.setItem('tenant_id', tenant_id);
 
                 toast.success(
-                    `✅ ¡Registro exitoso! Ahora inicia sesión con: ${admin_email}`,
+                    `✅ ¡Registro exitoso! Plan ${plan_asignado || 'asignado'}. Ahora inicia sesión con: ${admin_email}`,
                     { duration: 8000 }
                 );
 
@@ -211,6 +212,27 @@ const RegisterForm = ({ selectedPlan, onBack }) => {
                                         placeholder="Calle, número, colonia (opcional)"
                                         className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500"
                                     />
+                                </div>
+
+                                {/* ✅ NUEVO CAMPO: Población del municipio */}
+                                <div className="md:col-span-2">
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                        Población del municipio <span className="text-red-500">*</span>
+                                    </label>
+                                    <div className="relative">
+                                        <Users size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                        <input
+                                            type="number"
+                                            name="poblacion"
+                                            value={formData.poblacion}
+                                            onChange={handleChange}
+                                            required
+                                            min="1"
+                                            placeholder="Ej: 15000"
+                                            className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    </div>
+                                    <p className="text-xs text-slate-500 mt-1">Número de habitantes (para asignar el plan correcto)</p>
                                 </div>
                             </div>
                         </div>
