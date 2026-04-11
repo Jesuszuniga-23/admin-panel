@@ -15,6 +15,7 @@ import toast from 'react-hot-toast';
 import useAuthStore from '../../../store/authStore';
 import IconoEntidad, { BadgeTipoAlerta, BadgeIcono } from '../../../components/ui/IconoEntidad';
 import authService from '../../../services/auth.service';
+import alertasPanelService from '../../../services/admin/alertasPanel.service';
 
 // Mapeos correctos de roles y tipos
 const rolToEntidad = {
@@ -184,12 +185,22 @@ const GeneradorReporte = () => {
         data = res.data || [];
         console.log(`📊 Unidades cargadas: ${data.length}`);
       } else if (tipo === 'alertas') {
-        const [exp, cer] = await Promise.all([
-          alertasService.obtenerExpiradas(params).catch(() => ({ data: [] })),
-          alertasService.obtenerCerradasManual(params).catch(() => ({ data: [] }))
+        // ✅ Cargar TODAS las alertas (activas, en proceso, cerradas, expiradas)
+        const [activas, proceso, cerradas, expiradas] = await Promise.all([
+          alertasPanelService.obtenerActivas(params).catch(() => ({ data: [] })),
+          alertasPanelService.obtenerEnProceso(params).catch(() => ({ data: [] })),
+          alertasPanelService.obtenerCerradas(params).catch(() => ({ data: [] })),
+          alertasService.obtenerExpiradas(params).catch(() => ({ data: [] }))
         ]);
-        data = [...(exp.data || []), ...(cer.data || [])];
-        console.log(`📊 Alertas cargadas: ${data.length}`);
+
+        data = [
+          ...(activas.data || []),
+          ...(proceso.data || []),
+          ...(cerradas.data || []),
+          ...(expiradas.data || [])
+        ];
+
+        console.log(`📊 Alertas cargadas: ${data.length} (Activas: ${activas.data?.length || 0}, En proceso: ${proceso.data?.length || 0}, Cerradas: ${cerradas.data?.length || 0}, Expiradas: ${expiradas.data?.length || 0})`);
       }
 
       setDatos(data);
