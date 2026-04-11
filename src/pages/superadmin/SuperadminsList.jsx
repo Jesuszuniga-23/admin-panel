@@ -11,7 +11,7 @@ const SuperadminsList = () => {
     const [superadminsOriginal, setSuperadminsOriginal] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
-    const searchTerm = useDebounce(search, 500);
+    const { value: searchTerm } = useDebounce(search, 500);
     const abortControllerRef = useRef(null);
 
     // ✅ Cargar TODOS los superadmins UNA SOLA VEZ

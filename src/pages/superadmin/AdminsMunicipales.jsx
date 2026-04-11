@@ -14,7 +14,7 @@ const AdminsMunicipales = () => {
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [tenantFilter, setTenantFilter] = useState('');
-    const searchTerm = useDebounce(search, 500);
+    const { value: searchTerm } = useDebounce(search, 500);
     const abortControllerRef = useRef(null);
 
     // ✅ Cargar TODOS los admins UNA SOLA VEZ
