@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Plus, Search, Eye, Edit, Power, Mail, Phone, User, X, AlertTriangle, CheckCircle, Star } from 'lucide-react';
+import { Shield, Plus, Search, Edit, Power, Mail, Phone, User, Star } from 'lucide-react';
 import personalService from '../../services/admin/personal.service';
 import toast from 'react-hot-toast';
 import { useDebounce } from '../../hooks/useDebounce';
+
 const SuperadminsList = () => {
     const navigate = useNavigate();
     const [superadmins, setSuperadmins] = useState([]);
@@ -20,20 +21,22 @@ const SuperadminsList = () => {
         setLoading(true);
 
         try {
-            const response = await personalService.listarPersonal({
+            // ✅ DELEGAR FILTRADO AL BACKEND
+            const params = {
                 rol: 'superadmin',
                 limite: 100,
                 signal: abortControllerRef.current.signal
-            });
+            };
+            
+            if (searchTerm) {
+                params.search = searchTerm;
+            }
+
+            const response = await personalService.listarPersonal(params);
 
             if (response.success) {
-                const filtrados = response.data.filter(p => 
-                    p.rol === 'superadmin' &&
-                    (searchTerm === '' || 
-                     p.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                     p.email?.toLowerCase().includes(searchTerm.toLowerCase()))
-                );
-                setSuperadmins(filtrados);
+                // ✅ NO filtrar localmente
+                setSuperadmins(response.data);
             }
         } catch (error) {
             if (error.name !== 'AbortError') {

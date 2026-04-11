@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Building2, Search, Eye, Power, Mail, Phone, User, X, Filter, Crown } from 'lucide-react';
+import { Building2, Search, Eye, Power, Mail, Phone, User, Filter, Crown } from 'lucide-react';
 import personalService from '../../services/admin/personal.service';
 import tenantService from '../../services/admin/tenant.service';
 import toast from 'react-hot-toast';
 import { useDebounce } from '../../hooks/useDebounce';
+
 const AdminsMunicipales = () => {
     const navigate = useNavigate();
     const [admins, setAdmins] = useState([]);
@@ -29,29 +30,25 @@ const AdminsMunicipales = () => {
                 setTenants(tenantsRes.data.filter(t => t.id !== 'default'));
             }
 
-            // Cargar admins (rol = 'admin')
-            const adminsRes = await personalService.listarPersonal({
+            // ✅ DELEGAR FILTRADO AL BACKEND
+            const params = {
                 rol: 'admin',
                 limite: 500,
                 signal: abortControllerRef.current.signal
-            });
+            };
+            
+            if (searchTerm) {
+                params.search = searchTerm;
+            }
+            if (tenantFilter) {
+                params.tenant_id = tenantFilter;
+            }
+
+            const adminsRes = await personalService.listarPersonal(params);
 
             if (adminsRes.success) {
-                let filtrados = adminsRes.data;
-
-                if (searchTerm) {
-                    filtrados = filtrados.filter(a =>
-                        a.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        a.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        a.tenant_id?.toLowerCase().includes(searchTerm.toLowerCase())
-                    );
-                }
-
-                if (tenantFilter) {
-                    filtrados = filtrados.filter(a => a.tenant_id === tenantFilter);
-                }
-
-                setAdmins(filtrados);
+                // ✅ NO filtrar localmente - el backend ya devuelve filtrado
+                setAdmins(adminsRes.data);
             }
         } catch (error) {
             if (error.name !== 'AbortError') {
