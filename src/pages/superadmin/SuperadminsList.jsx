@@ -8,12 +8,13 @@ import { useDebounce } from '../../hooks/useDebounce';
 const SuperadminsList = () => {
     const navigate = useNavigate();
     const [superadmins, setSuperadmins] = useState([]);
+    const [superadminsOriginal, setSuperadminsOriginal] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const searchTerm = useDebounce(search, 500);
     const abortControllerRef = useRef(null);
 
-    // ✅ MEMOIZAR la función con useCallback para evitar loops infinitos
+    // ✅ Cargar TODOS los superadmins UNA SOLA VEZ
     const cargarSuperadmins = useCallback(async () => {
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
@@ -27,16 +28,12 @@ const SuperadminsList = () => {
                 limite: 100,
                 signal: abortControllerRef.current.signal
             };
-            
-            if (searchTerm) {
-                params.search = searchTerm;
-            }
 
             const response = await personalService.listarPersonal(params);
 
             if (response.success) {
-                // ✅ NO filtrar localmente
-                setSuperadmins(response.data);
+                setSuperadminsOriginal(response.data);
+                aplicarFiltrosLocal(response.data);
             }
         } catch (error) {
             if (error.name !== 'AbortError') {
@@ -45,8 +42,23 @@ const SuperadminsList = () => {
         } finally {
             setLoading(false);
         }
-    }, [searchTerm]); // ✅ Dependencias correctas
+    }, []);
 
+    // ✅ Filtrar LOCALMENTE (como PersonalList)
+    const aplicarFiltrosLocal = useCallback((datos) => {
+        let filtrados = datos;
+        
+        if (searchTerm) {
+            filtrados = filtrados.filter(p => 
+                p.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                p.email?.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+        }
+        
+        setSuperadmins(filtrados);
+    }, [searchTerm]);
+
+    // ✅ Cargar al montar
     useEffect(() => {
         cargarSuperadmins();
         return () => {
@@ -54,7 +66,14 @@ const SuperadminsList = () => {
                 abortControllerRef.current.abort();
             }
         };
-    }, [cargarSuperadmins]); // ✅ Depende de la función memoizada
+    }, [cargarSuperadmins]);
+
+    // ✅ Re-filtrar cuando cambia searchTerm
+    useEffect(() => {
+        if (superadminsOriginal.length) {
+            aplicarFiltrosLocal(superadminsOriginal);
+        }
+    }, [searchTerm, superadminsOriginal, aplicarFiltrosLocal]);
 
     const handleToggleActivo = async (id, nombre, activo) => {
         if (!confirm(`¿${activo ? 'Desactivar' : 'Activar'} a ${nombre}?`)) return;

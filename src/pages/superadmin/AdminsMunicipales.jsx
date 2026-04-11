@@ -9,6 +9,7 @@ import { useDebounce } from '../../hooks/useDebounce';
 const AdminsMunicipales = () => {
     const navigate = useNavigate();
     const [admins, setAdmins] = useState([]);
+    const [adminsOriginal, setAdminsOriginal] = useState([]);
     const [tenants, setTenants] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
@@ -16,7 +17,7 @@ const AdminsMunicipales = () => {
     const searchTerm = useDebounce(search, 500);
     const abortControllerRef = useRef(null);
 
-    // ✅ MEMOIZAR la función con useCallback para evitar loops infinitos
+    // ✅ Cargar TODOS los admins UNA SOLA VEZ
     const cargarDatos = useCallback(async () => {
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
@@ -31,25 +32,18 @@ const AdminsMunicipales = () => {
                 setTenants(tenantsRes.data.filter(t => t.id !== 'default'));
             }
 
-            // ✅ DELEGAR FILTRADO AL BACKEND
+            // Cargar admins
             const params = {
                 rol: 'admin',
                 limite: 500,
                 signal: abortControllerRef.current.signal
             };
-            
-            if (searchTerm) {
-                params.search = searchTerm;
-            }
-            if (tenantFilter) {
-                params.tenant_id = tenantFilter;
-            }
 
             const adminsRes = await personalService.listarPersonal(params);
 
             if (adminsRes.success) {
-                // ✅ NO filtrar localmente - el backend ya devuelve filtrado
-                setAdmins(adminsRes.data);
+                setAdminsOriginal(adminsRes.data);
+                aplicarFiltrosLocal(adminsRes.data);
             }
         } catch (error) {
             if (error.name !== 'AbortError') {
@@ -58,7 +52,26 @@ const AdminsMunicipales = () => {
         } finally {
             setLoading(false);
         }
-    }, [searchTerm, tenantFilter]); // ✅ Dependencias correctas
+    }, []);
+
+    // ✅ Filtrar LOCALMENTE
+    const aplicarFiltrosLocal = useCallback((datos) => {
+        let filtrados = datos;
+        
+        if (searchTerm) {
+            filtrados = filtrados.filter(a => 
+                a.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                a.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                a.tenant_id?.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+        }
+        
+        if (tenantFilter) {
+            filtrados = filtrados.filter(a => a.tenant_id === tenantFilter);
+        }
+        
+        setAdmins(filtrados);
+    }, [searchTerm, tenantFilter]);
 
     useEffect(() => {
         cargarDatos();
@@ -67,7 +80,13 @@ const AdminsMunicipales = () => {
                 abortControllerRef.current.abort();
             }
         };
-    }, [cargarDatos]); // ✅ Depende de la función memoizada
+    }, [cargarDatos]);
+
+    useEffect(() => {
+        if (adminsOriginal.length) {
+            aplicarFiltrosLocal(adminsOriginal);
+        }
+    }, [searchTerm, tenantFilter, adminsOriginal, aplicarFiltrosLocal]);
 
     const handleToggleActivo = async (id, nombre, activo) => {
         if (!confirm(`¿${activo ? 'Desactivar' : 'Activar'} a ${nombre}?`)) return;
