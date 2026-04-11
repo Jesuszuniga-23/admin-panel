@@ -1,5 +1,5 @@
 // src/components/maps/MapaMultiAlertas.jsx
-// VERSIÓN CORREGIDA - El contenedor siempre existe
+// VERSIÓN CORREGIDA - Con geocerca del municipio
 
 import { useEffect, useRef, useCallback, useMemo, useState } from 'react';
 import L from 'leaflet';
@@ -40,7 +40,7 @@ const getCustomIcon = (tipo) => {
   return icon;
 };
 
-const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta, altura = '500px' }) => {
+const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta, altura = '500px', geocercaTenant = null }) => {
   const containerRef = useRef(null);
   const mapaInstancia = useRef(null);
   const marcadoresRef = useRef(new Map());
@@ -56,11 +56,39 @@ const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta, altura = '500px' 
   }, [alertas]);
 
   const centroMapa = useMemo(() => {
-    if (alertasValidas.length === 0) return { lat: 19.4326, lng: -99.1332 };
-    const latMedia = alertasValidas.reduce((sum, a) => sum + parseFloat(a.lat), 0) / alertasValidas.length;
-    const lngMedia = alertasValidas.reduce((sum, a) => sum + parseFloat(a.lng), 0) / alertasValidas.length;
-    return { lat: latMedia, lng: lngMedia };
-  }, [alertasValidas]);
+    // Si hay alertas, centrar en ellas
+    if (alertasValidas.length > 0) {
+      const latMedia = alertasValidas.reduce((sum, a) => sum + parseFloat(a.lat), 0) / alertasValidas.length;
+      const lngMedia = alertasValidas.reduce((sum, a) => sum + parseFloat(a.lng), 0) / alertasValidas.length;
+      return { lat: latMedia, lng: lngMedia };
+    }
+    
+    // ✅ NUEVO: Si no hay alertas pero hay geocerca, centrar en el municipio
+    if (geocercaTenant?.centro_lat && geocercaTenant?.centro_lng) {
+      return { 
+        lat: parseFloat(geocercaTenant.centro_lat), 
+        lng: parseFloat(geocercaTenant.centro_lng) 
+      };
+    }
+    
+    // Fallback: Ciudad de México
+    return { lat: 19.4326, lng: -99.1332 };
+  }, [alertasValidas, geocercaTenant]);
+
+  const zoomInicial = useMemo(() => {
+    if (alertasValidas.length > 0) return 12; // Se ajustará con fitBounds
+    
+    // ✅ NUEVO: Si hay geocerca, calcular zoom según el tamaño
+    if (geocercaTenant?.bbox_lat_min && geocercaTenant?.bbox_lat_max) {
+      const latDiff = Math.abs(geocercaTenant.bbox_lat_max - geocercaTenant.bbox_lat_min);
+      if (latDiff > 0.5) return 11;
+      if (latDiff > 0.2) return 12;
+      if (latDiff > 0.1) return 13;
+      return 14;
+    }
+    
+    return 12;
+  }, [alertasValidas, geocercaTenant]);
 
   const crearPopupContent = useCallback((alerta) => {
     const fechaFormateada = alerta.fecha_creacion ? new Date(alerta.fecha_creacion).toLocaleString('es-MX') : 'Fecha desconocida';
@@ -109,13 +137,30 @@ const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta, altura = '500px' 
     console.log('🗺️ [MapaMultiAlertas] Inicializando mapa...');
     
     try {
-      const mapa = L.map(containerRef.current).setView([centroMapa.lat, centroMapa.lng], 12);
+      const mapa = L.map(containerRef.current).setView([centroMapa.lat, centroMapa.lng], zoomInicial);
       
       L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '© OpenStreetMap contributors',
         detectRetina: true
       }).addTo(mapa);
+      
+      // ✅ NUEVO: Limitar el mapa al bounding box del municipio
+      if (geocercaTenant?.bbox_lat_min && geocercaTenant?.bbox_lat_max && 
+          geocercaTenant?.bbox_lng_min && geocercaTenant?.bbox_lng_max) {
+        const southWest = L.latLng(
+          parseFloat(geocercaTenant.bbox_lat_min), 
+          parseFloat(geocercaTenant.bbox_lng_min)
+        );
+        const northEast = L.latLng(
+          parseFloat(geocercaTenant.bbox_lat_max), 
+          parseFloat(geocercaTenant.bbox_lng_max)
+        );
+        const bounds = L.latLngBounds(southWest, northEast);
+        mapa.setMaxBounds(bounds);
+        mapa.setMinZoom(10);
+        console.log('🗺️ Mapa limitado al municipio:', geocercaTenant.nombre);
+      }
       
       mapaInstancia.current = mapa;
       setInicializando(false);
@@ -132,7 +177,7 @@ const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta, altura = '500px' 
       setError(err.message);
       setInicializando(false);
     }
-  }, [centroMapa.lat, centroMapa.lng]);
+  }, [centroMapa.lat, centroMapa.lng, zoomInicial, geocercaTenant]);
 
   // Agregar marcadores cuando el mapa esté listo
   useEffect(() => {
@@ -206,7 +251,6 @@ const MapaMultiAlertas = ({ alertas = [], onSeleccionarAlerta, altura = '500px' 
     );
   }
 
-  // ✅ EL CONTENEDOR SIEMPRE EXISTE - no hay returns condicionales antes
   return (
     <div 
       ref={containerRef} 

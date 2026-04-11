@@ -35,6 +35,9 @@ const AnalisisGeografico = () => {
   const [zonas, setZonas] = useState([]);
   const [mostrarMapa, setMostrarMapa] = useState(true);
   
+  // ✅ NUEVO: Estado para la geocerca del tenant
+  const [geocercaTenant, setGeocercaTenant] = useState(null);
+  
   const [filtros, setFiltros] = useState({
     fechaInicio: '',
     fechaFin: '',
@@ -97,7 +100,6 @@ const AnalisisGeografico = () => {
 
   // Función para calcular estadísticas SOLO del tipo permitido
   const calcularEstadisticas = (datos) => {
-    // Si hay restricción de tipo, solo mostrar estadísticas de ese tipo
     const datosFiltrados = tipoAlertaPermitido 
       ? datos.filter(a => a.tipo === tipoAlertaPermitido)
       : datos;
@@ -108,7 +110,6 @@ const AnalisisGeografico = () => {
       total: datosFiltrados.length,
       conUbicacion,
       sinUbicacion: datosFiltrados.length - conUbicacion,
-      // Si hay restricción, el contrapuesto es 0
       panico: tipoAlertaPermitido === 'panico' ? datosFiltrados.length : datos.filter(a => a.tipo === 'panico').length,
       medica: tipoAlertaPermitido === 'medica' ? datosFiltrados.length : datos.filter(a => a.tipo === 'medica').length,
       activas: datosFiltrados.filter(a => a.estado === 'activa').length,
@@ -146,6 +147,22 @@ const AnalisisGeografico = () => {
     }
     return filtradas.filter(a => a.lat && a.lng);
   }, [alertasFiltradas, tipoAlertaPermitido]);
+
+  // ✅ NUEVO: Cargar geocerca del tenant al montar
+  useEffect(() => {
+    const cargarGeocerca = async () => {
+      try {
+        const response = await analisisGeograficoService.obtenerGeocercaTenant();
+        if (response.success && response.data) {
+          setGeocercaTenant(response.data);
+          console.log('📍 Geocerca del municipio cargada:', response.data);
+        }
+      } catch (error) {
+        console.error('Error cargando geocerca:', error);
+      }
+    };
+    cargarGeocerca();
+  }, []);
 
   // Cargar datos UNA SOLA VEZ
   useEffect(() => {
@@ -355,6 +372,7 @@ const AnalisisGeografico = () => {
               alertas={alertasParaMapa}
               onSeleccionarAlerta={setAlertaSeleccionada}
               altura="500px"
+              geocercaTenant={geocercaTenant}
             />
           ) : (
             <div className="h-[500px] w-full rounded-xl overflow-hidden border border-gray-200 shadow-inner bg-gray-50 flex flex-col items-center justify-center">
@@ -424,12 +442,10 @@ const AnalisisGeografico = () => {
           <ResumenCard label="Total" value={estadisticas.total} icon={Bell} color="indigo" />
           <ResumenCard label="Con ubicación" value={estadisticas.conUbicacion} icon={MapPin} color="green" />
           
-          {/* ✅ SOLO mostrar tarjeta de Pánico si corresponde */}
           {mostrarTarjetaPanico && (
             <ResumenCard label="Pánico" value={estadisticas.panico} icon={AlertTriangle} color="red" />
           )}
           
-          {/* ✅ SOLO mostrar tarjeta de Médica si corresponde */}
           {mostrarTarjetaMedica && (
             <ResumenCard label="Médica" value={estadisticas.medica} icon={Heart} color="green" />
           )}
@@ -450,11 +466,9 @@ const AnalisisGeografico = () => {
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Zona</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Total</th>
-                    {/* ✅ SOLO mostrar columna Pánico si corresponde */}
                     {mostrarTarjetaPanico && (
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Pánico</th>
                     )}
-                    {/* ✅ SOLO mostrar columna Médica si corresponde */}
                     {mostrarTarjetaMedica && !tipoAlertaPermitido && (
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Médica</th>
                     )}
