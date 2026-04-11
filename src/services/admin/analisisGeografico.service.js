@@ -15,8 +15,8 @@ class AnalisisGeograficoService {
         }
         
         try {
-            // Obtener alertas geográficas
-            const response = await axiosInstance.get(ENDPOINTS.ANALISIS_GEOGRAFICO.DATOS, { params, ...config });
+            // ✅ CORREGIDO: COMPLETO en lugar de DATOS
+            const response = await axiosInstance.get(ENDPOINTS.ANALISIS_GEOGRAFICO.COMPLETO, { params, ...config });
             return response.data;
         } catch (error) {
             if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
