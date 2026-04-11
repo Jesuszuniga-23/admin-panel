@@ -4,8 +4,7 @@ import { Building2, Search, Eye, Power, Mail, Phone, User, X, Filter, Crown } fr
 import personalService from '../../services/admin/personal.service';
 import tenantService from '../../services/admin/tenant.service';
 import toast from 'react-hot-toast';
-import { useDebounce } from '../../../hooks/useDebounce';
-
+import { useDebounce } from '../../hooks/useDebounce';
 const AdminsMunicipales = () => {
     const navigate = useNavigate();
     const [admins, setAdmins] = useState([]);

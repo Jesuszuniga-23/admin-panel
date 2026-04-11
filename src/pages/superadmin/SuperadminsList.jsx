@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Shield, Plus, Search, Eye, Edit, Power, Mail, Phone, User, X, AlertTriangle, CheckCircle, Star } from 'lucide-react';
 import personalService from '../../services/admin/personal.service';
 import toast from 'react-hot-toast';
-import { useDebounce } from '../../../hooks/useDebounce';
-
+import { useDebounce } from '../../hooks/useDebounce';
 const SuperadminsList = () => {
     const navigate = useNavigate();
     const [superadmins, setSuperadmins] = useState([]);
