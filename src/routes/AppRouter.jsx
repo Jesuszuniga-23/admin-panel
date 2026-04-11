@@ -121,14 +121,18 @@ const AppRouter = () => {
       >
         <Route index element={<Navigate to="/superadmin/dashboard" />} />
         <Route path="dashboard" element={<DashboardSuperAdmin />} />
-        <Route path="municipios" element={<TenantsList />} />
-        <Route path="municipios/nuevo" element={<TenantForm />} />
-        <Route path="municipios/:id/editar" element={<TenantForm />} />
-        <Route path="municipios/:id" element={<TenantDetail />} />
+
+        {/* ✅ RUTAS FIJAS PRIMERO (sin parámetros) */}
         <Route path="superadmins" element={<SuperadminsList />} />
         <Route path="superadmins/nuevo" element={<SuperadminForm />} />
         <Route path="superadmins/editar/:id" element={<SuperadminForm />} />
         <Route path="admins-municipales" element={<AdminsMunicipales />} />
+
+        {/* ✅ RUTAS CON PARÁMETROS DESPUÉS */}
+        <Route path="municipios" element={<TenantsList />} />
+        <Route path="municipios/nuevo" element={<TenantForm />} />
+        <Route path="municipios/:id/editar" element={<TenantForm />} />
+        <Route path="municipios/:id" element={<TenantDetail />} />
       </Route>
 
       {/* ✅ Ruta 404 - No encontrada */}
