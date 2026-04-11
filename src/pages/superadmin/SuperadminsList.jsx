@@ -49,10 +49,10 @@ const SuperadminsList = () => {
         let filtrados = datos;
 
         if (searchTerm) {
-            const term = searchTerm.toLowerCase();
+            const term = String(searchTerm || '').toLowerCase();
             filtrados = filtrados.filter(p => {
-                const nombre = (p.nombre || '').toLowerCase();
-                const email = (p.email || '').toLowerCase();
+                const nombre = String(p.nombre || '').toLowerCase();
+                const email = String(p.email || '').toLowerCase();
                 return nombre.includes(term) || email.includes(term);
             });
         }

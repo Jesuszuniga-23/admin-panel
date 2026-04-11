@@ -59,11 +59,11 @@ const AdminsMunicipales = () => {
         let filtrados = datos;
 
         if (searchTerm) {
-            const term = searchTerm.toLowerCase();
+            const term = String(searchTerm || '').toLowerCase();
             filtrados = filtrados.filter(a => {
-                const nombre = (a.nombre || '').toLowerCase();
-                const email = (a.email || '').toLowerCase();
-                const tenantId = (a.tenant_id || '').toLowerCase();
+                const nombre = String(a.nombre || '').toLowerCase();
+                const email = String(a.email || '').toLowerCase();
+                const tenantId = String(a.tenant_id || '').toLowerCase();
                 return nombre.includes(term) || email.includes(term) || tenantId.includes(term);
             });
         }
