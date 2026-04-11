@@ -47,14 +47,16 @@ const SuperadminsList = () => {
     // ✅ Filtrar LOCALMENTE (como PersonalList)
     const aplicarFiltrosLocal = useCallback((datos) => {
         let filtrados = datos;
-        
+
         if (searchTerm) {
-            filtrados = filtrados.filter(p => 
-                p.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                p.email?.toLowerCase().includes(searchTerm.toLowerCase())
-            );
+            const term = searchTerm.toLowerCase();
+            filtrados = filtrados.filter(p => {
+                const nombre = (p.nombre || '').toLowerCase();
+                const email = (p.email || '').toLowerCase();
+                return nombre.includes(term) || email.includes(term);
+            });
         }
-        
+
         setSuperadmins(filtrados);
     }, [searchTerm]);
 
@@ -77,7 +79,7 @@ const SuperadminsList = () => {
 
     const handleToggleActivo = async (id, nombre, activo) => {
         if (!confirm(`¿${activo ? 'Desactivar' : 'Activar'} a ${nombre}?`)) return;
-        
+
         try {
             await personalService.toggleActivo(id, !activo);
             toast.success(`Superadmin ${!activo ? 'activado' : 'desactivado'}`);

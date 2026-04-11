@@ -57,19 +57,21 @@ const AdminsMunicipales = () => {
     // ✅ Filtrar LOCALMENTE
     const aplicarFiltrosLocal = useCallback((datos) => {
         let filtrados = datos;
-        
+
         if (searchTerm) {
-            filtrados = filtrados.filter(a => 
-                a.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                a.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                a.tenant_id?.toLowerCase().includes(searchTerm.toLowerCase())
-            );
+            const term = searchTerm.toLowerCase();
+            filtrados = filtrados.filter(a => {
+                const nombre = (a.nombre || '').toLowerCase();
+                const email = (a.email || '').toLowerCase();
+                const tenantId = (a.tenant_id || '').toLowerCase();
+                return nombre.includes(term) || email.includes(term) || tenantId.includes(term);
+            });
         }
-        
+
         if (tenantFilter) {
             filtrados = filtrados.filter(a => a.tenant_id === tenantFilter);
         }
-        
+
         setAdmins(filtrados);
     }, [searchTerm, tenantFilter]);
 
