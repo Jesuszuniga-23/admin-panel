@@ -21,7 +21,9 @@ import {
   HelpCircle,
   Shield,
   Building2,
-  CreditCard
+  CreditCard,
+  Crown,
+  Star
 } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
 import authService from '../../services/auth.service';

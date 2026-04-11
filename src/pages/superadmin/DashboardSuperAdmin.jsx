@@ -1,9 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-    Building2, CheckCircle, XCircle, Clock, AlertTriangle, TrendingUp, TrendingDown,
-    Search, Filter, ChevronLeft, ChevronRight, Eye, Star, Crown
-} from 'lucide-react';
+import { Building2, CheckCircle, XCircle, Clock, AlertTriangle, TrendingUp, TrendingDown, Search, Filter, ChevronLeft, ChevronRight, Eye, Star, Crown } from 'lucide-react';
 import tenantService from '../../services/admin/tenant.service';
 import toast from 'react-hot-toast';
 
