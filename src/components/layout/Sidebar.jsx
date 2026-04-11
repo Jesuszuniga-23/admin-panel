@@ -182,6 +182,15 @@ const Sidebar = () => {
   }, [logout, navigate]);
 
   const handleNavigation = useCallback((path) => {
+    // ✅ SIEMPRE navegar en rutas de superadmin (sin confirmación)
+    if (path.startsWith('/superadmin')) {
+      setHasUnsavedChanges(false);
+      setIsPersonalFormActive(false);
+      navigate(path);
+      return;
+    }
+
+    // Para otras rutas, mantener la lógica original
     if (hasUnsavedChanges && isPersonalFormActive && path !== location.pathname) {
       setPendingPath(path);
       setShowConfirmModal(true);
