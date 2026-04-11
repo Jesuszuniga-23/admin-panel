@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, Plus, Search, Edit, Power, Mail, Phone, User, Star } from 'lucide-react';
 import personalService from '../../services/admin/personal.service';
@@ -13,7 +13,8 @@ const SuperadminsList = () => {
     const searchTerm = useDebounce(search, 500);
     const abortControllerRef = useRef(null);
 
-    const cargarSuperadmins = async () => {
+    // ✅ MEMOIZAR la función con useCallback para evitar loops infinitos
+    const cargarSuperadmins = useCallback(async () => {
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
         }
@@ -21,7 +22,6 @@ const SuperadminsList = () => {
         setLoading(true);
 
         try {
-            // ✅ DELEGAR FILTRADO AL BACKEND
             const params = {
                 rol: 'superadmin',
                 limite: 100,
@@ -45,7 +45,7 @@ const SuperadminsList = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [searchTerm]); // ✅ Dependencias correctas
 
     useEffect(() => {
         cargarSuperadmins();
@@ -54,7 +54,7 @@ const SuperadminsList = () => {
                 abortControllerRef.current.abort();
             }
         };
-    }, [searchTerm]);
+    }, [cargarSuperadmins]); // ✅ Depende de la función memoizada
 
     const handleToggleActivo = async (id, nombre, activo) => {
         if (!confirm(`¿${activo ? 'Desactivar' : 'Activar'} a ${nombre}?`)) return;

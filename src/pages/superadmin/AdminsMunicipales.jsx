@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Building2, Search, Eye, Power, Mail, Phone, User, Filter, Crown } from 'lucide-react';
 import personalService from '../../services/admin/personal.service';
@@ -16,7 +16,8 @@ const AdminsMunicipales = () => {
     const searchTerm = useDebounce(search, 500);
     const abortControllerRef = useRef(null);
 
-    const cargarDatos = async () => {
+    // ✅ MEMOIZAR la función con useCallback para evitar loops infinitos
+    const cargarDatos = useCallback(async () => {
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
         }
@@ -57,7 +58,7 @@ const AdminsMunicipales = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [searchTerm, tenantFilter]); // ✅ Dependencias correctas
 
     useEffect(() => {
         cargarDatos();
@@ -66,7 +67,7 @@ const AdminsMunicipales = () => {
                 abortControllerRef.current.abort();
             }
         };
-    }, [searchTerm, tenantFilter]);
+    }, [cargarDatos]); // ✅ Depende de la función memoizada
 
     const handleToggleActivo = async (id, nombre, activo) => {
         if (!confirm(`¿${activo ? 'Desactivar' : 'Activar'} a ${nombre}?`)) return;
