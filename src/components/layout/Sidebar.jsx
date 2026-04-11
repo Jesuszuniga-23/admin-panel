@@ -273,8 +273,8 @@ const Sidebar = () => {
               <button
                 onClick={() => handleNavigation("/admin/dashboard")}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${location.pathname === "/admin/dashboard"
-                    ? 'bg-blue-50 text-blue-600 font-semibold border-l-4 border-blue-600'
-                    : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600'
+                  ? 'bg-blue-50 text-blue-600 font-semibold border-l-4 border-blue-600'
+                  : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600'
                   }`}
                 aria-label="Ir al dashboard"
               >
@@ -286,8 +286,8 @@ const Sidebar = () => {
               <button
                 onClick={() => handleNavigation("/admin/perfil")}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${location.pathname === "/admin/perfil"
-                    ? 'bg-blue-50 text-blue-600 font-semibold border-l-4 border-blue-600'
-                    : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600'
+                  ? 'bg-blue-50 text-blue-600 font-semibold border-l-4 border-blue-600'
+                  : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600'
                   }`}
                 aria-label="Ver mi perfil"
               >
@@ -316,8 +316,8 @@ const Sidebar = () => {
                       <button
                         onClick={() => handleNavigation("/admin/alertas/activas")}
                         className={`w-full flex items-center gap-3 px-4 py-2 text-sm rounded-lg transition-all ${location.pathname === "/admin/alertas/activas"
-                            ? 'bg-blue-50 text-blue-600 font-semibold'
-                            : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
+                          ? 'bg-blue-50 text-blue-600 font-semibold'
+                          : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
                           }`}
                       >
                         <Bell size={16} />
@@ -327,8 +327,8 @@ const Sidebar = () => {
                       <button
                         onClick={() => handleNavigation("/admin/alertas/en-proceso")}
                         className={`w-full flex items-center gap-3 px-4 py-2 text-sm rounded-lg transition-all ${location.pathname === "/admin/alertas/en-proceso"
-                            ? 'bg-blue-50 text-blue-600 font-semibold'
-                            : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
+                          ? 'bg-blue-50 text-blue-600 font-semibold'
+                          : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
                           }`}
                       >
                         <Activity size={16} />
@@ -338,8 +338,8 @@ const Sidebar = () => {
                       <button
                         onClick={() => handleNavigation("/admin/alertas/cerradas")}
                         className={`w-full flex items-center gap-3 px-4 py-2 text-sm rounded-lg transition-all ${location.pathname === "/admin/alertas/cerradas"
-                            ? 'bg-blue-50 text-blue-600 font-semibold'
-                            : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
+                          ? 'bg-blue-50 text-blue-600 font-semibold'
+                          : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
                           }`}
                       >
                         <CheckCircle size={16} />
@@ -349,8 +349,8 @@ const Sidebar = () => {
                       <button
                         onClick={() => handleNavigation("/admin/alertas/expiradas")}
                         className={`w-full flex items-center gap-3 px-4 py-2 text-sm rounded-lg transition-all ${location.pathname === "/admin/alertas/expiradas"
-                            ? 'bg-blue-50 text-blue-600 font-semibold'
-                            : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
+                          ? 'bg-blue-50 text-blue-600 font-semibold'
+                          : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
                           }`}
                       >
                         <Clock size={16} />
@@ -360,8 +360,8 @@ const Sidebar = () => {
                       <button
                         onClick={() => handleNavigation("/admin/alertas/cerradas-manual")}
                         className={`w-full flex items-center gap-3 px-4 py-2 text-sm rounded-lg transition-all ${location.pathname === "/admin/alertas/cerradas-manual"
-                            ? 'bg-blue-50 text-blue-600 font-semibold'
-                            : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
+                          ? 'bg-blue-50 text-blue-600 font-semibold'
+                          : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
                           }`}
                       >
                         <CheckCircle size={16} />
@@ -377,8 +377,8 @@ const Sidebar = () => {
                 <button
                   onClick={() => handleNavigation("/admin/reasignaciones/pendientes")}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${location.pathname === "/admin/reasignaciones/pendientes"
-                      ? 'bg-blue-50 text-blue-600 font-semibold border-l-4 border-blue-600'
-                      : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600'
+                    ? 'bg-blue-50 text-blue-600 font-semibold border-l-4 border-blue-600'
+                    : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600'
                     }`}
                   aria-label="Ver reasignaciones pendientes"
                 >
@@ -408,8 +408,8 @@ const Sidebar = () => {
                       <button
                         onClick={() => handleNavigation("/admin/personal")}
                         className={`w-full flex items-center gap-3 px-4 py-2 text-sm rounded-lg transition-all ${location.pathname === "/admin/personal"
-                            ? 'bg-blue-50 text-blue-600 font-semibold'
-                            : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
+                          ? 'bg-blue-50 text-blue-600 font-semibold'
+                          : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
                           }`}
                         aria-label="Ver personal"
                       >
@@ -426,8 +426,8 @@ const Sidebar = () => {
                 <button
                   onClick={() => handleNavigation("/admin/unidades")}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${location.pathname === "/admin/unidades"
-                      ? 'bg-blue-50 text-blue-600 font-semibold border-l-4 border-blue-600'
-                      : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600'
+                    ? 'bg-blue-50 text-blue-600 font-semibold border-l-4 border-blue-600'
+                    : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600'
                     }`}
                   aria-label="Ver unidades"
                 >
@@ -440,8 +440,8 @@ const Sidebar = () => {
               <button
                 onClick={() => handleNavigation("/admin/reportes")}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${location.pathname === "/admin/reportes"
-                    ? 'bg-blue-50 text-blue-600 font-semibold border-l-4 border-blue-600'
-                    : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600'
+                  ? 'bg-blue-50 text-blue-600 font-semibold border-l-4 border-blue-600'
+                  : 'text-gray-700 hover:bg-gray-50 hover:text-blue-600'
                   }`}
                 aria-label="Ir al centro de reportes"
               >
@@ -454,8 +454,8 @@ const Sidebar = () => {
                 <button
                   onClick={() => handleNavigation("/admin/analisis/geografico")}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${location.pathname === "/admin/analisis/geografico"
-                      ? 'bg-indigo-50 text-indigo-600 font-semibold border-l-4 border-indigo-600'
-                      : 'text-gray-700 hover:bg-gray-50 hover:text-indigo-600'
+                    ? 'bg-indigo-50 text-indigo-600 font-semibold border-l-4 border-indigo-600'
+                    : 'text-gray-700 hover:bg-gray-50 hover:text-indigo-600'
                     }`}
                   aria-label="Ver análisis geográfico"
                 >
@@ -476,27 +476,39 @@ const Sidebar = () => {
               </div>
 
               {/* Dashboard de Control */}
-              <button
-                onClick={() => handleNavigation("/superadmin/dashboard")}
+              <button onClick={() => handleNavigation("/superadmin/dashboard")}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${location.pathname === "/superadmin/dashboard"
-                    ? 'bg-purple-50 text-purple-600 font-semibold border-l-4 border-purple-600'
-                    : 'text-gray-700 hover:bg-gray-50 hover:text-purple-600'
-                  }`}
-              >
+                  ? 'bg-purple-50 text-purple-600 font-semibold border-l-4 border-purple-600'
+                  : 'text-gray-700 hover:bg-gray-50 hover:text-purple-600'}`}>
                 <LayoutDashboard size={18} />
                 <span>Dashboard Control</span>
               </button>
 
               {/* Municipios */}
-              <button
-                onClick={() => handleNavigation("/superadmin/municipios")}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${location.pathname === "/superadmin/municipios"
-                    ? 'bg-purple-50 text-purple-600 font-semibold border-l-4 border-purple-600'
-                    : 'text-gray-700 hover:bg-gray-50 hover:text-purple-600'
-                  }`}
-              >
+              <button onClick={() => handleNavigation("/superadmin/municipios")}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${location.pathname.startsWith("/superadmin/municipios")
+                  ? 'bg-purple-50 text-purple-600 font-semibold border-l-4 border-purple-600'
+                  : 'text-gray-700 hover:bg-gray-50 hover:text-purple-600'}`}>
                 <Building2 size={18} />
                 <span>Municipios</span>
+              </button>
+
+              {/*  Super Administradores */}
+              <button onClick={() => handleNavigation("/superadmin/superadmins")}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${location.pathname.startsWith("/superadmin/superadmins")
+                  ? 'bg-purple-50 text-purple-600 font-semibold border-l-4 border-purple-600'
+                  : 'text-gray-700 hover:bg-gray-50 hover:text-purple-600'}`}>
+                <Shield size={18} />
+                <span>Super Admins</span>
+              </button>
+
+              {/* Administradores Municipales */}
+              <button onClick={() => handleNavigation("/superadmin/admins-municipales")}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${location.pathname === "/superadmin/admins-municipales"
+                  ? 'bg-purple-50 text-purple-600 font-semibold border-l-4 border-purple-600'
+                  : 'text-gray-700 hover:bg-gray-50 hover:text-purple-600'}`}>
+                <Crown size={18} />
+                <span>Admins Municipales</span>
               </button>
             </div>
           )}

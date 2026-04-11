@@ -4,6 +4,7 @@ import { Building2, Search, Eye, Power, Mail, Phone, User, X, Filter, Crown } fr
 import personalService from '../../services/admin/personal.service';
 import tenantService from '../../services/admin/tenant.service';
 import toast from 'react-hot-toast';
+import { useDebounce } from '../../../hooks/useDebounce';
 
 const AdminsMunicipales = () => {
     const navigate = useNavigate();
@@ -12,6 +13,7 @@ const AdminsMunicipales = () => {
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [tenantFilter, setTenantFilter] = useState('');
+    const searchTerm = useDebounce(search, 500);
     const abortControllerRef = useRef(null);
 
     const cargarDatos = async () => {
@@ -37,19 +39,19 @@ const AdminsMunicipales = () => {
 
             if (adminsRes.success) {
                 let filtrados = adminsRes.data;
-                
-                if (search) {
-                    filtrados = filtrados.filter(a => 
-                        a.nombre?.toLowerCase().includes(search.toLowerCase()) ||
-                        a.email?.toLowerCase().includes(search.toLowerCase()) ||
-                        a.tenant_id?.toLowerCase().includes(search.toLowerCase())
+
+                if (searchTerm) {
+                    filtrados = filtrados.filter(a =>
+                        a.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        a.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        a.tenant_id?.toLowerCase().includes(searchTerm.toLowerCase())
                     );
                 }
-                
+
                 if (tenantFilter) {
                     filtrados = filtrados.filter(a => a.tenant_id === tenantFilter);
                 }
-                
+
                 setAdmins(filtrados);
             }
         } catch (error) {
@@ -68,11 +70,11 @@ const AdminsMunicipales = () => {
                 abortControllerRef.current.abort();
             }
         };
-    }, [search, tenantFilter]);
+    }, [searchTerm, tenantFilter]);
 
     const handleToggleActivo = async (id, nombre, activo) => {
         if (!confirm(`¿${activo ? 'Desactivar' : 'Activar'} a ${nombre}?`)) return;
-        
+
         try {
             await personalService.toggleActivo(id, !activo);
             toast.success(`Admin ${!activo ? 'activado' : 'desactivado'}`);

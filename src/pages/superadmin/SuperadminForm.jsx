@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Shield, Save, X, ArrowLeft, User, Mail, Phone, Hash, CheckCircle,Star  } from 'lucide-react';
+import { Shield, Save, X, ArrowLeft, User, Mail, Phone, Hash, CheckCircle, Star } from 'lucide-react';
 import personalService from '../../services/admin/personal.service';
 import toast from 'react-hot-toast';
 
@@ -52,11 +52,21 @@ const SuperadminForm = () => {
 
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: type === 'checkbox' ? checked : value
-        }));
+
+        // ✅ Forzar email a minúsculas
+        if (name === 'email') {
+            setFormData(prev => ({
+                ...prev,
+                [name]: value.toLowerCase().trim()
+            }));
+        } else {
+            setFormData(prev => ({
+                ...prev,
+                [name]: type === 'checkbox' ? checked : value
+            }));
+        }
     };
+
 
     const handleSubmit = async (e) => {
         e.preventDefault();

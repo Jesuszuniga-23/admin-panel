@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { Shield, Plus, Search, Eye, Edit, Power, Mail, Phone, User, X, AlertTriangle, CheckCircle, Star } from 'lucide-react';
 import personalService from '../../services/admin/personal.service';
 import toast from 'react-hot-toast';
+import { useDebounce } from '../../../hooks/useDebounce';
 
 const SuperadminsList = () => {
     const navigate = useNavigate();
     const [superadmins, setSuperadmins] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
+    const searchTerm = useDebounce(search, 500);
     const abortControllerRef = useRef(null);
 
     const cargarSuperadmins = async () => {
@@ -28,9 +30,9 @@ const SuperadminsList = () => {
             if (response.success) {
                 const filtrados = response.data.filter(p => 
                     p.rol === 'superadmin' &&
-                    (search === '' || 
-                     p.nombre?.toLowerCase().includes(search.toLowerCase()) ||
-                     p.email?.toLowerCase().includes(search.toLowerCase()))
+                    (searchTerm === '' || 
+                     p.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                     p.email?.toLowerCase().includes(searchTerm.toLowerCase()))
                 );
                 setSuperadmins(filtrados);
             }
@@ -50,7 +52,7 @@ const SuperadminsList = () => {
                 abortControllerRef.current.abort();
             }
         };
-    }, [search]);
+    }, [searchTerm]);
 
     const handleToggleActivo = async (id, nombre, activo) => {
         if (!confirm(`¿${activo ? 'Desactivar' : 'Activar'} a ${nombre}?`)) return;
