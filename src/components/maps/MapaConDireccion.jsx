@@ -16,20 +16,26 @@ const MapaConDireccion = ({
   const [direccion, setDireccion] = useState('');
   const [error, setError] = useState('');
   const abortControllerRef = useRef(null);
+  const isMounted = useRef(true);
 
   // Validar coordenadas
-  if (!lat || !lng || isNaN(parseFloat(lat)) || isNaN(parseFloat(lng))) {
-    return (
-      <div className="bg-gray-100 rounded-lg p-4 text-center text-gray-500 border border-gray-200">
-        <MapPin size={24} className="mx-auto mb-2 opacity-50" />
-        <p className="text-sm">Coordenadas no disponibles</p>
-        <p className="text-xs text-gray-400 mt-1">ID: #{alertaId}</p>
-      </div>
-    );
-  }
+  const coordenadasValidas = lat && lng && !isNaN(parseFloat(lat)) && !isNaN(parseFloat(lng));
 
-  // Obtener dirección automáticamente al montar el componente con AbortController
+  // Limpiar al desmontar
   useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
+  // Obtener dirección automáticamente al montar el componente
+  useEffect(() => {
+    if (!coordenadasValidas) return;
+
     const obtenerDireccion = async () => {
       // Cancelar petición anterior si existe
       if (abortControllerRef.current) {
@@ -38,8 +44,10 @@ const MapaConDireccion = ({
       
       abortControllerRef.current = new AbortController();
       
-      setCargandoDireccion(true);
-      setError('');
+      if (isMounted.current) {
+        setCargandoDireccion(true);
+        setError('');
+      }
       
       try {
         const response = await fetch(
@@ -58,40 +66,36 @@ const MapaConDireccion = ({
 
         const data = await response.json();
         
-        //  Limpiar dirección si no hay datos
-        if (data && data.display_name) {
-          setDireccion(data.display_name);
-        } else {
-          setDireccion('Dirección no disponible');
+        if (isMounted.current) {
+          if (data && data.display_name) {
+            setDireccion(data.display_name);
+          } else {
+            setDireccion('Dirección no disponible');
+          }
         }
       } catch (err) {
-        //  Ignorar errores de cancelación
-        if (err.name !== 'AbortError' && err.code !== 'ERR_CANCELED') {
+        if (isMounted.current && err.name !== 'AbortError' && err.code !== 'ERR_CANCELED') {
           console.error('Error obteniendo dirección:', err);
           setError('No se pudo obtener la dirección');
         }
       } finally {
-        setCargandoDireccion(false);
+        if (isMounted.current) {
+          setCargandoDireccion(false);
+        }
         abortControllerRef.current = null;
       }
     };
 
     obtenerDireccion();
-    
-    //  Limpiar al desmontar
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
-  }, [lat, lng]);
+  }, [lat, lng, coordenadasValidas]);
 
   // Función para reintentar obtener dirección
   const handleReintentar = () => {
+    if (!coordenadasValidas) return;
+    
     setError('');
     setDireccion('');
     
-    // Disparar efecto nuevamente
     const obtenerDireccion = async () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -129,18 +133,28 @@ const MapaConDireccion = ({
     obtenerDireccion();
   };
 
+  if (!coordenadasValidas) {
+    return (
+      <div className="bg-gray-100 rounded-lg p-4 text-center text-gray-500 border border-gray-200">
+        <MapPin size={24} className="mx-auto mb-2 opacity-50" />
+        <p className="text-sm">Coordenadas no disponibles</p>
+        <p className="text-xs text-gray-400 mt-1">ID: #{alertaId}</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 h-full flex flex-col">
       {/* Dirección (si está disponible y se debe mostrar) */}
       {mostrarDireccion && (
         <>
           {cargandoDireccion ? (
-            <div className="bg-blue-50 p-3 rounded-lg border border-blue-200 flex items-center gap-2">
+            <div className="bg-blue-50 p-3 rounded-lg border border-blue-200 flex items-center gap-2 flex-shrink-0">
               <Loader size={16} className="animate-spin text-blue-600" />
               <span className="text-sm text-blue-600">Obteniendo dirección...</span>
             </div>
           ) : error ? (
-            <div className="bg-red-50 p-3 rounded-lg border border-red-200 flex items-center justify-between">
+            <div className="bg-red-50 p-3 rounded-lg border border-red-200 flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-2">
                 <AlertCircle size={16} className="text-red-500" />
                 <p className="text-sm text-red-600">{error}</p>
@@ -153,7 +167,7 @@ const MapaConDireccion = ({
               </button>
             </div>
           ) : direccion ? (
-            <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+            <div className="bg-blue-50 p-3 rounded-lg border border-blue-200 flex-shrink-0">
               <div className="text-sm text-gray-700">
                 <span className="font-semibold text-blue-800 flex items-center gap-1">
                   <MapPin size={14} className="text-blue-600" /> Dirección:
@@ -166,15 +180,17 @@ const MapaConDireccion = ({
         </>
       )}
 
-      {/* Mapa */}
+      {/* Mapa - ahora ocupa el espacio restante */}
       {mostrarMapa && (
-        <MapaOSM
-          lat={lat}
-          lng={lng}
-          titulo={titulo}
-          subtitulo={`ID: #${alertaId}`}
-          altura={altura}
-        />
+        <div className={mostrarDireccion ? "flex-1 min-h-0" : "h-full"}>
+          <MapaOSM
+            lat={lat}
+            lng={lng}
+            titulo={titulo}
+            subtitulo={`ID: #${alertaId}`}
+            altura="100%"
+          />
+        </div>
       )}
     </div>
   );

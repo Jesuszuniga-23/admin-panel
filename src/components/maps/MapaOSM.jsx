@@ -1,4 +1,4 @@
-// src/components/maps/MapaOSM.jsx
+// src/components/maps/MapaOSM.jsx (MEJORADO)
 import { useEffect, useRef, useCallback, useMemo } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -26,8 +26,9 @@ const MapaOSM = ({
   const mapaInstancia = useRef(null);
   const marcadorRef = useRef(null);
   const resizeObserverRef = useRef(null);
+  const isMounted = useRef(true);
 
-  //  Validar coordenadas
+  // Validar coordenadas
   const coordenadasValidas = useMemo(() => {
     if (!lat || !lng) return false;
     const latNum = parseFloat(lat);
@@ -37,7 +38,7 @@ const MapaOSM = ({
            lngNum >= -180 && lngNum <= 180;
   }, [lat, lng]);
 
-  //  Memoizar contenido del popup
+  // Memoizar contenido del popup
   const popupContent = useMemo(() => {
     if (!showPopup) return null;
     
@@ -63,7 +64,7 @@ const MapaOSM = ({
     `;
   }, [titulo, subtitulo, showPopup]);
 
-  //  Función para actualizar marcador
+  // Función para actualizar marcador
   const actualizarMarcador = useCallback((mapa, posicion) => {
     if (marcadorRef.current) {
       mapa.removeLayer(marcadorRef.current);
@@ -80,17 +81,22 @@ const MapaOSM = ({
     return marcador;
   }, [showPopup, popupContent]);
 
-  //  Función para manejar cambio de tamaño
+  // Función para manejar cambio de tamaño (MEJORADA)
   const handleResize = useCallback(() => {
-    if (mapaInstancia.current) {
-      setTimeout(() => {
-        mapaInstancia.current.invalidateSize();
-      }, 100);
+    if (mapaInstancia.current && isMounted.current) {
+      // Usar requestAnimationFrame para mejor rendimiento
+      requestAnimationFrame(() => {
+        if (mapaInstancia.current) {
+          mapaInstancia.current.invalidateSize();
+        }
+      });
     }
   }, []);
 
   // Inicializar y actualizar mapa
   useEffect(() => {
+    isMounted.current = true;
+
     if (!coordenadasValidas || !mapaRef.current) {
       return;
     }
@@ -101,6 +107,12 @@ const MapaOSM = ({
     if (mapaInstancia.current) {
       mapaInstancia.current.setView(posicion, zoom);
       actualizarMarcador(mapaInstancia.current, posicion);
+      // Forzar redimensionamiento
+      setTimeout(() => {
+        if (mapaInstancia.current && isMounted.current) {
+          mapaInstancia.current.invalidateSize();
+        }
+      }, 100);
       return;
     }
 
@@ -116,7 +128,7 @@ const MapaOSM = ({
 
       actualizarMarcador(mapa, posicion);
       
-      //  Evento de clic en el mapa
+      // Evento de clic en el mapa
       if (onMapClick) {
         mapa.on('click', (e) => {
           onMapClick({ lat: e.latlng.lat, lng: e.latlng.lng });
@@ -128,6 +140,7 @@ const MapaOSM = ({
     }
 
     return () => {
+      isMounted.current = false;
       if (mapaInstancia.current) {
         mapaInstancia.current.remove();
         mapaInstancia.current = null;
@@ -140,7 +153,7 @@ const MapaOSM = ({
   useEffect(() => {
     window.addEventListener('resize', handleResize);
     
-    //  Usar ResizeObserver para detectar cambios en el contenedor
+    // Usar ResizeObserver para detectar cambios en el contenedor
     if (mapaRef.current && window.ResizeObserver) {
       resizeObserverRef.current = new ResizeObserver(handleResize);
       resizeObserverRef.current.observe(mapaRef.current);
@@ -154,7 +167,7 @@ const MapaOSM = ({
     };
   }, [handleResize]);
 
-  //  Mensaje cuando las coordenadas no son válidas
+  // Mensaje cuando las coordenadas no son válidas
   if (!coordenadasValidas) {
     return (
       <div 
@@ -192,7 +205,7 @@ const MapaOSM = ({
         borderRadius: '12px',
         backgroundColor: '#e5e7eb'
       }} 
-      className="overflow-hidden"
+      className="overflow-hidden rounded-xl"
     />
   );
 };

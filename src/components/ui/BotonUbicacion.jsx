@@ -17,10 +17,22 @@ const BotonUbicacion = ({
   const [direccion, setDireccion] = useState('');
   const [error, setError] = useState('');
   const abortControllerRef = useRef(null);
+  const isMounted = useRef(true);
 
-  //  Validar coordenadas
+  // Validar coordenadas
   const coordenadasValidas = lat && lng && !isNaN(parseFloat(lat)) && !isNaN(parseFloat(lng));
   
+  // Limpiar al desmontar
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
   // Limpiar estado cuando cambian las coordenadas
   useEffect(() => {
     if (!coordenadasValidas) return;
@@ -41,8 +53,10 @@ const BotonUbicacion = ({
     
     abortControllerRef.current = new AbortController();
     
-    setCargandoDireccion(true);
-    setError('');
+    if (isMounted.current) {
+      setCargandoDireccion(true);
+      setError('');
+    }
     
     try {
       const response = await fetch(
@@ -60,20 +74,23 @@ const BotonUbicacion = ({
       }
 
       const data = await response.json();
-      setDireccion(data.display_name || 'Dirección no disponible');
+      if (isMounted.current) {
+        setDireccion(data.display_name || 'Dirección no disponible');
+      }
     } catch (err) {
-      //  Ignorar errores de cancelación
-      if (err.name !== 'AbortError' && err.code !== 'ERR_CANCELED') {
+      if (isMounted.current && err.name !== 'AbortError' && err.code !== 'ERR_CANCELED') {
         console.error('Error obteniendo dirección:', err);
         setError('No se pudo obtener la dirección');
       }
     } finally {
-      setCargandoDireccion(false);
+      if (isMounted.current) {
+        setCargandoDireccion(false);
+      }
       abortControllerRef.current = null;
     }
   }, [lat, lng, coordenadasValidas]);
 
-  //  Manejar clic en botón
+  // Manejar clic en botón
   const handleVerUbicacion = useCallback(async () => {
     setMostrarMapa(true);
     await obtenerDireccion();
@@ -87,21 +104,12 @@ const BotonUbicacion = ({
     }
   }, [onMapClose]);
 
-  //  Reintentar obtener dirección
+  // Reintentar obtener dirección
   const handleReintentar = useCallback(() => {
     obtenerDireccion();
   }, [obtenerDireccion]);
 
-  //  Limpiar al desmontar
-  useEffect(() => {
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
-  }, []);
-
-  //  Si las coordenadas no son válidas
+  // Si las coordenadas no son válidas
   if (!coordenadasValidas) {
     return (
       <div className="bg-gray-100 rounded-lg p-4 text-center text-gray-500 border border-gray-200">
@@ -173,8 +181,9 @@ const BotonUbicacion = ({
             ) : null}
           </div>
 
-          {/* Mapa */}
+          {/* Mapa - ahora con key para forzar re-render cuando cambia */}
           <MapaOSM
+            key={`mapa-${lat}-${lng}-${mostrarMapa}`}
             lat={lat}
             lng={lng}
             titulo={titulo}

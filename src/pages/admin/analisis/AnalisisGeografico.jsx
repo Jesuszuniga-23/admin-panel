@@ -1,10 +1,11 @@
-// src/pages/admin/analisis/AnalisisGeografico.jsx
+// src/pages/admin/analisis/AnalisisGeografico.jsx (VERSIÓN RESPONSIVA)
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   MapPin, Calendar, Filter, ChevronLeft, AlertTriangle,
   Heart, Clock, Bell, Info, Layers, XCircle, CheckCircle, Activity,
-  Map, FileSpreadsheet, FilePieChart, BarChart3, TrendingUp
+  Map, FileSpreadsheet, FilePieChart, BarChart3, TrendingUp,
+  Menu, X
 } from 'lucide-react';
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip,
@@ -44,6 +45,7 @@ const AnalisisGeografico = () => {
   const [geocercaTenant, setGeocercaTenant] = useState(null);
   const [tendenciasMensuales, setTendenciasMensuales] = useState([]);
   const [alertasPorHora, setAlertasPorHora] = useState([]);
+  const [mostrarFiltrosMobile, setMostrarFiltrosMobile] = useState(false);
 
   const [filtros, setFiltros] = useState({
     fechaInicio: '',
@@ -295,6 +297,7 @@ const AnalisisGeografico = () => {
       zona: 'todas'
     });
     setAlertaSeleccionada(null);
+    setMostrarFiltrosMobile(false);
   };
 
   const exportarExcel = async () => {
@@ -310,7 +313,6 @@ const AnalisisGeografico = () => {
     }
   };
 
-  // ✅ NUEVA: Función para exportar PDF con gráficas
   const exportarPDFConGraficas = async () => {
     if (alertasFiltradas.length === 0) {
       toast.error('No hay datos para exportar');
@@ -321,7 +323,6 @@ const AnalisisGeografico = () => {
     const toastId = toast.loading('Capturando gráficas y generando PDF...');
 
     try {
-      // Capturar todas las gráficas
       const capturarElemento = async (ref) => {
         if (ref.current) {
           const canvas = await html2canvas(ref.current, { 
@@ -401,163 +402,219 @@ const AnalisisGeografico = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Header */}
-        <div className="relative mb-8">
-          <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl opacity-10"></div>
-          <div className="relative flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-6">
-            <div className="flex items-center gap-4">
-              <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-4 rounded-2xl shadow-xl shadow-indigo-200">
-                <IconoEntidad entidad="MAPA" size={32} color="text-white" />
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 md:py-8">
+        
+        {/* Header - RESPONSIVO */}
+        <div className="relative mb-6 sm:mb-8">
+          <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl sm:rounded-2xl opacity-10"></div>
+          <div className="relative flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 sm:p-5 md:p-6">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-2.5 sm:p-3 md:p-4 rounded-xl sm:rounded-2xl shadow-xl shadow-indigo-200">
+                <IconoEntidad entidad="MAPA" size={24} color="text-white" />
               </div>
               <div>
-                <h1 className="text-3xl md:text-4xl font-bold text-gray-800">Análisis Geográfico</h1>
-                <p className="text-sm text-gray-500 mt-1 flex items-center gap-2">
-                  <IconoEntidad entidad="UBICACION" size={14} />
-                  <span>{estadisticas.conUbicacion} ubicaciones registradas</span>
-                  <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
-                  <span>{zonas.length} zonas identificadas</span>
+                <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-gray-800">
+                  Análisis Geográfico
+                </h1>
+                <p className="text-xs sm:text-sm text-gray-500 mt-1 flex flex-wrap items-center gap-2">
+                  <IconoEntidad entidad="UBICACION" size={12} />
+                  <span>{estadisticas.conUbicacion} ubicaciones</span>
+                  <span className="hidden xs:inline w-1 h-1 bg-gray-300 rounded-full"></span>
+                  <span>{zonas.length} zonas</span>
                   {tipoAlertaPermitido && (
-                    <span className="text-indigo-600">
-                      {tipoAlertaPermitido === 'panico' ? ' (Solo Pánico)' : ' (Solo Médicas)'}
+                    <span className="text-indigo-600 text-xs">
+                      ({tipoAlertaPermitido === 'panico' ? 'Solo Pánico' : 'Solo Médicas'})
                     </span>
                   )}
                 </p>
               </div>
             </div>
-            <div className="flex gap-2 flex-wrap">
+            
+            {/* Botones de acción - RESPONSIVOS */}
+            <div className="flex gap-2 flex-wrap w-full sm:w-auto">
+              <button 
+                onClick={() => setMostrarFiltrosMobile(!mostrarFiltrosMobile)} 
+                className="lg:hidden flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm shadow-sm"
+              >
+                <Filter size={14} />
+                <span>Filtros</span>
+              </button>
               <button 
                 onClick={exportarExcel} 
                 disabled={exportando} 
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl text-sm shadow-md disabled:opacity-50"
+                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl text-xs sm:text-sm shadow-md disabled:opacity-50"
               >
-                <FileSpreadsheet size={16} /><span className="hidden sm:inline">Excel</span>
+                <FileSpreadsheet size={14} />
+                <span className="hidden xs:inline">Excel</span>
               </button>
               <button 
                 onClick={exportarPDFConGraficas} 
                 disabled={exportando} 
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl text-sm shadow-md disabled:opacity-50"
+                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl text-xs sm:text-sm shadow-md disabled:opacity-50"
               >
-                <FilePieChart size={16} /><span className="hidden sm:inline">PDF Gráficas</span>
+                <FilePieChart size={14} />
+                <span className="hidden xs:inline">PDF</span>
               </button>
               <button 
                 onClick={() => navigate('/admin/dashboard')} 
-                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 text-sm shadow-sm"
+                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 text-xs sm:text-sm shadow-sm"
               >
-                <ChevronLeft size={16} /><span className="hidden sm:inline">Dashboard</span>
+                <ChevronLeft size={14} />
+                <span className="hidden xs:inline">Dashboard</span>
               </button>
             </div>
           </div>
         </div>
 
-        {/* Filtros */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-6 mb-8 border border-gray-100">
-          <div className="flex items-center gap-3 mb-5">
-            <div className="p-2 bg-indigo-100 rounded-lg"><Filter size={18} className="text-indigo-600" /></div>
-            <h2 className="text-base font-semibold text-gray-800">Filtros</h2>
-            <button onClick={limpiarFiltros} className="ml-auto text-xs text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-3 py-1 rounded-full">Limpiar</button>
+        {/* Filtros - RESPONSIVOS (Desktop siempre visible, Mobile toggle) */}
+        <div className={`${mostrarFiltrosMobile ? 'block' : 'hidden lg:block'} bg-white/80 backdrop-blur-sm rounded-xl sm:rounded-2xl shadow-xl p-4 sm:p-5 md:p-6 mb-6 sm:mb-8 border border-gray-100 transition-all duration-300`}>
+          <div className="flex items-center justify-between gap-3 mb-4 sm:mb-5">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="p-1.5 sm:p-2 bg-indigo-100 rounded-lg"><Filter size={16} className="text-indigo-600" /></div>
+              <h2 className="text-sm sm:text-base font-semibold text-gray-800">Filtros</h2>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={limpiarFiltros} className="text-xs text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-2 sm:px-3 py-1 rounded-full">
+                Limpiar
+              </button>
+              <button 
+                onClick={() => setMostrarFiltrosMobile(false)} 
+                className="lg:hidden p-1 hover:bg-gray-100 rounded-lg"
+              >
+                <X size={16} className="text-gray-500" />
+              </button>
+            </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-            <input type="date" value={filtros.fechaInicio} onChange={(e) => setFiltros({ ...filtros, fechaInicio: e.target.value })} placeholder="Desde" className="px-3 py-2.5 border rounded-xl text-sm bg-gray-50" />
-            <input type="date" value={filtros.fechaFin} onChange={(e) => setFiltros({ ...filtros, fechaFin: e.target.value })} placeholder="Hasta" className="px-3 py-2.5 border rounded-xl text-sm bg-gray-50" />
-            <select value={filtros.tipo} onChange={(e) => setFiltros({ ...filtros, tipo: e.target.value })} disabled={!!tipoAlertaPermitido} className="px-3 py-2.5 border rounded-xl text-sm bg-gray-50">
-              <option value="todos">Todos</option>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+            <input 
+              type="date" 
+              value={filtros.fechaInicio} 
+              onChange={(e) => setFiltros({ ...filtros, fechaInicio: e.target.value })} 
+              placeholder="Desde" 
+              className="px-3 py-2.5 border rounded-xl text-sm bg-gray-50 text-gray-700"
+            />
+            <input 
+              type="date" 
+              value={filtros.fechaFin} 
+              onChange={(e) => setFiltros({ ...filtros, fechaFin: e.target.value })} 
+              placeholder="Hasta" 
+              className="px-3 py-2.5 border rounded-xl text-sm bg-gray-50 text-gray-700"
+            />
+            <select 
+              value={filtros.tipo} 
+              onChange={(e) => setFiltros({ ...filtros, tipo: e.target.value })} 
+              disabled={!!tipoAlertaPermitido} 
+              className="px-3 py-2.5 border rounded-xl text-sm bg-gray-50 text-gray-700 disabled:opacity-50"
+            >
+              <option value="todos">Todos los tipos</option>
               <option value="panico">Pánico</option>
               <option value="medica">Médica</option>
             </select>
-            <select value={filtros.estado} onChange={(e) => setFiltros({ ...filtros, estado: e.target.value })} className="px-3 py-2.5 border rounded-xl text-sm bg-gray-50">
-              <option value="todos">Todos</option>
-              <option value="activa">Activa</option>
+            <select 
+              value={filtros.estado} 
+              onChange={(e) => setFiltros({ ...filtros, estado: e.target.value })} 
+              className="px-3 py-2.5 border rounded-xl text-sm bg-gray-50 text-gray-700"
+            >
+              <option value="todos">Todos los estados</option>
+              <option value="activa">Activas</option>
               <option value="proceso">En Proceso</option>
-              <option value="cerrada">Cerrada</option>
+              <option value="cerrada">Cerradas</option>
             </select>
-            <select value={filtros.zona} onChange={(e) => setFiltros({ ...filtros, zona: e.target.value })} className="px-3 py-2.5 border rounded-xl text-sm bg-gray-50">
-              <option value="todas">Todas</option>
+            <select 
+              value={filtros.zona} 
+              onChange={(e) => setFiltros({ ...filtros, zona: e.target.value })} 
+              className="px-3 py-2.5 border rounded-xl text-sm bg-gray-50 text-gray-700"
+            >
+              <option value="todas">Todas las zonas</option>
               {zonas.map(z => <option key={z.zona} value={z.zona}>{z.zona}</option>)}
             </select>
           </div>
         </div>
 
-        {/* MAPA PRINCIPAL */}
-        <div className="bg-white rounded-2xl shadow-xl p-6 mb-8 border border-gray-100">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl shadow-md">
-                <Map size={20} className="text-white" />
+        {/* MAPA PRINCIPAL - RESPONSIVO */}
+        <div className="bg-white rounded-xl sm:rounded-2xl shadow-xl p-4 sm:p-5 md:p-6 mb-6 sm:mb-8 border border-gray-100">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <div className="p-1.5 sm:p-2 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg sm:rounded-xl shadow-md">
+                <Map size={16} className="text-white sm:w-5 sm:h-5" />
               </div>
-              <h2 className="text-lg font-semibold text-gray-800">
+              <h2 className="text-base sm:text-lg font-semibold text-gray-800">
                 Mapa de Incidentes
-                {tipoAlertaPermitido && (
-                  <span className="ml-2 text-sm font-normal text-gray-500">
-                    ({tipoAlertaPermitido === 'panico' ? 'Solo alertas de Pánico' : 'Solo alertas Médicas'})
-                  </span>
-                )}
               </h2>
-              <div className="flex items-center gap-2 ml-4">
+              <div className="flex flex-wrap items-center gap-2 ml-0 sm:ml-2">
                 {mostrarTarjetaPanico && (
                   <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                    <span className="text-xs text-gray-500">Pánico</span>
+                    <div className="w-2.5 h-2.5 bg-red-500 rounded-full"></div>
+                    <span className="text-[10px] sm:text-xs text-gray-500">Pánico</span>
                   </div>
                 )}
                 {mostrarTarjetaMedica && !tipoAlertaPermitido && (
                   <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                    <span className="text-xs text-gray-500">Médica</span>
+                    <div className="w-2.5 h-2.5 bg-green-500 rounded-full"></div>
+                    <span className="text-[10px] sm:text-xs text-gray-500">Médica</span>
                   </div>
                 )}
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full">
-                {alertasParaMapa.length} puntos visibles
+              <span className="text-[10px] sm:text-xs bg-indigo-50 text-indigo-600 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full whitespace-nowrap">
+                {alertasParaMapa.length} puntos
               </span>
-              <button onClick={() => setMostrarMapa(!mostrarMapa)} className="text-xs text-gray-500 hover:text-gray-700">
-                {mostrarMapa ? 'Ocultar mapa' : 'Mostrar mapa'}
+              <button 
+                onClick={() => setMostrarMapa(!mostrarMapa)} 
+                className="text-[10px] sm:text-xs text-gray-500 hover:text-gray-700"
+              >
+                {mostrarMapa ? 'Ocultar' : 'Mostrar'}
               </button>
             </div>
           </div>
 
           {mostrarMapa ? (
-            <MapaMultiAlertas
-              alertas={alertasParaMapa}
-              onSeleccionarAlerta={setAlertaSeleccionada}
-              altura="500px"
-              geocercaTenant={geocercaTenant}
-            />
+            <div className="w-full rounded-xl overflow-hidden">
+              <MapaMultiAlertas
+                alertas={alertasParaMapa}
+                onSeleccionarAlerta={setAlertaSeleccionada}
+                altura="350px sm:400px md:500px"
+                geocercaTenant={geocercaTenant}
+              />
+            </div>
           ) : (
-            <div className="h-[500px] w-full rounded-xl overflow-hidden border border-gray-200 shadow-inner bg-gray-50 flex flex-col items-center justify-center">
-              <Map size={48} className="text-gray-400 mb-4" />
-              <p className="text-gray-500 text-sm">Mapa oculto</p>
-              <button onClick={() => setMostrarMapa(true)} className="mt-2 text-sm text-indigo-600 hover:text-indigo-800">
+            <div className="h-[350px] sm:h-[400px] md:h-[500px] w-full rounded-xl overflow-hidden border border-gray-200 shadow-inner bg-gray-50 flex flex-col items-center justify-center">
+              <Map size={32} className="text-gray-400 mb-3 sm:mb-4" />
+              <p className="text-gray-500 text-xs sm:text-sm">Mapa oculto</p>
+              <button onClick={() => setMostrarMapa(true)} className="mt-2 text-xs sm:text-sm text-indigo-600 hover:text-indigo-800">
                 Mostrar mapa
               </button>
             </div>
           )}
 
+          {/* Alerta seleccionada - RESPONSIVA */}
           {alertaSeleccionada && (
-            <div className="mt-4 p-4 bg-indigo-50 rounded-xl border border-indigo-200">
-              <div className="flex items-start justify-between">
-                <div className="flex items-start gap-3">
-                  <div className={`p-2 rounded-lg ${alertaSeleccionada.tipo === 'panico' ? 'bg-red-100' : 'bg-green-100'}`}>
-                    <IconoEntidad entidad={alertaSeleccionada.tipo === 'panico' ? 'ALERTA_PANICO' : 'ALERTA_MEDICA'} size={16} />
+            <div className="mt-3 sm:mt-4 p-3 sm:p-4 bg-indigo-50 rounded-xl border border-indigo-200">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                <div className="flex items-start gap-2 sm:gap-3">
+                  <div className={`p-1.5 sm:p-2 rounded-lg flex-shrink-0 ${alertaSeleccionada.tipo === 'panico' ? 'bg-red-100' : 'bg-green-100'}`}>
+                    <IconoEntidad entidad={alertaSeleccionada.tipo === 'panico' ? 'ALERTA_PANICO' : 'ALERTA_MEDICA'} size={14} />
                   </div>
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold text-gray-800">Alerta #{alertaSeleccionada.id}</h3>
-                      <BadgeTipoAlerta tipo={alertaSeleccionada.tipo} size={12} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <h3 className="font-semibold text-gray-800 text-sm sm:text-base">Alerta #{alertaSeleccionada.id}</h3>
+                      <BadgeTipoAlerta tipo={alertaSeleccionada.tipo} size={10} />
                     </div>
-                    <p className="text-sm text-gray-600 mb-2">{alertaSeleccionada.ciudadano?.nombre || 'Ciudadano desconocido'}</p>
-                    <div className="flex items-center gap-4 text-xs text-gray-500">
+                    <p className="text-xs sm:text-sm text-gray-600 mb-2 break-words">
+                      {alertaSeleccionada.ciudadano?.nombre || 'Ciudadano desconocido'}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-[10px] sm:text-xs text-gray-500">
                       <span className="flex items-center gap-1">
-                        <IconoEntidad entidad="UBICACION" size={12} />
+                        <IconoEntidad entidad="UBICACION" size={10} />
                         {alertaSeleccionada.lat?.toFixed(4)}, {alertaSeleccionada.lng?.toFixed(4)}
                       </span>
                       <span className="flex items-center gap-1">
-                        <Clock size={12} />
+                        <Clock size={10} />
                         {new Date(alertaSeleccionada.fecha_creacion).toLocaleString()}
                       </span>
-                      <span className={`px-2 py-0.5 rounded-full text-xs ${
+                      <span className={`px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-xs ${
                         alertaSeleccionada.estado === 'activa' ? 'bg-red-100 text-red-700' :
                         alertaSeleccionada.estado === 'asignada' ? 'bg-blue-100 text-blue-700' :
                         alertaSeleccionada.estado === 'cerrada' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
@@ -567,34 +624,36 @@ const AnalisisGeografico = () => {
                     </div>
                   </div>
                 </div>
-                <button onClick={() => setAlertaSeleccionada(null)} className="p-1 hover:bg-white rounded-lg transition-colors">
-                  <XCircle size={18} className="text-gray-400" />
+                <button onClick={() => setAlertaSeleccionada(null)} className="p-1 hover:bg-white rounded-lg transition-colors self-start">
+                  <XCircle size={16} className="text-gray-400" />
                 </button>
               </div>
             </div>
           )}
         </div>
 
-        {/* Tarjetas */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-3 mb-8">
+        {/* Tarjetas de resumen - GRID RESPONSIVO */}
+        <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2 sm:gap-3 md:gap-4 mb-6 sm:mb-8">
           <ResumenCard label="Total" value={estadisticas.total} icon={Bell} color="indigo" />
-          <ResumenCard label="Con ubicación" value={estadisticas.conUbicacion} icon={MapPin} color="green" />
+          <ResumenCard label="Ubicados" value={estadisticas.conUbicacion} icon={MapPin} color="green" />
           {mostrarTarjetaPanico && <ResumenCard label="Pánico" value={estadisticas.panico} icon={AlertTriangle} color="red" />}
           {mostrarTarjetaMedica && <ResumenCard label="Médica" value={estadisticas.medica} icon={Heart} color="green" />}
           <ResumenCard label="Activas" value={estadisticas.activas} icon={Activity} color="blue" />
-          <ResumenCard label="En Proceso" value={estadisticas.proceso} icon={Clock} color="amber" />
+          <ResumenCard label="Proceso" value={estadisticas.proceso} icon={Clock} color="amber" />
           <ResumenCard label="Cerradas" value={estadisticas.cerradas} icon={CheckCircle} color="purple" />
           <ResumenCard label="Expiradas" value={estadisticas.expiradas} icon={XCircle} color="gray" />
         </div>
 
-        {/* Gráfica de Pastel - Distribución por Tipo */}
+        {/* Gráficas - todas con altura responsiva */}
+        
+        {/* Gráfica de Pastel */}
         {estadisticas && (estadisticas.panico > 0 || estadisticas.medica > 0) && (
-          <div ref={pastelRef} className="bg-white rounded-2xl shadow-xl p-6 mb-8 border border-gray-100">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <Layers size={20} className="text-indigo-600" />
-              Distribución por Tipo de Alerta
+          <div ref={pastelRef} className="bg-white rounded-xl sm:rounded-2xl shadow-xl p-4 sm:p-5 md:p-6 mb-6 sm:mb-8 border border-gray-100">
+            <h2 className="text-base sm:text-lg font-semibold text-gray-800 mb-3 sm:mb-4 flex items-center gap-2">
+              <Layers size={16} className="text-indigo-600 sm:w-5 sm:h-5" />
+              Distribución por Tipo
             </h2>
-            <div className="h-64">
+            <div className="h-48 sm:h-56 md:h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -603,28 +662,28 @@ const AnalisisGeografico = () => {
                       { name: 'Médica', value: estadisticas.medica, color: '#10B981' }
                     ]}
                     cx="50%" cy="50%" labelLine={true}
-                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={80} dataKey="value"
+                    label={({ name, percent }) => percent > 0.05 ? `${name}: ${(percent * 100).toFixed(0)}%` : ''}
+                    outerRadius={60} dataKey="value"
                   >
                     <Cell fill="#EF4444" />
                     <Cell fill="#10B981" />
                   </Pie>
                   <Tooltip />
-                  <Legend />
+                  <Legend wrapperStyle={{ fontSize: '11px' }} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
           </div>
         )}
 
-        {/* Gráfica de Barras - Distribución por Estado */}
+        {/* Gráfica de Estados */}
         {estadisticas && (
-          <div ref={estadosRef} className="bg-white rounded-2xl shadow-xl p-6 mb-8 border border-gray-100">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <Activity size={20} className="text-indigo-600" />
-              Distribución por Estado de Alerta
+          <div ref={estadosRef} className="bg-white rounded-xl sm:rounded-2xl shadow-xl p-4 sm:p-5 md:p-6 mb-6 sm:mb-8 border border-gray-100">
+            <h2 className="text-base sm:text-lg font-semibold text-gray-800 mb-3 sm:mb-4 flex items-center gap-2">
+              <Activity size={16} className="text-indigo-600 sm:w-5 sm:h-5" />
+              Distribución por Estado
             </h2>
-            <div className="h-64">
+            <div className="h-48 sm:h-56 md:h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={[
@@ -636,9 +695,9 @@ const AnalisisGeografico = () => {
                   margin={{ top: 10, right: 10, left: 0, bottom: 20 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                  <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#6B7280' }} />
-                  <YAxis tick={{ fontSize: 11, fill: '#6B7280' }} />
-                  <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none' }} />
+                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#6B7280' }} angle={-15} textAnchor="end" height={40} />
+                  <YAxis tick={{ fontSize: 10, fill: '#6B7280' }} />
+                  <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', fontSize: '11px' }} />
                   <Bar dataKey="value" radius={[4, 4, 0, 0]}>
                     <Cell fill="#EF4444" />
                     <Cell fill="#3B82F6" />
@@ -651,41 +710,41 @@ const AnalisisGeografico = () => {
           </div>
         )}
 
-        {/* Gráfica de Líneas - Tendencias Mensuales */}
+        {/* Gráfica de Tendencias Mensuales */}
         {tendenciasMensuales.length > 0 && (
-          <div ref={tendenciasRef} className="bg-white rounded-2xl shadow-xl p-6 mb-8 border border-gray-100">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <TrendingUp size={20} className="text-indigo-600" />
-              Tendencias Mensuales (últimos 12 meses)
+          <div ref={tendenciasRef} className="bg-white rounded-xl sm:rounded-2xl shadow-xl p-4 sm:p-5 md:p-6 mb-6 sm:mb-8 border border-gray-100">
+            <h2 className="text-base sm:text-lg font-semibold text-gray-800 mb-3 sm:mb-4 flex items-center gap-2">
+              <TrendingUp size={16} className="text-indigo-600 sm:w-5 sm:h-5" />
+              Tendencias Mensuales
             </h2>
-            <div className="h-72">
+            <div className="h-52 sm:h-64 md:h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={tendenciasMensuales} margin={{ top: 10, right: 10, left: 0, bottom: 10 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#6B7280' }} />
-                  <YAxis tick={{ fontSize: 11, fill: '#6B7280' }} />
-                  <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none' }} />
-                  <Line type="monotone" dataKey="total" name="Total Alertas" stroke="#6366F1" strokeWidth={2} dot={{ r: 4, fill: '#6366F1' }} activeDot={{ r: 6 }} />
+                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#6B7280' }} angle={-30} textAnchor="end" height={50} interval={1} />
+                  <YAxis tick={{ fontSize: 10, fill: '#6B7280' }} />
+                  <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', fontSize: '11px' }} />
+                  <Line type="monotone" dataKey="total" name="Total Alertas" stroke="#6366F1" strokeWidth={2} dot={{ r: 3, fill: '#6366F1' }} activeDot={{ r: 5 }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
           </div>
         )}
 
-        {/* Gráfica de Barras - Alertas por Hora */}
+        {/* Gráfica de Alertas por Hora */}
         {alertasPorHora.length > 0 && (
-          <div ref={horasRef} className="bg-white rounded-2xl shadow-xl p-6 mb-8 border border-gray-100">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <Clock size={20} className="text-indigo-600" />
-              Alertas por Hora del Día
+          <div ref={horasRef} className="bg-white rounded-xl sm:rounded-2xl shadow-xl p-4 sm:p-5 md:p-6 mb-6 sm:mb-8 border border-gray-100">
+            <h2 className="text-base sm:text-lg font-semibold text-gray-800 mb-3 sm:mb-4 flex items-center gap-2">
+              <Clock size={16} className="text-indigo-600 sm:w-5 sm:h-5" />
+              Alertas por Hora
             </h2>
-            <div className="h-64">
+            <div className="h-48 sm:h-56 md:h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={alertasPorHora} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                  <XAxis dataKey="hora" tick={{ fontSize: 10, fill: '#6B7280' }} interval={2} />
-                  <YAxis tick={{ fontSize: 11, fill: '#6B7280' }} />
-                  <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none' }} />
+                  <XAxis dataKey="hora" tick={{ fontSize: 9, fill: '#6B7280' }} interval={2} angle={-30} textAnchor="end" height={40} />
+                  <YAxis tick={{ fontSize: 10, fill: '#6B7280' }} />
+                  <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', fontSize: '11px' }} />
                   <Bar dataKey="total" name="Alertas" fill="#F59E0B" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -693,20 +752,20 @@ const AnalisisGeografico = () => {
           </div>
         )}
 
-        {/* Gráfica de Barras - Incidentes por Zona */}
+        {/* Gráfica de Incidentes por Zona */}
         {zonas.length > 0 && (
-          <div ref={zonasRef} className="bg-white rounded-2xl shadow-xl p-6 mb-8 border border-gray-100">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <BarChart3 size={20} className="text-indigo-600" />
+          <div ref={zonasRef} className="bg-white rounded-xl sm:rounded-2xl shadow-xl p-4 sm:p-5 md:p-6 mb-6 sm:mb-8 border border-gray-100">
+            <h2 className="text-base sm:text-lg font-semibold text-gray-800 mb-3 sm:mb-4 flex items-center gap-2">
+              <BarChart3 size={16} className="text-indigo-600 sm:w-5 sm:h-5" />
               Incidentes por Zona
             </h2>
-            <div className="h-80">
+            <div className="h-56 sm:h-64 md:h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={zonas.slice(0, 8)} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
+                <BarChart data={zonas.slice(0, 8)} margin={{ top: 10, right: 10, left: 0, bottom: 60 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                  <XAxis dataKey="zona" tick={{ fontSize: 11, fill: '#6B7280' }} angle={-45} textAnchor="end" height={60} />
-                  <YAxis tick={{ fontSize: 11, fill: '#6B7280' }} />
-                  <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }} />
+                  <XAxis dataKey="zona" tick={{ fontSize: 10, fill: '#6B7280' }} angle={-45} textAnchor="end" height={60} />
+                  <YAxis tick={{ fontSize: 10, fill: '#6B7280' }} />
+                  <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', fontSize: '11px' }} />
                   <Bar dataKey="total" name="Total Alertas" fill="#6366F1" radius={[4, 4, 0, 0]} />
                   {mostrarTarjetaPanico && <Bar dataKey="panico" name="Pánico" fill="#EF4444" radius={[4, 4, 0, 0]} />}
                   {mostrarTarjetaMedica && !tipoAlertaPermitido && <Bar dataKey="medica" name="Médica" fill="#10B981" radius={[4, 4, 0, 0]} />}
@@ -716,44 +775,46 @@ const AnalisisGeografico = () => {
           </div>
         )}
 
-        {/* Tabla de zonas */}
-        <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">Distribución por Zona</h2>
+        {/* Tabla de zonas - RESPONSIVA con overflow-x-auto */}
+        <div className="bg-white rounded-xl sm:rounded-2xl shadow-xl p-4 sm:p-5 md:p-6 border border-gray-100">
+          <h2 className="text-base sm:text-lg font-semibold text-gray-800 mb-3 sm:mb-4">Distribución por Zona</h2>
           {zonas.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+            <div className="overflow-x-auto -mx-4 sm:-mx-5 px-4 sm:px-5">
+              <table className="min-w-[300px] sm:min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Zona</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Total</th>
-                    {mostrarTarjetaPanico && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Pánico</th>}
-                    {mostrarTarjetaMedica && !tipoAlertaPermitido && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Médica</th>}
+                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase">Zona</th>
+                    <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase">Total</th>
+                    {mostrarTarjetaPanico && <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase">Pánico</th>}
+                    {mostrarTarjetaMedica && !tipoAlertaPermitido && <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase">Médica</th>}
                   </tr>
                 </thead>
                 <tbody>
                   {zonas.map((zona, i) => (
                     <tr key={zona.zona} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                      <td className="px-6 py-4 text-sm font-medium">{zona.zona}</td>
-                      <td className="px-6 py-4 text-sm">{zona.total}</td>
-                      {mostrarTarjetaPanico && <td className="px-6 py-4 text-sm text-red-600">{zona.panico}</td>}
-                      {mostrarTarjetaMedica && !tipoAlertaPermitido && <td className="px-6 py-4 text-sm text-green-600">{zona.medica}</td>}
+                      <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm font-medium">{zona.zona}</td>
+                      <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm">{zona.total}</td>
+                      {mostrarTarjetaPanico && <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm text-red-600">{zona.panico}</td>}
+                      {mostrarTarjetaMedica && !tipoAlertaPermitido && <td className="px-3 sm:px-6 py-2 sm:py-4 text-xs sm:text-sm text-green-600">{zona.medica}</td>}
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           ) : (
-            <div className="text-center py-8 text-gray-400">No hay datos disponibles</div>
+            <div className="text-center py-6 sm:py-8 text-gray-400 text-sm">No hay datos disponibles</div>
           )}
         </div>
 
-        {/* Nota informativa */}
-        <div className="mt-8 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl p-6 border border-indigo-200">
-          <div className="flex items-start gap-4">
-            <div className="p-2 bg-white rounded-xl shadow-sm"><Info size={20} className="text-indigo-600" /></div>
+        {/* Nota informativa - RESPONSIVA */}
+        <div className="mt-6 sm:mt-8 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl sm:rounded-2xl p-4 sm:p-5 md:p-6 border border-indigo-200">
+          <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
+            <div className="p-1.5 sm:p-2 bg-white rounded-lg sm:rounded-xl shadow-sm flex-shrink-0">
+              <Info size={16} className="text-indigo-600 sm:w-5 sm:h-5" />
+            </div>
             <div className="flex-1">
-              <h3 className="text-sm font-semibold text-indigo-900 mb-1">Análisis basado en datos reales</h3>
-              <p className="text-sm text-indigo-700">
+              <h3 className="text-xs sm:text-sm font-semibold text-indigo-900 mb-1">Análisis basado en datos reales</h3>
+              <p className="text-xs sm:text-sm text-indigo-700 leading-relaxed">
                 Este análisis utiliza las coordenadas reales de {estadisticas.conUbicacion} alertas con ubicación geográfica válida.
                 {estadisticas.sinUbicacion} alertas no tienen coordenadas y no se incluyen en el análisis por zona.
                 {tipoAlertaPermitido && ` Actualmente filtrado para mostrar solo alertas de tipo ${tipoAlertaPermitido === 'panico' ? 'Pánico' : 'Médicas'}.`}
@@ -767,6 +828,7 @@ const AnalisisGeografico = () => {
   );
 };
 
+// Componente ResumenCard - RESPONSIVO
 const ResumenCard = ({ label, value, icon: Icon, color }) => {
   const colors = {
     indigo: 'from-indigo-50 to-indigo-100 border-indigo-200 text-indigo-600',
@@ -779,12 +841,12 @@ const ResumenCard = ({ label, value, icon: Icon, color }) => {
   };
 
   return (
-    <div className={`bg-gradient-to-br ${colors[color]} rounded-xl p-4 border shadow-sm`}>
-      <div className="flex items-center justify-between mb-2">
-        <Icon size={18} className={colors[color].split(' ')[2]} />
+    <div className={`bg-gradient-to-br ${colors[color]} rounded-lg sm:rounded-xl p-2 sm:p-3 md:p-4 border shadow-sm transition-all hover:shadow-md`}>
+      <div className="flex items-center justify-between mb-1 sm:mb-2">
+        <Icon size={14} className={`sm:w-4 sm:h-4 ${colors[color].split(' ')[2]}`} />
       </div>
-      <p className="text-2xl font-bold text-gray-800">{value}</p>
-      <p className="text-xs text-gray-500 mt-1">{label}</p>
+      <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-800">{value}</p>
+      <p className="text-[9px] sm:text-[10px] md:text-xs text-gray-500 mt-0.5 sm:mt-1 truncate">{label}</p>
     </div>
   );
 };
