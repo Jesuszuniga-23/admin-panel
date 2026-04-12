@@ -2,7 +2,6 @@
 import { useState, useRef, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import alertasPanelService from '../services/admin/alertasPanel.service';
-import { Mail,CheckCircle } from 'lucide-react';
 
 export const useOtp = () => {
   const [solicitando, setSolicitando] = useState(false);
@@ -12,11 +11,9 @@ export const useOtp = () => {
   const [otpExpiracion, setOtpExpiracion] = useState(null);
   const [codigoOtp, setCodigoOtp] = useState('');
 
-  //  Refs para AbortControllers
   const solicitarAbortControllerRef = useRef(null);
   const verificarAbortControllerRef = useRef(null);
 
-  //  Función para limpiar estado
   const limpiarEstado = useCallback(() => {
     setShowModal(false);
     setOtpEmail('');
@@ -24,7 +21,6 @@ export const useOtp = () => {
     setCodigoOtp('');
   }, []);
 
-  //  Función para cancelar peticiones
   const cancelarPeticiones = useCallback(() => {
     if (solicitarAbortControllerRef.current) {
       solicitarAbortControllerRef.current.abort();
@@ -37,16 +33,14 @@ export const useOtp = () => {
   }, []);
 
   const solicitarOtp = useCallback(async (alertaId) => {
-    //  Validar alertaId
     if (!alertaId) {
       toast.error('ID de alerta no válido');
       return { success: false, error: 'ID de alerta no válido' };
     }
 
-    //  Cancelar petición anterior si existe
     if (solicitarAbortControllerRef.current) {
       solicitarAbortControllerRef.current.abort();
-      console.log(' Petición OTP anterior cancelada');
+      console.log('🛑 Petición OTP anterior cancelada');
     }
 
     solicitarAbortControllerRef.current = new AbortController();
@@ -61,8 +55,7 @@ export const useOtp = () => {
         setShowModal(true);
         setOtpEmail(response.email_ofuscado);
         setOtpExpiracion(response.expiracion);
-        toast.success(response.message || 'Código enviado a tu correo', {
-          icon: <Mail size={18} className="text-green-600" />,
+        toast.success('' + (response.message || 'Código enviado a tu correo'), {
           duration: 5000
         });
         return { success: true, message: response.message };
@@ -72,7 +65,6 @@ export const useOtp = () => {
         return { success: false, error: errorMsg };
       }
     } catch (error) {
-      //  Ignorar errores de cancelación
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         console.log(' Solicitud OTP cancelada');
         return { success: false, cancelled: true };
@@ -88,7 +80,6 @@ export const useOtp = () => {
   }, []);
 
   const verificarOtp = useCallback(async (alertaId, codigo) => {
-    //  Validar parámetros
     if (!alertaId) {
       toast.error('ID de alerta no válido');
       return { success: false, error: 'ID de alerta no válido' };
@@ -99,7 +90,6 @@ export const useOtp = () => {
       return { success: false, error: 'Código inválido' };
     }
 
-    //  Cancelar petición anterior si existe
     if (verificarAbortControllerRef.current) {
       verificarAbortControllerRef.current.abort();
       console.log(' Verificación OTP anterior cancelada');
@@ -115,8 +105,7 @@ export const useOtp = () => {
 
       if (response.success) {
         limpiarEstado();
-        toast.success('Código verificado. Bienvenido.', {
-          icon: <CheckCircle size={18} className="text-green-600" />,
+        toast.success(' Código verificado. Bienvenido.', {
           duration: 3000
         });
         return { success: true, data: response.data };
@@ -126,7 +115,6 @@ export const useOtp = () => {
         return { success: false, error: errorMsg };
       }
     } catch (error) {
-      //  Ignorar errores de cancelación
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
         console.log(' Verificación OTP cancelada');
         return { success: false, cancelled: true };
@@ -145,15 +133,12 @@ export const useOtp = () => {
     limpiarEstado();
   }, [limpiarEstado]);
 
-  //  Limpiar al desmontar
   const cleanup = useCallback(() => {
     cancelarPeticiones();
     limpiarEstado();
   }, [cancelarPeticiones, limpiarEstado]);
 
-  //  Exponer cleanup para uso externo
   return {
-    // Estados
     solicitando,
     verificando,
     showModal,
@@ -161,14 +146,10 @@ export const useOtp = () => {
     otpExpiracion,
     codigoOtp,
     setCodigoOtp,
-
-    // Funciones
     solicitarOtp,
     verificarOtp,
     cerrarModal,
     cleanup,
-
-    //  Indicadores útiles
     isExpired: otpExpiracion ? new Date() > new Date(otpExpiracion) : false,
     tiempoRestante: otpExpiracion ? Math.max(0, Math.floor((new Date(otpExpiracion) - new Date()) / 1000)) : 0
   };
