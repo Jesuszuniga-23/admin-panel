@@ -1,14 +1,11 @@
 import axiosInstance from '../api/axiosConfig';
 import { ENDPOINTS } from '../api/endpoints';
-import personalService from './personal.service';
-import unidadService from './unidad.service';
-import alertasService from './alertas.service';
-import alertasPanelService from './alertasPanel.service';
-import authService from '../../services/auth.service';
 
 class DashboardService {
   
-  // ✅ Obtener dashboard completo en UNA sola petición
+  // =====================================================
+  // OBTENER DASHBOARD COMPLETO (ÚNICA FUENTE DE VERDAD)
+  // =====================================================
   async obtenerDashboardCompleto(options = {}) {
     try {
       const response = await axiosInstance.get(ENDPOINTS.DASHBOARD.COMPLETO, {
@@ -17,7 +14,7 @@ class DashboardService {
       return response.data;
     } catch (error) {
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
-        console.log('📡 Petición cancelada en obtenerDashboardCompleto');
+        console.log(' Petición cancelada en obtenerDashboardCompleto');
         return { success: false, aborted: true };
       }
       console.error('Error obteniendo dashboard completo:', error);
@@ -25,244 +22,59 @@ class DashboardService {
     }
   }
 
+  // =====================================================
+  // MÉTODO DE COMPATIBILIDAD (usa el cache)
+  // =====================================================
   async obtenerEstadisticas(filtros = {}, options = {}) {
-    try {
-      console.log("Cargando estadísticas del dashboard...");
-      
-      const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
-      const rolPersonalPermitido = authService.getRolPersonalPermitido();
-      const tipoUnidadPermitido = authService.getTipoUnidadPermitido();
-      
-      const personalParams = rolPersonalPermitido ? { rol: rolPersonalPermitido } : {};
-      const alertasParams = tipoAlertaPermitido ? { tipo: tipoAlertaPermitido } : {};
-      const unidadParams = tipoUnidadPermitido ? { tipo: tipoUnidadPermitido } : {};
-      
-      const signal = options.signal;
-      
-      const [
-        personalRes,
-        unidadesRes,
-        alertasExpiradasRes,
-        alertasCerradasManualRes,
-        alertasActivasRes,
-        alertasEnProcesoRes,
-        alertasCerradasRes
-      ] = await Promise.allSettled([
-        personalService.listarPersonal({ limite: 1000, ...personalParams, ...filtros, signal }),
-        unidadService.listarUnidades({ limite: 1000, ...unidadParams, ...filtros, signal }),
-        alertasService.listarExpiradas({ limite: 1000, ...alertasParams, ...filtros, signal }), // ✅ CORREGIDO
-        alertasService.listarCerradasManual({ limite: 1000, ...alertasParams, ...filtros, signal }), // ✅ CORREGIDO
-        alertasPanelService.listarActivas({ limite: 1000, ...alertasParams, ...filtros, signal }), // ✅ CORREGIDO
-        alertasPanelService.listarEnProceso({ limite: 1000, ...alertasParams, ...filtros, signal }), // ✅ CORREGIDO
-        alertasPanelService.listarCerradas({ limite: 1000, ...alertasParams, ...filtros, signal }) // ✅ CORREGIDO
-      ]);
-
-      const personalData = personalRes.status === 'fulfilled' ? personalRes.value.data || [] : [];
-      const unidadesData = unidadesRes.status === 'fulfilled' ? unidadesRes.value.data || [] : [];
-      const alertasExpiradas = alertasExpiradasRes.status === 'fulfilled' ? alertasExpiradasRes.value.data || [] : [];
-      const alertasCerradasManual = alertasCerradasManualRes.status === 'fulfilled' ? alertasCerradasManualRes.value.data || [] : [];
-      const alertasActivas = alertasActivasRes.status === 'fulfilled' ? alertasActivasRes.value.data || [] : [];
-      const alertasEnProceso = alertasEnProcesoRes.status === 'fulfilled' ? alertasEnProcesoRes.value.data || [] : [];
-      const alertasCerradas = alertasCerradasRes.status === 'fulfilled' ? alertasCerradasRes.value.data || [] : [];
-
-      const personalStats = {
-        total: personalData.length,
-        activos: personalData.filter(p => p.activo).length,
-        inactivos: personalData.filter(p => !p.activo).length,
-        disponibles: personalData.filter(p => p.disponible).length,
-        noDisponibles: personalData.filter(p => !p.disponible).length,
-        porRol: {
-          policia: personalData.filter(p => p.rol === 'policia').length,
-          paramedico: personalData.filter(p => p.rol === 'paramedico').length,
-          admin: personalData.filter(p => p.rol === 'admin').length,
-          superadmin: personalData.filter(p => p.rol === 'superadmin').length
-        }
-      };
-
-      const unidadesStats = {
-        total: unidadesData.length,
-        activas: unidadesData.filter(u => u.activa).length,
-        inactivas: unidadesData.filter(u => !u.activa).length,
-        disponibles: unidadesData.filter(u => u.estado === 'disponible').length,
-        ocupadas: unidadesData.filter(u => u.estado === 'ocupada').length,
-        porTipo: {
-          patrulla: unidadesData.filter(u => u.tipo === 'patrulla').length,
-          ambulancia: unidadesData.filter(u => u.tipo === 'ambulancia').length
-        }
-      };
-
-      const alertasStats = {
-        expiradas: alertasExpiradas.length,
-        cerradasManual: alertasCerradasManual.length,
-        totalAlertas: alertasExpiradas.length + alertasCerradasManual.length,
-        activas: alertasActivas.length,
-        enProceso: alertasEnProceso.length,
-        cerradasTotales: alertasCerradas.length
-      };
-
-      const mesActual = new Date().getMonth();
-      const mesAnterior = mesActual === 0 ? 11 : mesActual - 1;
-      
-      const alertasMesActual = alertasCerradas.filter(a => {
-        const fecha = new Date(a.fecha_cierre || a.fecha_creacion);
-        return fecha.getMonth() === mesActual;
-      }).length;
-      
-      const alertasMesAnterior = alertasCerradas.filter(a => {
-        const fecha = new Date(a.fecha_cierre || a.fecha_creacion);
-        return fecha.getMonth() === mesAnterior;
-      }).length;
-
-      let alertasVariacion = '0%';
-      let alertasTendencia = 'stable';
-      
-      if (alertasMesAnterior > 0) {
-        const diff = ((alertasMesActual - alertasMesAnterior) / alertasMesAnterior) * 100;
-        alertasVariacion = `${diff > 0 ? '+' : ''}${diff.toFixed(1)}%`;
-        alertasTendencia = diff > 0 ? 'up' : diff < 0 ? 'down' : 'stable';
-      }
-
-      const personalNuevos = personalData.filter(p => {
-        const fecha = new Date(p.creado_en);
-        return fecha.getMonth() === mesActual;
-      }).length;
-      
-      const personalVariacion = personalNuevos > 0 ? `+${personalNuevos}` : '0';
-      const personalTendencia = personalNuevos > 0 ? 'up' : 'stable';
-
-      const unidadesNuevas = unidadesData.filter(u => {
-        const fecha = new Date(u.creado_en);
-        return fecha.getMonth() === mesActual;
-      }).length;
-      
-      const unidadesVariacion = unidadesNuevas > 0 ? `+${unidadesNuevas}` : '0';
-      const unidadesTendencia = unidadesNuevas > 0 ? 'up' : 'stable';
-
-      const kpis = {
-        personal: {
-          total: personalStats.total,
-          variacion: personalVariacion,
-          tendencia: personalTendencia
-        },
-        unidades: {
-          total: unidadesStats.total,
-          variacion: unidadesVariacion,
-          tendencia: unidadesTendencia
-        },
-        alertas: {
-          total: alertasStats.totalAlertas,
-          variacion: alertasVariacion,
-          tendencia: alertasTendencia
-        }
-      };
-
+    const response = await this.obtenerDashboardCompleto(options);
+    if (response.success && response.data) {
       return {
         success: true,
-        personal: personalStats,
-        unidades: unidadesStats,
-        alertas: alertasStats,
-        kpis
-      };
-
-    } catch (error) {
-      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
-        console.log('📡 Petición cancelada en obtenerEstadisticas');
-        return { success: false, aborted: true };
-      }
-      console.error('Error obteniendo estadísticas:', error);
-      return {
-        success: false,
-        error: error.message || 'Error al cargar estadísticas'
-      };
-    }
-  }
-
-  async obtenerAlertasPorHora(filtros = {}, options = {}) {
-    try {
-      const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
-      const alertasParams = tipoAlertaPermitido ? { tipo: tipoAlertaPermitido } : {};
-      
-      const signal = options.signal;
-      
-      const [expiradasRes, cerradasRes] = await Promise.allSettled([
-        alertasService.listarExpiradas({ limite: 500, ...alertasParams, ...filtros, signal }), // ✅ CORREGIDO
-        alertasService.listarCerradasManual({ limite: 500, ...alertasParams, ...filtros, signal }) // ✅ CORREGIDO
-      ]);
-
-      const expiradas = expiradasRes.status === 'fulfilled' ? expiradasRes.value.data || [] : [];
-      const cerradas = cerradasRes.status === 'fulfilled' ? cerradasRes.value.data || [] : [];
-      
-      const todasAlertas = [...expiradas, ...cerradas];
-      
-      const horas = Array.from({ length: 24 }, (_, i) => ({
-        hora: i,
-        expiradas: 0,
-        cerradas: 0,
-        total: 0
-      }));
-
-      todasAlertas.forEach(alerta => {
-        const fecha = new Date(alerta.fecha_creacion || alerta.fecha_cierre);
-        const hora = fecha.getHours();
-        
-        if (alerta.expirada) {
-          horas[hora].expiradas++;
-        } else if (alerta.cerrada_manualmente) {
-          horas[hora].cerradas++;
+        personal: response.data.personal,
+        unidades: response.data.unidades,
+        alertas: response.data.alertas,
+        kpis: {
+          personal: {
+            total: response.data.personal?.total || 0,
+            variacion: '0%',
+            tendencia: 'stable'
+          },
+          unidades: {
+            total: response.data.unidades?.total || 0,
+            variacion: '0%',
+            tendencia: 'stable'
+          },
+          alertas: {
+            total: response.data.alertas?.totalAlertas || 0,
+            variacion: '0%',
+            tendencia: 'stable'
+          }
         }
-        horas[hora].total++;
-      });
-
-      return horas;
-
-    } catch (error) {
-      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
-        console.log('📡 Petición cancelada en obtenerAlertasPorHora');
-        return [];
-      }
-      console.error('Error obteniendo alertas por hora:', error);
-      return [];
+      };
     }
+    return { success: false, error: response.error };
   }
 
-  async obtenerActividadReciente(filtros = {}, options = {}) {
-    try {
-      const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
-      const rolPersonalPermitido = authService.getRolPersonalPermitido();
-      const tipoUnidadPermitido = authService.getTipoUnidadPermitido();
-      
-      const personalParams = rolPersonalPermitido ? { rol: rolPersonalPermitido } : {};
-      const alertasParams = tipoAlertaPermitido ? { tipo: tipoAlertaPermitido } : {};
-      const unidadParams = tipoUnidadPermitido ? { tipo: tipoUnidadPermitido } : {};
-      
-      const signal = options.signal;
-      
-      const [personalRes, unidadesRes, alertasActivasRes, alertasProcesoRes] = await Promise.allSettled([
-        personalService.listarPersonal({ limite: 5, orden: 'DESC', ordenarPor: 'creado_en', ...personalParams, ...filtros, signal }),
-        unidadService.listarUnidades({ limite: 5, orden: 'DESC', ordenarPor: 'creado_en', ...unidadParams, ...filtros, signal }),
-        alertasPanelService.listarActivas({ limite: 3, ...alertasParams, ...filtros, signal }), // ✅ CORREGIDO
-        alertasPanelService.listarEnProceso({ limite: 3, ...alertasParams, ...filtros, signal }) // ✅ CORREGIDO
-      ]);
-
-      const personalReciente = personalRes.status === 'fulfilled' ? personalRes.value.data || [] : [];
-      const unidadesRecientes = unidadesRes.status === 'fulfilled' ? unidadesRes.value.data || [] : [];
-      const alertasActivas = alertasActivasRes.status === 'fulfilled' ? alertasActivasRes.value.data || [] : [];
-      const alertasProceso = alertasProcesoRes.status === 'fulfilled' ? alertasProcesoRes.value.data || [] : [];
-
-      return {
-        personal: personalReciente,
-        unidades: unidadesRecientes,
-        alertas: [...alertasActivas, ...alertasProceso].slice(0, 5)
-      };
-
-    } catch (error) {
-      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
-        console.log('📡 Petición cancelada en obtenerActividadReciente');
-        return { personal: [], unidades: [], alertas: [] };
-      }
-      console.error('Error obteniendo actividad reciente:', error);
-      return { personal: [], unidades: [], alertas: [] };
+  // =====================================================
+  // OBTENER ALERTAS POR HORA
+  // =====================================================
+  async obtenerAlertasPorHora(filtros = {}, options = {}) {
+    const response = await this.obtenerDashboardCompleto(options);
+    if (response.success && response.data) {
+      return response.data.alertasPorHora || [];
     }
+    return [];
+  }
+
+  // =====================================================
+  // OBTENER ACTIVIDAD RECIENTE
+  // =====================================================
+  async obtenerActividadReciente(filtros = {}, options = {}) {
+    const response = await this.obtenerDashboardCompleto(options);
+    if (response.success && response.data) {
+      return response.data.actividadReciente || { personal: [], unidades: [], alertas: [] };
+    }
+    return { personal: [], unidades: [], alertas: [] };
   }
 }
 

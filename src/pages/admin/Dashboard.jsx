@@ -47,9 +47,24 @@ const formatearNombre = (nombre) => {
     .join(' ');
 };
 
-// Valores por defecto
+// Valores por defecto - ACTUALIZADO con todos los roles
 const defaultData = {
-  personal: { total: 0, activos: 0, inactivos: 0, disponibles: 0, noDisponibles: 0, porRol: { policia: 0, paramedico: 0, admin: 0, superadmin: 0 } },
+  personal: { 
+    total: 0, 
+    activos: 0, 
+    inactivos: 0, 
+    disponibles: 0, 
+    noDisponibles: 0, 
+    porRol: { 
+      policia: 0, 
+      paramedico: 0, 
+      admin: 0, 
+      operador_tecnico: 0,
+      operador_medico: 0,
+      operador_policial: 0,
+      operador_general: 0
+    } 
+  },
   unidades: { total: 0, activas: 0, inactivas: 0, disponibles: 0, ocupadas: 0, porTipo: { patrulla: 0, ambulancia: 0 } },
   alertas: { expiradas: 0, cerradasManual: 0, totalAlertas: 0, activas: 0, enProceso: 0, cerradasTotales: 0 },
   periodoAnterior: {
@@ -185,33 +200,54 @@ const Dashboard = () => {
 
   const mostrarTarjetaPanico = !tipoAlertaPermitido || tipoAlertaPermitido === 'panico';
 
+  // =====================================================
+  // DISTRIBUCIÓN DE PERSONAL - CORREGIDA (TODOS LOS ROLES)
+  // =====================================================
   const getPersonalDistributionData = useCallback(() => {
     const porRol = stats?.personal?.porRol || {};
+    
     if (rolPersonalPermitido === 'policia') {
       return [{ name: 'Policía', value: porRol.policia || 0 }];
     }
     if (rolPersonalPermitido === 'paramedico') {
       return [{ name: 'Paramédico', value: porRol.paramedico || 0 }];
     }
-    const nombresRol = {
-      'policia': 'Policía',
-      'paramedico': 'Paramédico',
-      'admin': 'Admin',
-      'superadmin': 'Super Admin',
-      'operador_tecnico': 'Op. Técnico',
-      'operador_medico': 'Op. Médico',
-      'operador_policial': 'Op. Policial',
-      'operador_general': 'Op. General'
-    };
-    return Object.entries(porRol)
-      .filter(([_, value]) => value > 0)
-      .map(([rol, value]) => ({
-        name: nombresRol[rol] || rol,
-        value
-      }));
+    
+    // ✅ TODOS LOS ROLES (sin superadmin)
+    const todosLosRoles = [
+      { key: 'policia', name: 'Policía' },
+      { key: 'paramedico', name: 'Paramédico' },
+      { key: 'admin', name: 'Admin' },
+      { key: 'operador_tecnico', name: 'Op. Técnico' },
+      { key: 'operador_medico', name: 'Op. Médico' },
+      { key: 'operador_policial', name: 'Op. Policial' },
+      { key: 'operador_general', name: 'Op. General' }
+    ];
+    
+    const rolesConValor = todosLosRoles
+      .map(rol => ({
+        name: rol.name,
+        value: porRol[rol.key] || 0
+      }))
+      .filter(item => item.value > 0);
+    
+    if (rolesConValor.length === 0) {
+      return [{ name: 'Sin datos', value: 1 }];
+    }
+    
+    return rolesConValor;
   }, [rolPersonalPermitido, stats?.personal?.porRol]);
 
-  const COLORS = useMemo(() => ['#3b82f6', '#ef4444', '#f59e0b', '#10b981', '#8b5cf6'], []);
+  // ✅ COLORES PARA CADA ROL
+  const COLORS = useMemo(() => [
+    '#3b82f6', // azul - policia
+    '#ef4444', // rojo - paramedico
+    '#f59e0b', // ámbar - admin
+    '#10b981', // verde - operador_tecnico
+    '#8b5cf6', // morado - operador_medico
+    '#ec4899', // rosa - operador_policial
+    '#06b6d4', // cian - operador_general
+  ], []);
 
   useEffect(() => {
     if (data) {
@@ -339,7 +375,7 @@ const Dashboard = () => {
                 </div>
               </div>
             </div>
-            {alertasPorHora.length > 0 ? (
+            {alertasPorHora && alertasPorHora.length > 0 ? (
               <div className="h-40 sm:h-48 md:h-56 lg:h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={alertasPorHora}>
@@ -364,7 +400,7 @@ const Dashboard = () => {
               </div>
             ) : (
               <div className="h-40 sm:h-48 md:h-56 flex items-center justify-center text-gray-400 text-xs sm:text-sm">
-                No hay datos disponibles
+                No hay datos disponibles en las últimas 24 horas
               </div>
             )}
           </div>
@@ -400,7 +436,9 @@ const Dashboard = () => {
               {personalDistributionData.map((item, idx) => (
                 <div key={idx} className="flex items-center gap-1.5 sm:gap-2">
                   <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 lg:w-3 lg:h-3 rounded-full" style={{ backgroundColor: COLORS[idx % COLORS.length] }} />
-                  <span className="text-[10px] sm:text-xs text-slate-500 truncate">{item.name}: {item.value}</span>
+                  <span className="text-[10px] sm:text-xs text-slate-600 truncate">
+                    {item.name}: <span className="font-semibold">{item.value}</span>
+                  </span>
                 </div>
               ))}
             </div>
