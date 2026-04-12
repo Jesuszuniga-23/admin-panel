@@ -27,7 +27,7 @@ const MapaOSM = ({
   const marcadorRef = useRef(null);
   const resizeObserverRef = useRef(null);
 
-  // ✅ Validar coordenadas
+  //  Validar coordenadas
   const coordenadasValidas = useMemo(() => {
     if (!lat || !lng) return false;
     const latNum = parseFloat(lat);
@@ -37,7 +37,7 @@ const MapaOSM = ({
            lngNum >= -180 && lngNum <= 180;
   }, [lat, lng]);
 
-  // ✅ Memoizar contenido del popup
+  //  Memoizar contenido del popup
   const popupContent = useMemo(() => {
     if (!showPopup) return null;
     
@@ -63,7 +63,7 @@ const MapaOSM = ({
     `;
   }, [titulo, subtitulo, showPopup]);
 
-  // ✅ Función para actualizar marcador
+  //  Función para actualizar marcador
   const actualizarMarcador = useCallback((mapa, posicion) => {
     if (marcadorRef.current) {
       mapa.removeLayer(marcadorRef.current);
@@ -80,7 +80,7 @@ const MapaOSM = ({
     return marcador;
   }, [showPopup, popupContent]);
 
-  // ✅ Función para manejar cambio de tamaño
+  //  Función para manejar cambio de tamaño
   const handleResize = useCallback(() => {
     if (mapaInstancia.current) {
       setTimeout(() => {
@@ -89,7 +89,7 @@ const MapaOSM = ({
     }
   }, []);
 
-  // ✅ Inicializar y actualizar mapa
+  // Inicializar y actualizar mapa
   useEffect(() => {
     if (!coordenadasValidas || !mapaRef.current) {
       return;
@@ -97,14 +97,14 @@ const MapaOSM = ({
 
     const posicion = [parseFloat(lat), parseFloat(lng)];
     
-    // ✅ Si el mapa ya existe, solo actualizar vista y marcador
+    // Si el mapa ya existe, solo actualizar vista y marcador
     if (mapaInstancia.current) {
       mapaInstancia.current.setView(posicion, zoom);
       actualizarMarcador(mapaInstancia.current, posicion);
       return;
     }
 
-    // ✅ Crear nuevo mapa
+    // Crear nuevo mapa
     try {
       const mapa = L.map(mapaRef.current).setView(posicion, zoom);
       mapaInstancia.current = mapa;
@@ -116,7 +116,7 @@ const MapaOSM = ({
 
       actualizarMarcador(mapa, posicion);
       
-      // ✅ Evento de clic en el mapa
+      //  Evento de clic en el mapa
       if (onMapClick) {
         mapa.on('click', (e) => {
           onMapClick({ lat: e.latlng.lat, lng: e.latlng.lng });
@@ -136,11 +136,11 @@ const MapaOSM = ({
     };
   }, [coordenadasValidas, lat, lng, zoom, actualizarMarcador, onMapClick]);
 
-  // ✅ Manejar cambio de tamaño de ventana
+  // Manejar cambio de tamaño de ventana
   useEffect(() => {
     window.addEventListener('resize', handleResize);
     
-    // ✅ Usar ResizeObserver para detectar cambios en el contenedor
+    //  Usar ResizeObserver para detectar cambios en el contenedor
     if (mapaRef.current && window.ResizeObserver) {
       resizeObserverRef.current = new ResizeObserver(handleResize);
       resizeObserverRef.current.observe(mapaRef.current);
@@ -154,7 +154,7 @@ const MapaOSM = ({
     };
   }, [handleResize]);
 
-  // ✅ Mensaje cuando las coordenadas no son válidas
+  //  Mensaje cuando las coordenadas no son válidas
   if (!coordenadasValidas) {
     return (
       <div 

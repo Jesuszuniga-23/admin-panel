@@ -13,7 +13,7 @@ export const useAuth = () => {
   const [loginError, setLoginError] = useState(null);
   const abortControllerRef = useRef(null);
 
-  // ✅ Cancelar peticiones al desmontar
+  //  Cancelar peticiones al desmontar
   const cleanup = useCallback(() => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -23,19 +23,19 @@ export const useAuth = () => {
 
   const login = useGoogleLogin({
     onSuccess: async (response) => {
-      console.log("✅ Respuesta completa de Google:", response);
+      console.log("Respuesta completa de Google:", response);
       
-      // ✅ El token viene en response.credential
+      //  El token viene en response.credential
       const token = response.credential;
       
       if (!token) {
-        console.error("❌ No se encontró credential en la respuesta:", response);
+        console.error("No se encontró credential en la respuesta:", response);
         toast.error('Error: No se pudo obtener el token de Google');
         setIsLoggingIn(false);
         return;
       }
 
-      // ✅ Cancelar petición anterior si existe
+      //  Cancelar petición anterior si existe
       cleanup();
       
       // Crear nuevo AbortController
@@ -53,13 +53,13 @@ export const useAuth = () => {
         });
         
         toast.dismiss('login');
-        console.log("📦 Resultado del login:", result);
+        console.log(" Resultado del login:", result);
         
         if (result?.success) {
           setUser(result.usuario);
           toast.success(`Bienvenido ${result.usuario?.nombre || result.usuario?.email || 'Usuario'}`);
           
-          // ✅ Manejo correcto de roles
+          //  Manejo correcto de roles
           const rolesAdmin = ['superadmin', 'admin', 'operador_tecnico', 'operador_policial', 'operador_medico', 'operador_general'];
           
           if (rolesAdmin.includes(result.usuario?.rol)) {
@@ -67,7 +67,7 @@ export const useAuth = () => {
           } else if (result.usuario?.rol === 'ciudadano') {
             navigate('/mobile', { replace: true });
           } else {
-            console.warn(`⚠️ Rol no reconocido: ${result.usuario?.rol}`);
+            console.warn(` Rol no reconocido: ${result.usuario?.rol}`);
             navigate('/login', { replace: true });
           }
         } else {
@@ -78,7 +78,7 @@ export const useAuth = () => {
       } catch (error) {
         toast.dismiss('login');
         
-        // ✅ Manejar cancelación
+        //  Manejar cancelación
         if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
           console.log('🛑 Login cancelado');
           return;
@@ -86,7 +86,7 @@ export const useAuth = () => {
         
         console.error("❌ Error en proceso de login:", error);
         
-        // ✅ Manejar caso de 2FA requerido
+        //  Manejar caso de 2FA requerido
         if (error?.requires_2fa) {
           navigate(`/verificar-2fa?email=${encodeURIComponent(error.email_ofuscado)}`);
         } else {
@@ -101,7 +101,7 @@ export const useAuth = () => {
       }
     },
     onError: (error) => {
-      console.error("❌ Error de Google OAuth:", error);
+      console.error(" Error de Google OAuth:", error);
       const errorMsg = error?.error_description || error?.error || 'Error en autenticación con Google';
       setLoginError(errorMsg);
       toast.error(errorMsg);
@@ -112,7 +112,7 @@ export const useAuth = () => {
     scope: 'openid email profile',
   });
 
-  // ✅ Logout con AbortController
+  //  Logout con AbortController
   const logout = useCallback(async () => {
     // Cancelar petición anterior si existe
     if (abortControllerRef.current) {
@@ -126,16 +126,16 @@ export const useAuth = () => {
         signal: abortControllerRef.current.signal
       });
     } catch (error) {
-      // ✅ Ignorar errores de cancelación
+      //  Ignorar errores de cancelación
       if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
-        console.error("❌ Error al cerrar sesión:", error);
+        console.error(" Error al cerrar sesión:", error);
       }
     } finally {
       cleanup();
     }
   }, []);
 
-  // ✅ Función para verificar sesión actual
+  //  Función para verificar sesión actual
   const checkSession = useCallback(async () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -158,7 +158,7 @@ export const useAuth = () => {
     }
   }, []);
 
-  // ✅ Limpiar al desmontar
+  //  Limpiar al desmontar
   const cleanupRef = useRef(cleanup);
   useEffect(() => {
     return () => {

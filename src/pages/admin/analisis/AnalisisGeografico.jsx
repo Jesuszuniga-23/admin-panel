@@ -4,10 +4,17 @@ import { useNavigate } from 'react-router-dom';
 import {
   MapPin, Calendar, Filter, ChevronLeft, AlertTriangle,
   Heart, Clock, Bell, Info, Layers, XCircle, CheckCircle, Activity,
-  Map, FileSpreadsheet, FilePieChart
+  Map, FileSpreadsheet, FilePieChart, BarChart3, TrendingUp
 } from 'lucide-react';
+import { 
+  PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
+  LineChart, Line
+} from 'recharts';
+import html2canvas from 'html2canvas';
 import analisisGeograficoService from '../../../services/admin/analisisGeografico.service';
 import reportesService from '../../../services/admin/reportes.service';
+import reportesGraficasService from '../../../services/admin/reportesGraficas.service';
 import Loader from '../../../components/common/Loader';
 import MapaMultiAlertas from '../../../components/maps/MapaMultiAlertas';
 import useAuthStore from '../../../store/authStore';
@@ -19,10 +26,10 @@ const AnalisisGeografico = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
-  
+
   const abortControllerRef = useRef(null);
   const isMountedRef = useRef(true);
-  
+
   const [cargando, setCargando] = useState(true);
   const [exportando, setExportando] = useState(false);
   const [alertas, setAlertas] = useState([]);
@@ -34,10 +41,10 @@ const AnalisisGeografico = () => {
   });
   const [zonas, setZonas] = useState([]);
   const [mostrarMapa, setMostrarMapa] = useState(true);
-  
-  // ✅ NUEVO: Estado para la geocerca del tenant
   const [geocercaTenant, setGeocercaTenant] = useState(null);
-  
+  const [tendenciasMensuales, setTendenciasMensuales] = useState([]);
+  const [alertasPorHora, setAlertasPorHora] = useState([]);
+
   const [filtros, setFiltros] = useState({
     fechaInicio: '',
     fechaFin: '',
@@ -45,6 +52,14 @@ const AnalisisGeografico = () => {
     estado: 'todos',
     zona: 'todas'
   });
+
+  // Refs para capturar gráficas
+  const pastelRef = useRef(null);
+  const estadosRef = useRef(null);
+  const tendenciasRef = useRef(null);
+  const horasRef = useRef(null);
+  const zonasRef = useRef(null);
+  const mapaRef = useRef(null);
 
   // Función para calcular zona
   const calcularZona = (lat, lng) => {
@@ -62,7 +77,7 @@ const AnalisisGeografico = () => {
   // Función para aplicar filtros
   const aplicarFiltros = (datos) => {
     let filtrados = [...datos];
-    
+
     if (filtros.fechaInicio && filtros.fechaFin) {
       const inicio = new Date(filtros.fechaInicio);
       inicio.setHours(0, 0, 0, 0);
@@ -73,11 +88,11 @@ const AnalisisGeografico = () => {
         return fecha >= inicio && fecha <= fin;
       });
     }
-    
+
     if (filtros.tipo !== 'todos') {
       filtrados = filtrados.filter(item => item.tipo === filtros.tipo);
     }
-    
+
     if (filtros.estado !== 'todos') {
       filtrados = filtrados.filter(item => {
         if (filtros.estado === 'activa') return item.estado === 'activa';
@@ -87,25 +102,25 @@ const AnalisisGeografico = () => {
         return true;
       });
     }
-    
+
     if (filtros.zona !== 'todas') {
       filtrados = filtrados.filter(item => {
         const zona = calcularZona(item.lat, item.lng);
         return zona === filtros.zona;
       });
     }
-    
+
     return filtrados;
   };
 
-  // Función para calcular estadísticas SOLO del tipo permitido
+  // Función para calcular estadísticas
   const calcularEstadisticas = (datos) => {
-    const datosFiltrados = tipoAlertaPermitido 
+    const datosFiltrados = tipoAlertaPermitido
       ? datos.filter(a => a.tipo === tipoAlertaPermitido)
       : datos;
-    
+
     const conUbicacion = datosFiltrados.filter(a => a.lat && a.lng).length;
-    
+
     return {
       total: datosFiltrados.length,
       conUbicacion,
@@ -119,12 +134,12 @@ const AnalisisGeografico = () => {
     };
   };
 
-  // Función para procesar zonas SOLO del tipo permitido
+  // Función para procesar zonas
   const procesarZonas = (datos) => {
-    const datosFiltrados = tipoAlertaPermitido 
+    const datosFiltrados = tipoAlertaPermitido
       ? datos.filter(a => a.tipo === tipoAlertaPermitido)
       : datos;
-    
+
     const zonasMap = {};
     datosFiltrados.forEach(alerta => {
       if (!alerta.lat || !alerta.lng) return;
@@ -139,6 +154,51 @@ const AnalisisGeografico = () => {
     return Object.values(zonasMap).sort((a, b) => b.total - a.total);
   };
 
+  // Función para procesar tendencias mensuales
+  const procesarTendenciasMensuales = (datos) => {
+    const meses = {};
+    const nombresMeses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    
+    datos.forEach(alerta => {
+      if (!alerta.fecha_creacion) return;
+      const fecha = new Date(alerta.fecha_creacion);
+      if (isNaN(fecha.getTime())) return;
+      
+      const key = `${fecha.getFullYear()}-${fecha.getMonth()}`;
+      if (!meses[key]) {
+        meses[key] = { 
+          mes: nombresMeses[fecha.getMonth()], 
+          año: fecha.getFullYear(),
+          total: 0
+        };
+      }
+      meses[key].total++;
+    });
+    
+    return Object.values(meses)
+      .sort((a, b) => a.año - b.año || nombresMeses.indexOf(a.mes) - nombresMeses.indexOf(b.mes))
+      .slice(-12)
+      .map(m => ({ ...m, label: `${m.mes} ${m.año}` }));
+  };
+
+  // Función para procesar alertas por hora
+  const procesarAlertasPorHora = (datos) => {
+    const horas = Array(24).fill(0);
+    
+    datos.forEach(alerta => {
+      if (!alerta.fecha_creacion) return;
+      const fecha = new Date(alerta.fecha_creacion);
+      if (isNaN(fecha.getTime())) return;
+      const hora = fecha.getHours();
+      horas[hora]++;
+    });
+    
+    return horas.map((total, hora) => ({
+      hora: `${hora.toString().padStart(2, '0')}:00`,
+      total
+    }));
+  };
+
   // Alertas para el mapa
   const alertasParaMapa = useMemo(() => {
     let filtradas = alertasFiltradas;
@@ -148,14 +208,13 @@ const AnalisisGeografico = () => {
     return filtradas.filter(a => a.lat && a.lng);
   }, [alertasFiltradas, tipoAlertaPermitido]);
 
-  // ✅ NUEVO: Cargar geocerca del tenant al montar
+  // Cargar geocerca del tenant
   useEffect(() => {
     const cargarGeocerca = async () => {
       try {
         const response = await analisisGeograficoService.obtenerGeocercaTenant();
         if (response.success && response.data) {
           setGeocercaTenant(response.data);
-          console.log('📍 Geocerca del municipio cargada:', response.data);
         }
       } catch (error) {
         console.error('Error cargando geocerca:', error);
@@ -171,24 +230,26 @@ const AnalisisGeografico = () => {
         abortControllerRef.current.abort();
       }
       abortControllerRef.current = new AbortController();
-      
+
       setCargando(true);
-      
+
       try {
         const params = { signal: abortControllerRef.current.signal, limite: 5000 };
         if (tipoAlertaPermitido) params.tipo = tipoAlertaPermitido;
-        
+
         const response = await analisisGeograficoService.obtenerDatosCompletos(params);
-        
+
         if (!isMountedRef.current) return;
-        
+
         if (response.success && response.alertas) {
           setAlertas(response.alertas);
-          
+
           const filtrados = aplicarFiltros(response.alertas);
           setAlertasFiltradas(filtrados);
           setEstadisticas(calcularEstadisticas(filtrados));
           setZonas(procesarZonas(filtrados));
+          setTendenciasMensuales(procesarTendenciasMensuales(filtrados));
+          setAlertasPorHora(procesarAlertasPorHora(filtrados));
         } else {
           toast.error(response.error || 'Error al cargar datos');
         }
@@ -201,10 +262,10 @@ const AnalisisGeografico = () => {
         if (isMountedRef.current) setCargando(false);
       }
     };
-    
+
     isMountedRef.current = true;
     cargarDatos();
-    
+
     return () => {
       isMountedRef.current = false;
       if (abortControllerRef.current) {
@@ -216,11 +277,13 @@ const AnalisisGeografico = () => {
   // Aplicar filtros cuando cambian
   useEffect(() => {
     if (alertas.length === 0) return;
-    
+
     const filtrados = aplicarFiltros(alertas);
     setAlertasFiltradas(filtrados);
     setEstadisticas(calcularEstadisticas(filtrados));
     setZonas(procesarZonas(filtrados));
+    setTendenciasMensuales(procesarTendenciasMensuales(filtrados));
+    setAlertasPorHora(procesarAlertasPorHora(filtrados));
   }, [filtros, alertas]);
 
   const limpiarFiltros = () => {
@@ -237,11 +300,89 @@ const AnalisisGeografico = () => {
   const exportarExcel = async () => {
     setExportando(true);
     try {
-      toast.loading('Generando reporte...', { id: 'export' });
-      await reportesService.generarExcelPersonalizado(alertasFiltradas, 'alertas', filtros, user);
-      toast.success('Reporte generado', { id: 'export' });
+      toast.loading('Generando reporte Excel...', { id: 'export' });
+      await reportesService.generarExcelPersonalizado(alertasFiltradas, 'alertas', filtros, user, estadisticas);
+      toast.success('Reporte Excel generado', { id: 'export' });
     } catch (error) {
       toast.error('Error al generar reporte', { id: 'export' });
+    } finally {
+      setExportando(false);
+    }
+  };
+
+  // ✅ NUEVA: Función para exportar PDF con gráficas
+  const exportarPDFConGraficas = async () => {
+    if (alertasFiltradas.length === 0) {
+      toast.error('No hay datos para exportar');
+      return;
+    }
+
+    setExportando(true);
+    const toastId = toast.loading('Capturando gráficas y generando PDF...');
+
+    try {
+      // Capturar todas las gráficas
+      const capturarElemento = async (ref) => {
+        if (ref.current) {
+          const canvas = await html2canvas(ref.current, { 
+            scale: 1.5, 
+            backgroundColor: '#FFFFFF',
+            logging: false
+          });
+          return canvas.toDataURL('image/png');
+        }
+        return null;
+      };
+
+      toast.loading('Capturando mapa...', { id: toastId });
+      const mapaElement = document.querySelector('.leaflet-container');
+      let mapaImagen = null;
+      if (mapaElement) {
+        const canvas = await html2canvas(mapaElement, { scale: 1.2, backgroundColor: '#FFFFFF' });
+        mapaImagen = canvas.toDataURL('image/png');
+      }
+
+      toast.loading('Capturando gráficas...', { id: toastId });
+      
+      const [pastelImg, estadosImg, tendenciasImg, horasImg, zonasImg] = await Promise.all([
+        capturarElemento(pastelRef),
+        capturarElemento(estadosRef),
+        capturarElemento(tendenciasRef),
+        capturarElemento(horasRef),
+        capturarElemento(zonasRef)
+      ]);
+
+      const graficas = {
+        mapa: mapaImagen,
+        pastel: pastelImg,
+        barras: zonasImg,
+        estados: estadosImg,
+        tendencias: tendenciasImg,
+        horas: horasImg,
+        estadisticas: estadisticas,
+        datosPorZona: zonas.map(z => ({
+          ...z,
+          porcentaje: estadisticas.total > 0 ? ((z.total / estadisticas.total) * 100).toFixed(1) : '0',
+          activas: 0,
+          enProceso: 0,
+          cerradas: 0
+        }))
+      };
+
+      toast.loading('Generando PDF...', { id: toastId });
+      
+      await reportesGraficasService.generarPDFConGraficas(
+        alertasFiltradas,
+        'alertas',
+        filtros,
+        user,
+        graficas
+      );
+
+      toast.success('PDF con gráficas generado correctamente', { id: toastId });
+    } catch (error) {
+      console.error('Error generando PDF con gráficas:', error);
+      toast.error('Error al generar PDF con gráficas', { id: toastId });
     } finally {
       setExportando(false);
     }
@@ -255,7 +396,6 @@ const AnalisisGeografico = () => {
     );
   }
 
-  // Determinar qué tarjetas mostrar según el rol
   const mostrarTarjetaPanico = !tipoAlertaPermitido || tipoAlertaPermitido === 'panico';
   const mostrarTarjetaMedica = !tipoAlertaPermitido || tipoAlertaPermitido === 'medica';
 
@@ -285,11 +425,25 @@ const AnalisisGeografico = () => {
                 </p>
               </div>
             </div>
-            <div className="flex gap-2">
-              <button onClick={exportarExcel} disabled={exportando} className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl text-sm shadow-md disabled:opacity-50">
+            <div className="flex gap-2 flex-wrap">
+              <button 
+                onClick={exportarExcel} 
+                disabled={exportando} 
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl text-sm shadow-md disabled:opacity-50"
+              >
                 <FileSpreadsheet size={16} /><span className="hidden sm:inline">Excel</span>
               </button>
-              <button onClick={() => navigate('/admin/dashboard')} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 text-sm shadow-sm">
+              <button 
+                onClick={exportarPDFConGraficas} 
+                disabled={exportando} 
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl text-sm shadow-md disabled:opacity-50"
+              >
+                <FilePieChart size={16} /><span className="hidden sm:inline">PDF Gráficas</span>
+              </button>
+              <button 
+                onClick={() => navigate('/admin/dashboard')} 
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 text-sm shadow-sm"
+              >
                 <ChevronLeft size={16} /><span className="hidden sm:inline">Dashboard</span>
               </button>
             </div>
@@ -304,20 +458,20 @@ const AnalisisGeografico = () => {
             <button onClick={limpiarFiltros} className="ml-auto text-xs text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-3 py-1 rounded-full">Limpiar</button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-            <input type="date" value={filtros.fechaInicio} onChange={(e) => setFiltros({...filtros, fechaInicio: e.target.value})} placeholder="Desde" className="px-3 py-2.5 border rounded-xl text-sm bg-gray-50" />
-            <input type="date" value={filtros.fechaFin} onChange={(e) => setFiltros({...filtros, fechaFin: e.target.value})} placeholder="Hasta" className="px-3 py-2.5 border rounded-xl text-sm bg-gray-50" />
-            <select value={filtros.tipo} onChange={(e) => setFiltros({...filtros, tipo: e.target.value})} disabled={!!tipoAlertaPermitido} className="px-3 py-2.5 border rounded-xl text-sm bg-gray-50">
+            <input type="date" value={filtros.fechaInicio} onChange={(e) => setFiltros({ ...filtros, fechaInicio: e.target.value })} placeholder="Desde" className="px-3 py-2.5 border rounded-xl text-sm bg-gray-50" />
+            <input type="date" value={filtros.fechaFin} onChange={(e) => setFiltros({ ...filtros, fechaFin: e.target.value })} placeholder="Hasta" className="px-3 py-2.5 border rounded-xl text-sm bg-gray-50" />
+            <select value={filtros.tipo} onChange={(e) => setFiltros({ ...filtros, tipo: e.target.value })} disabled={!!tipoAlertaPermitido} className="px-3 py-2.5 border rounded-xl text-sm bg-gray-50">
               <option value="todos">Todos</option>
               <option value="panico">Pánico</option>
               <option value="medica">Médica</option>
             </select>
-            <select value={filtros.estado} onChange={(e) => setFiltros({...filtros, estado: e.target.value})} className="px-3 py-2.5 border rounded-xl text-sm bg-gray-50">
+            <select value={filtros.estado} onChange={(e) => setFiltros({ ...filtros, estado: e.target.value })} className="px-3 py-2.5 border rounded-xl text-sm bg-gray-50">
               <option value="todos">Todos</option>
               <option value="activa">Activa</option>
               <option value="proceso">En Proceso</option>
               <option value="cerrada">Cerrada</option>
             </select>
-            <select value={filtros.zona} onChange={(e) => setFiltros({...filtros, zona: e.target.value})} className="px-3 py-2.5 border rounded-xl text-sm bg-gray-50">
+            <select value={filtros.zona} onChange={(e) => setFiltros({ ...filtros, zona: e.target.value })} className="px-3 py-2.5 border rounded-xl text-sm bg-gray-50">
               <option value="todas">Todas</option>
               {zonas.map(z => <option key={z.zona} value={z.zona}>{z.zona}</option>)}
             </select>
@@ -358,17 +512,14 @@ const AnalisisGeografico = () => {
               <span className="text-xs bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full">
                 {alertasParaMapa.length} puntos visibles
               </span>
-              <button
-                onClick={() => setMostrarMapa(!mostrarMapa)}
-                className="text-xs text-gray-500 hover:text-gray-700"
-              >
+              <button onClick={() => setMostrarMapa(!mostrarMapa)} className="text-xs text-gray-500 hover:text-gray-700">
                 {mostrarMapa ? 'Ocultar mapa' : 'Mostrar mapa'}
               </button>
             </div>
           </div>
 
           {mostrarMapa ? (
-            <MapaMultiAlertas 
+            <MapaMultiAlertas
               alertas={alertasParaMapa}
               onSeleccionarAlerta={setAlertaSeleccionada}
               altura="500px"
@@ -378,34 +529,25 @@ const AnalisisGeografico = () => {
             <div className="h-[500px] w-full rounded-xl overflow-hidden border border-gray-200 shadow-inner bg-gray-50 flex flex-col items-center justify-center">
               <Map size={48} className="text-gray-400 mb-4" />
               <p className="text-gray-500 text-sm">Mapa oculto</p>
-              <button
-                onClick={() => setMostrarMapa(true)}
-                className="mt-2 text-sm text-indigo-600 hover:text-indigo-800"
-              >
+              <button onClick={() => setMostrarMapa(true)} className="mt-2 text-sm text-indigo-600 hover:text-indigo-800">
                 Mostrar mapa
               </button>
             </div>
           )}
 
-          {/* Alerta seleccionada */}
           {alertaSeleccionada && (
             <div className="mt-4 p-4 bg-indigo-50 rounded-xl border border-indigo-200">
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-3">
                   <div className={`p-2 rounded-lg ${alertaSeleccionada.tipo === 'panico' ? 'bg-red-100' : 'bg-green-100'}`}>
-                    <IconoEntidad 
-                      entidad={alertaSeleccionada.tipo === 'panico' ? 'ALERTA_PANICO' : 'ALERTA_MEDICA'} 
-                      size={16}
-                    />
+                    <IconoEntidad entidad={alertaSeleccionada.tipo === 'panico' ? 'ALERTA_PANICO' : 'ALERTA_MEDICA'} size={16} />
                   </div>
                   <div>
                     <div className="flex items-center gap-2 mb-1">
                       <h3 className="font-semibold text-gray-800">Alerta #{alertaSeleccionada.id}</h3>
                       <BadgeTipoAlerta tipo={alertaSeleccionada.tipo} size={12} />
                     </div>
-                    <p className="text-sm text-gray-600 mb-2">
-                      {alertaSeleccionada.ciudadano?.nombre || 'Ciudadano desconocido'}
-                    </p>
+                    <p className="text-sm text-gray-600 mb-2">{alertaSeleccionada.ciudadano?.nombre || 'Ciudadano desconocido'}</p>
                     <div className="flex items-center gap-4 text-xs text-gray-500">
                       <span className="flex items-center gap-1">
                         <IconoEntidad entidad="UBICACION" size={12} />
@@ -418,18 +560,14 @@ const AnalisisGeografico = () => {
                       <span className={`px-2 py-0.5 rounded-full text-xs ${
                         alertaSeleccionada.estado === 'activa' ? 'bg-red-100 text-red-700' :
                         alertaSeleccionada.estado === 'asignada' ? 'bg-blue-100 text-blue-700' :
-                        alertaSeleccionada.estado === 'cerrada' ? 'bg-green-100 text-green-700' :
-                        'bg-gray-100 text-gray-700'
+                        alertaSeleccionada.estado === 'cerrada' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
                       }`}>
                         {alertaSeleccionada.estado.toUpperCase()}
                       </span>
                     </div>
                   </div>
                 </div>
-                <button
-                  onClick={() => setAlertaSeleccionada(null)}
-                  className="p-1 hover:bg-white rounded-lg transition-colors"
-                >
+                <button onClick={() => setAlertaSeleccionada(null)} className="p-1 hover:bg-white rounded-lg transition-colors">
                   <XCircle size={18} className="text-gray-400" />
                 </button>
               </div>
@@ -437,24 +575,146 @@ const AnalisisGeografico = () => {
           )}
         </div>
 
-        {/* Tarjetas - SOLO MOSTRAR SEGÚN ROL */}
+        {/* Tarjetas */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-3 mb-8">
           <ResumenCard label="Total" value={estadisticas.total} icon={Bell} color="indigo" />
           <ResumenCard label="Con ubicación" value={estadisticas.conUbicacion} icon={MapPin} color="green" />
-          
-          {mostrarTarjetaPanico && (
-            <ResumenCard label="Pánico" value={estadisticas.panico} icon={AlertTriangle} color="red" />
-          )}
-          
-          {mostrarTarjetaMedica && (
-            <ResumenCard label="Médica" value={estadisticas.medica} icon={Heart} color="green" />
-          )}
-          
+          {mostrarTarjetaPanico && <ResumenCard label="Pánico" value={estadisticas.panico} icon={AlertTriangle} color="red" />}
+          {mostrarTarjetaMedica && <ResumenCard label="Médica" value={estadisticas.medica} icon={Heart} color="green" />}
           <ResumenCard label="Activas" value={estadisticas.activas} icon={Activity} color="blue" />
           <ResumenCard label="En Proceso" value={estadisticas.proceso} icon={Clock} color="amber" />
           <ResumenCard label="Cerradas" value={estadisticas.cerradas} icon={CheckCircle} color="purple" />
           <ResumenCard label="Expiradas" value={estadisticas.expiradas} icon={XCircle} color="gray" />
         </div>
+
+        {/* Gráfica de Pastel - Distribución por Tipo */}
+        {estadisticas && (estadisticas.panico > 0 || estadisticas.medica > 0) && (
+          <div ref={pastelRef} className="bg-white rounded-2xl shadow-xl p-6 mb-8 border border-gray-100">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <Layers size={20} className="text-indigo-600" />
+              Distribución por Tipo de Alerta
+            </h2>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={[
+                      { name: 'Pánico', value: estadisticas.panico, color: '#EF4444' },
+                      { name: 'Médica', value: estadisticas.medica, color: '#10B981' }
+                    ]}
+                    cx="50%" cy="50%" labelLine={true}
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    outerRadius={80} dataKey="value"
+                  >
+                    <Cell fill="#EF4444" />
+                    <Cell fill="#10B981" />
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
+        {/* Gráfica de Barras - Distribución por Estado */}
+        {estadisticas && (
+          <div ref={estadosRef} className="bg-white rounded-2xl shadow-xl p-6 mb-8 border border-gray-100">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <Activity size={20} className="text-indigo-600" />
+              Distribución por Estado de Alerta
+            </h2>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={[
+                    { name: 'Activas', value: estadisticas.activas, color: '#EF4444' },
+                    { name: 'En Proceso', value: estadisticas.proceso, color: '#3B82F6' },
+                    { name: 'Cerradas', value: estadisticas.cerradas, color: '#10B981' },
+                    { name: 'Expiradas', value: estadisticas.expiradas, color: '#6B7280' }
+                  ]}
+                  margin={{ top: 10, right: 10, left: 0, bottom: 20 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                  <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#6B7280' }} />
+                  <YAxis tick={{ fontSize: 11, fill: '#6B7280' }} />
+                  <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none' }} />
+                  <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                    <Cell fill="#EF4444" />
+                    <Cell fill="#3B82F6" />
+                    <Cell fill="#10B981" />
+                    <Cell fill="#6B7280" />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
+        {/* Gráfica de Líneas - Tendencias Mensuales */}
+        {tendenciasMensuales.length > 0 && (
+          <div ref={tendenciasRef} className="bg-white rounded-2xl shadow-xl p-6 mb-8 border border-gray-100">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <TrendingUp size={20} className="text-indigo-600" />
+              Tendencias Mensuales (últimos 12 meses)
+            </h2>
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={tendenciasMensuales} margin={{ top: 10, right: 10, left: 0, bottom: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#6B7280' }} />
+                  <YAxis tick={{ fontSize: 11, fill: '#6B7280' }} />
+                  <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none' }} />
+                  <Line type="monotone" dataKey="total" name="Total Alertas" stroke="#6366F1" strokeWidth={2} dot={{ r: 4, fill: '#6366F1' }} activeDot={{ r: 6 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
+        {/* Gráfica de Barras - Alertas por Hora */}
+        {alertasPorHora.length > 0 && (
+          <div ref={horasRef} className="bg-white rounded-2xl shadow-xl p-6 mb-8 border border-gray-100">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <Clock size={20} className="text-indigo-600" />
+              Alertas por Hora del Día
+            </h2>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={alertasPorHora} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                  <XAxis dataKey="hora" tick={{ fontSize: 10, fill: '#6B7280' }} interval={2} />
+                  <YAxis tick={{ fontSize: 11, fill: '#6B7280' }} />
+                  <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none' }} />
+                  <Bar dataKey="total" name="Alertas" fill="#F59E0B" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
+        {/* Gráfica de Barras - Incidentes por Zona */}
+        {zonas.length > 0 && (
+          <div ref={zonasRef} className="bg-white rounded-2xl shadow-xl p-6 mb-8 border border-gray-100">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <BarChart3 size={20} className="text-indigo-600" />
+              Incidentes por Zona
+            </h2>
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={zonas.slice(0, 8)} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                  <XAxis dataKey="zona" tick={{ fontSize: 11, fill: '#6B7280' }} angle={-45} textAnchor="end" height={60} />
+                  <YAxis tick={{ fontSize: 11, fill: '#6B7280' }} />
+                  <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }} />
+                  <Bar dataKey="total" name="Total Alertas" fill="#6366F1" radius={[4, 4, 0, 0]} />
+                  {mostrarTarjetaPanico && <Bar dataKey="panico" name="Pánico" fill="#EF4444" radius={[4, 4, 0, 0]} />}
+                  {mostrarTarjetaMedica && !tipoAlertaPermitido && <Bar dataKey="medica" name="Médica" fill="#10B981" radius={[4, 4, 0, 0]} />}
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
 
         {/* Tabla de zonas */}
         <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
@@ -466,25 +726,17 @@ const AnalisisGeografico = () => {
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Zona</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Total</th>
-                    {mostrarTarjetaPanico && (
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Pánico</th>
-                    )}
-                    {mostrarTarjetaMedica && !tipoAlertaPermitido && (
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Médica</th>
-                    )}
-                   </tr>
+                    {mostrarTarjetaPanico && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Pánico</th>}
+                    {mostrarTarjetaMedica && !tipoAlertaPermitido && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Médica</th>}
+                  </tr>
                 </thead>
                 <tbody>
                   {zonas.map((zona, i) => (
                     <tr key={zona.zona} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                       <td className="px-6 py-4 text-sm font-medium">{zona.zona}</td>
                       <td className="px-6 py-4 text-sm">{zona.total}</td>
-                      {mostrarTarjetaPanico && (
-                        <td className="px-6 py-4 text-sm text-red-600">{zona.panico}</td>
-                      )}
-                      {mostrarTarjetaMedica && !tipoAlertaPermitido && (
-                        <td className="px-6 py-4 text-sm text-green-600">{zona.medica}</td>
-                      )}
+                      {mostrarTarjetaPanico && <td className="px-6 py-4 text-sm text-red-600">{zona.panico}</td>}
+                      {mostrarTarjetaMedica && !tipoAlertaPermitido && <td className="px-6 py-4 text-sm text-green-600">{zona.medica}</td>}
                     </tr>
                   ))}
                 </tbody>

@@ -243,7 +243,7 @@ const AlertaPanelDetail = () => {
             </button>
             <div>
               <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Detalle de Alerta</h1>
-              <p className="text-sm text-gray-500 mt-1">Información completa de la alerta #{alerta.id}</p>
+              <p className="text-sm text-gray-500 mt-1">Información completa de la alerta</p>
             </div>
           </div>
 

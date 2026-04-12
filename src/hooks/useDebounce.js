@@ -15,7 +15,7 @@ export function useDebounce(value, delay = 500, options = { leading: false, trai
   const timeoutRef = useRef(null);
   const leadingCalledRef = useRef(false);
 
-  // ✅ Función para cancelar el debounce
+  //  Función para cancelar el debounce
   const cancel = useCallback(() => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
@@ -25,7 +25,7 @@ export function useDebounce(value, delay = 500, options = { leading: false, trai
     setPendingValue(null);
   }, []);
 
-  // ✅ Función para ejecutar inmediatamente el valor pendiente
+  //  Función para ejecutar inmediatamente el valor pendiente
   const flush = useCallback(() => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
@@ -41,7 +41,7 @@ export function useDebounce(value, delay = 500, options = { leading: false, trai
     setPendingValue(null);
   }, [pendingValue, value]);
 
-  // ✅ Función para ejecutar el valor actual
+  //  Función para ejecutar el valor actual
   const executeTrailing = useCallback((val) => {
     setDebouncedValue(val);
     setPendingValue(null);
@@ -49,22 +49,22 @@ export function useDebounce(value, delay = 500, options = { leading: false, trai
   }, []);
 
   useEffect(() => {
-    // ✅ Si leading está habilitado y no se ha llamado aún
+    //  Si leading está habilitado y no se ha llamado aún
     if (options.leading && !leadingCalledRef.current) {
       leadingCalledRef.current = true;
       setDebouncedValue(value);
       setPendingValue(value);
     } else {
-      // ✅ Guardar el valor pendiente
+      //  Guardar el valor pendiente
       setPendingValue(value);
     }
 
-    // ✅ Limpiar timeout anterior
+    //  Limpiar timeout anterior
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
 
-    // ✅ Solo programar trailing si está habilitado
+    //  Solo programar trailing si está habilitado
     if (options.trailing) {
       timeoutRef.current = setTimeout(() => {
         if (pendingValue !== null || !options.leading) {
@@ -72,13 +72,13 @@ export function useDebounce(value, delay = 500, options = { leading: false, trai
         }
       }, delay);
     } else {
-      // ✅ Si no hay trailing, limpiar el timeout sin ejecutar
+      //  Si no hay trailing, limpiar el timeout sin ejecutar
       timeoutRef.current = setTimeout(() => {
         timeoutRef.current = null;
       }, delay);
     }
 
-    // ✅ Limpieza al desmontar o cuando cambian dependencias
+    //  Limpieza al desmontar o cuando cambian dependencias
     return () => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
@@ -87,7 +87,7 @@ export function useDebounce(value, delay = 500, options = { leading: false, trai
     };
   }, [value, delay, options.leading, options.trailing, executeTrailing]);
 
-  // ✅ Limpiar al desmontar
+  //  Limpiar al desmontar
   useEffect(() => {
     return cancel;
   }, [cancel]);
@@ -100,7 +100,7 @@ export function useDebounce(value, delay = 500, options = { leading: false, trai
   };
 }
 
-// ✅ Versión simplificada (compatible con la original)
+//  Versión simplificada (compatible con la original)
 export function useDebounceSimple(value, delay) {
   const [debouncedValue, setDebouncedValue] = useState(value);
   const timeoutRef = useRef(null);
@@ -124,13 +124,13 @@ export function useDebounceSimple(value, delay) {
   return debouncedValue;
 }
 
-// ✅ Versión para funciones (debounce de llamadas a función)
+//  Versión para funciones (debounce de llamadas a función)
 export function useDebouncedCallback(callback, delay = 500, options = { leading: false, trailing: true }) {
   const timeoutRef = useRef(null);
   const leadingCalledRef = useRef(false);
   const callbackRef = useRef(callback);
   
-  // ✅ Actualizar referencia del callback cuando cambia
+  //  Actualizar referencia del callback cuando cambia
   useEffect(() => {
     callbackRef.current = callback;
   }, [callback]);
@@ -155,18 +155,18 @@ export function useDebouncedCallback(callback, delay = 500, options = { leading:
   }, []);
 
   const debouncedCallback = useCallback((...args) => {
-    // ✅ Si leading está habilitado y no se ha llamado aún
+    //  Si leading está habilitado y no se ha llamado aún
     if (options.leading && !leadingCalledRef.current) {
       leadingCalledRef.current = true;
       callbackRef.current(...args);
     }
 
-    // ✅ Limpiar timeout anterior
+    //  Limpiar timeout anterior
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
 
-    // ✅ Programar trailing
+    //  Programar trailing
     if (options.trailing) {
       timeoutRef.current = setTimeout(() => {
         callbackRef.current(...args);
@@ -174,7 +174,7 @@ export function useDebouncedCallback(callback, delay = 500, options = { leading:
         timeoutRef.current = null;
       }, delay);
     } else {
-      // ✅ Si no hay trailing, solo resetear el timeout
+      //  Si no hay trailing, solo resetear el timeout
       timeoutRef.current = setTimeout(() => {
         timeoutRef.current = null;
       }, delay);
@@ -188,5 +188,5 @@ export function useDebouncedCallback(callback, delay = 500, options = { leading:
   };
 }
 
-// ✅ Exportar por defecto la versión simple para mantener compatibilidad
+//  Exportar por defecto la versión simple para mantener compatibilidad
 export default useDebounceSimple;

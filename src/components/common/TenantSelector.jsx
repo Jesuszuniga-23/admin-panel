@@ -28,7 +28,7 @@ const TenantSelector = () => {
  const cargarTenants = async () => {
     setLoading(true);
     try {
-        console.log('🔍 Fetching tenants con fetch...');
+        console.log(' Fetching tenants con fetch...');
         
         const response = await fetch('https://backend-emergencias.onrender.com/api/admin/tenants', {
             credentials: 'include',
@@ -39,7 +39,7 @@ const TenantSelector = () => {
         });
         
         const data = await response.json();
-        console.log('📦 Respuesta fetch:', data);
+        console.log(' Respuesta fetch:', data);
         
         if (data.success && data.data) {
             let filteredTenants = [...data.data];

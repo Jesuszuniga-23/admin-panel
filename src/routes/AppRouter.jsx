@@ -37,6 +37,7 @@ import LandingPage from '../pages/LandingPage';
 import SuperadminsList from '../pages/superadmin/SuperadminsList';
 import SuperadminForm from '../pages/superadmin/SuperadminForm';
 import AdminsMunicipales from '../pages/superadmin/AdminsMunicipales';
+import RegistroExitoso from '../components/landing/RegistroExitoso';
 
 
 // ✅ Logs condicionales solo en desarrollo
@@ -56,6 +57,7 @@ const AppRouter = () => {
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<Login />} />
       <Route path="/verificar-2fa" element={<Verificar2FA />} />
+      <Route path="/registro-exitoso" element={<RegistroExitoso />} />
 
       {/* ✅ Rutas admin - orden correcto: específicas primero, genéricas después */}
       <Route

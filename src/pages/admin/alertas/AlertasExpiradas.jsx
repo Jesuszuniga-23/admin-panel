@@ -479,7 +479,7 @@ const AlertasExpiradas = () => {
                 onClick={limpiarFiltros}
                 className="flex-1 px-3 sm:px-4 py-2 border border-slate-200 bg-white rounded-lg md:rounded-xl hover:bg-slate-50 hover:border-slate-300 transition-all text-xs sm:text-sm font-medium text-slate-600 whitespace-nowrap"
               >
-                Limpiar
+                Limpiar filtros
               </button>
             </div>
           </div>

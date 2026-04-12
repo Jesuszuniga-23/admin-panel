@@ -14,7 +14,7 @@ const SessionMonitor = () => {
   const [sessionActive, setSessionActive] = useState(true);
   const sessionActiveRef = useRef(sessionActive);
   
-  // ✅ Ref para debounce/throttle de actividad
+  //  Ref para debounce/throttle de actividad
   const actividadTimeoutRef = useRef(null);
   const ultimaActividadRef = useRef(Date.now());
   const abortControllerRef = useRef(null);
@@ -41,7 +41,7 @@ const SessionMonitor = () => {
         if (sessionActiveRef.current) {
           setSessionActive(false);
           setShowWarning(true);
-          // ✅ Calcular countdown en segundos
+          //  Calcular countdown en segundos
           const segundosRestantes = (estado.minutos_restantes || 0.5) * 60;
           setCountdown(Math.max(10, Math.floor(segundosRestantes)));
           
@@ -54,31 +54,31 @@ const SessionMonitor = () => {
         setShowWarning(false);
       }
     } catch (error) {
-      // ✅ Ignorar errores de cancelación
+      //  Ignorar errores de cancelación
       if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
         console.error('Error verificando sesión:', error);
       }
     }
   }, []);
 
-  // ✅ FUNCIÓN CON DEBOUNCE Y THROTTLE - Solo registra actividad cada 30 segundos
+  //  FUNCIÓN CON DEBOUNCE Y THROTTLE - Solo registra actividad cada 30 segundos
   const registrarActividad = useCallback(async () => {
     // Limpiar timeout anterior
     if (actividadTimeoutRef.current) {
       clearTimeout(actividadTimeoutRef.current);
     }
     
-    // ✅ Debounce: esperar 2 segundos después del último evento
+    //  Debounce: esperar 2 segundos después del último evento
     actividadTimeoutRef.current = setTimeout(async () => {
       // Verificar si pasó suficiente tiempo desde la última actividad registrada
       const ahora = Date.now();
       const tiempoDesdeUltima = ahora - ultimaActividadRef.current;
       
-      // ✅ Solo registrar si pasaron al menos 30 segundos desde la última vez
+      //  Solo registrar si pasaron al menos 30 segundos desde la última vez
       if (tiempoDesdeUltima >= 30000) {
         ultimaActividadRef.current = ahora;
         
-        // ✅ Cancelar petición anterior si existe
+        //  Cancelar petición anterior si existe
         if (abortControllerRef.current) {
           abortControllerRef.current.abort();
         }
@@ -90,7 +90,7 @@ const SessionMonitor = () => {
           });
           console.log('🔄 Actividad registrada');
         } catch (error) {
-          // ✅ Ignorar errores de cancelación y rate limit
+          // Ignorar errores de cancelación y rate limit
           if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
             if (error.response?.status !== 429) {
               console.error('Error registrando actividad:', error);
@@ -107,7 +107,7 @@ const SessionMonitor = () => {
     return () => clearInterval(interval);
   }, [verificarSesion]);
 
-  // ✅ Eventos de actividad del usuario con debounce
+  //  Eventos de actividad del usuario con debounce
   useEffect(() => {
     const eventos = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
     
@@ -125,14 +125,14 @@ const SessionMonitor = () => {
       eventos.forEach(evento => {
         window.removeEventListener(evento, handleActivity);
       });
-      // ✅ Limpiar timeout al desmontar
+      //  Limpiar timeout al desmontar
       if (actividadTimeoutRef.current) {
         clearTimeout(actividadTimeoutRef.current);
       }
     };
   }, [registrarActividad]);
 
-  // ✅ Limpiar abort controllers al desmontar
+  //  Limpiar abort controllers al desmontar
   useEffect(() => {
     return () => {
       if (abortControllerRef.current) {
@@ -152,7 +152,7 @@ const SessionMonitor = () => {
         setCountdown(prev => prev - 1);
       }, 1000);
     } else if (showWarning && countdown === 0) {
-      // ✅ Cerrar sesión y redirigir
+      //  Cerrar sesión y redirigir
       logout();
       navigate('/login');
     }

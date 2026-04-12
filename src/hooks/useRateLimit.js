@@ -6,7 +6,7 @@ export const useRateLimit = () => {
   const [timeLeft, setTimeLeft] = useState(null);
   const intervalRef = useRef(null);
 
-  // ✅ Función para actualizar rate limit desde localStorage
+  //  Función para actualizar rate limit desde localStorage
   const actualizarDesdeStorage = useCallback(() => {
     const nuevoRateLimit = checkRateLimit();
     setRateLimit(nuevoRateLimit);
@@ -15,7 +15,7 @@ export const useRateLimit = () => {
     }
   }, []);
 
-  // ✅ Escuchar cambios en localStorage (sincronización entre pestañas)
+  // Escuchar cambios en localStorage (sincronización entre pestañas)
   useEffect(() => {
     const handleStorageChange = (e) => {
       if (e.key === 'rate_limit_info') {
@@ -38,7 +38,7 @@ export const useRateLimit = () => {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
-  // ✅ Escuchar eventos personalizados
+  //  Escuchar eventos personalizados
   useEffect(() => {
     const handleRateLimitActivated = (event) => {
       setRateLimit(event.detail);
@@ -58,7 +58,7 @@ export const useRateLimit = () => {
     };
   }, []);
 
-  // ✅ Intervalo para actualizar tiempo restante
+  //  Intervalo para actualizar tiempo restante
   useEffect(() => {
     // Limpiar intervalo anterior
     if (intervalRef.current) {
@@ -71,16 +71,16 @@ export const useRateLimit = () => {
       return;
     }
     
-    // ✅ Calcular tiempo inicial
+    //  Calcular tiempo inicial
     const calcularTiempoRestante = () => {
       const remaining = Math.max(0, Math.ceil((rateLimit.expira - Date.now()) / 1000));
       setTimeLeft(remaining);
       
-      // ✅ Si el tiempo expiró, limpiar automáticamente
+      //  Si el tiempo expiró, limpiar automáticamente
       if (remaining <= 0) {
         setRateLimit(null);
         localStorage.removeItem('rate_limit_info');
-        // ✅ Disparar evento para notificar a otras partes de la app
+        //  Disparar evento para notificar a otras partes de la app
         window.dispatchEvent(new CustomEvent('rate-limit-cleared'));
         return true; // Indica que expiró
       }
@@ -108,7 +108,7 @@ export const useRateLimit = () => {
     };
   }, [rateLimit]);
 
-  // ✅ Formatear tiempo con mejor formato
+  //  Formatear tiempo con mejor formato
   const formatTime = useCallback((seconds) => {
     if (!seconds && seconds !== 0) return '0s';
     if (seconds <= 0) return '0s';
@@ -124,7 +124,7 @@ export const useRateLimit = () => {
     return mins > 0 ? `${horas}h ${mins}m` : `${horas}h`;
   }, []);
 
-  // ✅ Formatear tiempo para mostrar en UI
+  // Formatear tiempo para mostrar en UI
   const formatTimeForUI = useCallback((seconds) => {
     if (!seconds && seconds !== 0) return '--:--';
     if (seconds <= 0) return '00:00';
@@ -134,7 +134,7 @@ export const useRateLimit = () => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }, []);
 
-  // ✅ Calcular porcentaje de tiempo transcurrido (para barra de progreso)
+  //  Calcular porcentaje de tiempo transcurrido (para barra de progreso)
   const getProgressPercentage = useCallback(() => {
     if (!rateLimit?.retryAfter || !timeLeft) return 0;
     const total = rateLimit.retryAfter;
@@ -142,12 +142,12 @@ export const useRateLimit = () => {
     return Math.min(100, Math.max(0, (elapsed / total) * 100));
   }, [rateLimit?.retryAfter, timeLeft]);
 
-  // ✅ Función para forzar actualización (útil después de recargar página)
+  //  Función para forzar actualización (útil después de recargar página)
   const refresh = useCallback(() => {
     actualizarDesdeStorage();
   }, [actualizarDesdeStorage]);
 
-  // ✅ Función para limpiar manualmente el rate limit (para pruebas)
+  //  Función para limpiar manualmente el rate limit (para pruebas)
   const clear = useCallback(() => {
     localStorage.removeItem('rate_limit_info');
     setRateLimit(null);
@@ -169,7 +169,7 @@ export const useRateLimit = () => {
   };
 };
 
-// ✅ Versión con contador de reintentos (para componentes que necesitan reintentar automáticamente)
+//  Versión con contador de reintentos (para componentes que necesitan reintentar automáticamente)
 export const useRateLimitWithRetry = (onRetry, options = {}) => {
   const { maxRetries = 3, retryDelay = 2000 } = options;
   const rateLimit = useRateLimit();
@@ -177,7 +177,7 @@ export const useRateLimitWithRetry = (onRetry, options = {}) => {
   const [isRetrying, setIsRetrying] = useState(false);
   const retryTimeoutRef = useRef(null);
 
-  // ✅ Cancelar reintento pendiente al desmontar
+  //  Cancelar reintento pendiente al desmontar
   useEffect(() => {
     return () => {
       if (retryTimeoutRef.current) {
@@ -207,7 +207,7 @@ export const useRateLimitWithRetry = (onRetry, options = {}) => {
     }
   }, [rateLimit.isLimited, retryCount, maxRetries, retryDelay, onRetry]);
 
-  // ✅ Resetear contador cuando se limpia el rate limit
+  //  Resetear contador cuando se limpia el rate limit
   useEffect(() => {
     if (!rateLimit.isLimited) {
       setRetryCount(0);
@@ -227,7 +227,7 @@ export const useRateLimitWithRetry = (onRetry, options = {}) => {
   };
 };
 
-// ✅ Versión con barra de progreso animada (para UI)
+//  Versión con barra de progreso animada (para UI)
 export const useRateLimitProgress = () => {
   const rateLimit = useRateLimit();
   const [progress, setProgress] = useState(0);

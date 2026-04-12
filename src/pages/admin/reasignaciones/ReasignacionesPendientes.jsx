@@ -1,8 +1,9 @@
+// src/pages/admin/reasignaciones/ReasignacionesPendientes.jsx
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle, Clock, MapPin, User, Calendar,
-  ChevronLeft, RefreshCw, Truck, XCircle, CheckCircle,
+  ChevronLeft, ChevronRight, RefreshCw, Truck, XCircle, CheckCircle,
   Loader, AlertCircle, Phone, Shield, X, Bell, BellRing,
   Mail, MapPinned, Navigation, Copy, Eye, Filter, Search, Heart,
   ShieldCheck, Ambulance, Users, UserCheck, MessageSquare, Send
@@ -30,6 +31,12 @@ const ReasignacionesPendientes = () => {
   const [motivoCierre, setMotivoCierre] = useState('');
   const [ultimaActualizacion, setUltimaActualizacion] = useState(new Date());
   
+  // ✅ NUEVO: Estados de paginación
+  const [pagina, setPagina] = useState(1);
+  const [limite] = useState(10);
+  const [total, setTotal] = useState(0);
+  const [totalPaginas, setTotalPaginas] = useState(0);
+  
   const abortControllerRef = useRef(null);
   const unidadesAbortControllerRef = useRef(null);
   const intervalRef = useRef(null);
@@ -48,10 +55,9 @@ const ReasignacionesPendientes = () => {
     tipo: null
   });
 
-  // ✅ CORRECCIÓN #1: Filtrar alertas cuando cambia filtroTipo
+  // ✅ Filtrar alertas cuando cambia filtroTipo
   useEffect(() => {
     if (tipoAlertaPermitido) {
-      // Si hay filtro de seguridad, solo mostrar ese tipo
       setAlertasFiltradas(alertas.filter(a => a.tipo === tipoAlertaPermitido));
     } else if (filtroTipo === 'todos') {
       setAlertasFiltradas(alertas);
@@ -70,20 +76,26 @@ const ReasignacionesPendientes = () => {
     
     if (!silencioso) setCargando(true);
     try {
-      const params = { signal: abortControllerRef.current.signal };
+      const params = { 
+        signal: abortControllerRef.current.signal,
+        pagina,
+        limite
+      };
       
       // ✅ APLICAR FILTRO DE SEGURIDAD PRIMERO
       if (tipoAlertaPermitido) {
         params.tipo = tipoAlertaPermitido;
-      } 
-      // ✅ SOLO SI NO HAY FILTRO DE SEGURIDAD, aplicar filtro del usuario
-      else if (filtroTipo !== 'todos') {
+      } else if (filtroTipo !== 'todos') {
         params.tipo = filtroTipo;
       }
       
       const response = await reasignacionService.obtenerPendientes(params);
+      
+      // ✅ NUEVO: Usar datos paginados
       const nuevosAlertas = response.data || [];
       setAlertas(nuevosAlertas);
+      setTotal(response.total || 0);
+      setTotalPaginas(response.totalPaginas || 1);
       setUltimaActualizacion(new Date());
 
       if (mostrarModal && nuevosAlertas.length !== alertas.length) {
@@ -100,7 +112,7 @@ const ReasignacionesPendientes = () => {
     } finally {
       if (!silencioso) setCargando(false);
     }
-  }, [tipoAlertaPermitido, filtroTipo, mostrarModal, alertas.length]);
+  }, [tipoAlertaPermitido, filtroTipo, mostrarModal, alertas.length, pagina, limite]);
 
   const handleVerUnidades = useCallback(async (alerta) => {
     if (!puedeReasignar) {
@@ -131,6 +143,11 @@ const ReasignacionesPendientes = () => {
       }
     }
   }, [puedeReasignar]);
+
+  // ✅ Reiniciar a página 1 cuando cambia el filtro
+  useEffect(() => {
+    setPagina(1);
+  }, [filtroTipo]);
 
   useEffect(() => {
     cargarPendientes();
@@ -244,10 +261,11 @@ const ReasignacionesPendientes = () => {
     navigate(`/admin/alertas/${alertaId}`);
   };
 
-  const getTipoGradient = (tipo) => {
-    return tipo === 'panico'
-      ? 'from-red-600 to-rose-700'
-      : 'from-green-600 to-emerald-700';
+  const cambiarPagina = (nuevaPagina) => {
+    if (nuevaPagina >= 1 && nuevaPagina <= totalPaginas) {
+      setPagina(nuevaPagina);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   const formatearFechaCorta = (fecha) => {
@@ -258,6 +276,9 @@ const ReasignacionesPendientes = () => {
       year: 'numeric'
     });
   };
+
+  const inicioRegistro = total > 0 ? (pagina - 1) * limite + 1 : 0;
+  const finRegistro = Math.min(pagina * limite, total);
 
   if (cargando && alertas.length === 0) {
     return (
@@ -361,7 +382,7 @@ const ReasignacionesPendientes = () => {
             </button>
           </div>
           <div className="mt-3 text-xs text-gray-500">
-            {alertasFiltradas.length} alertas encontradas
+            {total} alertas encontradas
           </div>
         </div>
 
@@ -378,101 +399,135 @@ const ReasignacionesPendientes = () => {
             </p>
           </div>
         ) : (
-          <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px]">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">TIPO</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">CIUDADANO</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">TIEMPO ESPERA</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">UBICACIÓN</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">FECHA</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">ACCIONES</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {alertasFiltradas.map((alerta) => (
-                    <tr 
-                      key={alerta.id}
-                      onClick={() => handleRowClick(alerta.id)}
-                      className="hover:bg-gray-50 cursor-pointer transition-colors"
-                    >
-                      <td className="px-4 py-3">
-                        <BadgeTipoAlerta tipo={alerta.tipo} size={12} />
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-col">
-                          <span className="text-sm font-medium text-gray-800">
-                            {alerta.ciudadano?.nombre || 'Desconocido'}
-                          </span>
-                          {alerta.ciudadano?.telefono && (
-                            <span className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
-                              <Phone size={10} />
-                              {alerta.ciudadano.telefono}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5">
-                          <Clock size={14} className="text-amber-500" />
-                          <span className="text-sm font-semibold text-amber-600">
-                            {alerta.minutos_espera} min
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        {alerta.lat && alerta.lng ? (
-                          <BotonMapa
-                            onClick={(e) => abrirMapaModal(e, alerta)}
-                            texto="Ver mapa"
-                            size={14}
-                          />
-                        ) : (
-                          <span className="text-xs text-gray-400">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-500">
-                        {formatearFechaCorta(alerta.fecha_creacion)}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          {puedeReasignar && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleVerUnidades(alerta);
-                              }}
-                              className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all text-xs font-medium shadow-md"
-                              title="Reasignar alerta"
-                            >
-                              <Truck size={14} />
-                              <span>Reasignar</span>
-                            </button>
-                          )}
-                          {puedeReasignar && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setAlertaSeleccionada(alerta);
-                                setMostrarModalCierre(true);
-                              }}
-                              className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-red-200 text-red-600 rounded-lg hover:bg-red-50 hover:border-red-300 transition-all text-xs font-medium"
-                              title="Cerrar manualmente"
-                            >
-                              <XCircle size={14} />
-                              <span>Cerrar</span>
-                            </button>
-                          )}
-                        </div>
-                      </td>
+          <>
+            <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[900px]">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">TIPO</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">CIUDADANO</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">TIEMPO ESPERA</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">UBICACIÓN</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">FECHA</th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">ACCIONES</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {alertasFiltradas.map((alerta) => (
+                      <tr 
+                        key={alerta.id}
+                        onClick={() => handleRowClick(alerta.id)}
+                        className="hover:bg-gray-50 cursor-pointer transition-colors"
+                      >
+                        <td className="px-4 py-3">
+                          <BadgeTipoAlerta tipo={alerta.tipo} size={12} />
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium text-gray-800">
+                              {alerta.ciudadano?.nombre || 'Desconocido'}
+                            </span>
+                            {alerta.ciudadano?.telefono && (
+                              <span className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                                <Phone size={10} />
+                                {alerta.ciudadano.telefono}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1.5">
+                            <Clock size={14} className="text-amber-500" />
+                            <span className="text-sm font-semibold text-amber-600">
+                              {alerta.minutos_espera} min
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          {alerta.lat && alerta.lng ? (
+                            <BotonMapa
+                              onClick={(e) => abrirMapaModal(e, alerta)}
+                              texto="Ver mapa"
+                              size={14}
+                            />
+                          ) : (
+                            <span className="text-xs text-gray-400">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-500">
+                          {formatearFechaCorta(alerta.fecha_creacion)}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            {puedeReasignar && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleVerUnidades(alerta);
+                                }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all text-xs font-medium shadow-md"
+                                title="Reasignar alerta"
+                              >
+                                <Truck size={14} />
+                                <span>Reasignar</span>
+                              </button>
+                            )}
+                            {puedeReasignar && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setAlertaSeleccionada(alerta);
+                                  setMostrarModalCierre(true);
+                                }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-red-200 text-red-600 rounded-lg hover:bg-red-50 hover:border-red-300 transition-all text-xs font-medium"
+                                title="Cerrar manualmente"
+                              >
+                                <XCircle size={14} />
+                                <span>Cerrar</span>
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+
+            {/* ✅ NUEVO: PAGINADOR */}
+            <div className="bg-white rounded-xl shadow-lg p-4 mt-4 border border-gray-100">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                <p className="text-sm text-gray-500">
+                  Mostrando <span className="font-medium">{inicioRegistro}</span> a{' '}
+                  <span className="font-medium">{finRegistro}</span> de{' '}
+                  <span className="font-medium">{total}</span> alertas
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => cambiarPagina(pagina - 1)}
+                    disabled={pagina === 1}
+                    className="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                  >
+                    <ChevronLeft size={14} />
+                    Anterior
+                  </button>
+                  <span className="px-3 py-1.5 text-sm text-gray-600 bg-gray-50 rounded-lg">
+                    Página {pagina} de {totalPaginas}
+                  </span>
+                  <button
+                    onClick={() => cambiarPagina(pagina + 1)}
+                    disabled={pagina === totalPaginas}
+                    className="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                  >
+                    Siguiente
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </>
         )}
         
         {/* Modal de Reasignación MEJORADO */}

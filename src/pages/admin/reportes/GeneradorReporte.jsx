@@ -339,14 +339,14 @@ const GeneradorReporte = () => {
       stats.disponibles = datosFiltrados.filter(d => d.disponible).length;
       stats.ocupados = datosFiltrados.filter(d => !d.disponible && d.activo).length;
       stats.porRol = {
-        policia: datosFiltrados.filter(d => d.rol === 'policia').length,
-        paramedico: datosFiltrados.filter(d => d.rol === 'paramedico').length,
         admin: datosFiltrados.filter(d => d.rol === 'admin').length,
-        superadmin: datosFiltrados.filter(d => d.rol === 'superadmin').length,
-        operador_tecnico: datosFiltrados.filter(d => d.rol === 'operador_tecnico').length,
         operador_policial: datosFiltrados.filter(d => d.rol === 'operador_policial').length,
         operador_medico: datosFiltrados.filter(d => d.rol === 'operador_medico').length,
-        operador_general: datosFiltrados.filter(d => d.rol === 'operador_general').length
+        operador_tecnico: datosFiltrados.filter(d => d.rol === 'operador_tecnico').length,
+        operador_general: datosFiltrados.filter(d => d.rol === 'operador_general').length,
+        policia: datosFiltrados.filter(d => d.rol === 'policia').length,
+        paramedico: datosFiltrados.filter(d => d.rol === 'paramedico').length,
+        superadmin: datosFiltrados.filter(d => d.rol === 'superadmin').length
       };
     } else if (tipo === 'unidades') {
       stats.total = datosFiltrados.length;
@@ -588,7 +588,7 @@ const GeneradorReporte = () => {
                 (tipo === 'alertas' && tipoAlertaPermitido)}
               className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white disabled:bg-gray-100"
             >
-              <option value="todos">Todos</option>
+              <option value="todos">Todos los roles</option>
               {info.filtrosDisponibles[0]?.opciones.map(op => (
                 <option key={op} value={op}>{op}</option>
               ))}

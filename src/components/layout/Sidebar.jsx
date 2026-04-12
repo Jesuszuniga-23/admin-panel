@@ -172,7 +172,7 @@ const Sidebar = () => {
       navigate('/', { replace: true });
     } catch (error) {
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
-        console.log('🛑 Logout cancelado');
+        console.log(' Logout cancelado');
         return;
       }
       console.error("Error al cerrar sesión:", error);
@@ -182,7 +182,7 @@ const Sidebar = () => {
   }, [logout, navigate]);
 
   const handleNavigation = useCallback((path) => {
-    // ✅ SIEMPRE navegar en rutas de superadmin (sin confirmación)
+    //  SIEMPRE navegar en rutas de superadmin (sin confirmación)
     if (path.startsWith('/superadmin')) {
       setHasUnsavedChanges(false);
       setIsPersonalFormActive(false);

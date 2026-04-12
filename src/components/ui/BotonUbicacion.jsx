@@ -18,10 +18,10 @@ const BotonUbicacion = ({
   const [error, setError] = useState('');
   const abortControllerRef = useRef(null);
 
-  // ✅ Validar coordenadas
+  //  Validar coordenadas
   const coordenadasValidas = lat && lng && !isNaN(parseFloat(lat)) && !isNaN(parseFloat(lng));
   
-  // ✅ Limpiar estado cuando cambian las coordenadas
+  // Limpiar estado cuando cambian las coordenadas
   useEffect(() => {
     if (!coordenadasValidas) return;
     
@@ -30,7 +30,7 @@ const BotonUbicacion = ({
     setMostrarMapa(mostrarMapaPorDefecto);
   }, [lat, lng, coordenadasValidas, mostrarMapaPorDefecto]);
 
-  // ✅ Función para obtener dirección con AbortController
+  // Función para obtener dirección con AbortController
   const obtenerDireccion = useCallback(async () => {
     if (!coordenadasValidas) return;
     
@@ -62,7 +62,7 @@ const BotonUbicacion = ({
       const data = await response.json();
       setDireccion(data.display_name || 'Dirección no disponible');
     } catch (err) {
-      // ✅ Ignorar errores de cancelación
+      //  Ignorar errores de cancelación
       if (err.name !== 'AbortError' && err.code !== 'ERR_CANCELED') {
         console.error('Error obteniendo dirección:', err);
         setError('No se pudo obtener la dirección');
@@ -73,13 +73,13 @@ const BotonUbicacion = ({
     }
   }, [lat, lng, coordenadasValidas]);
 
-  // ✅ Manejar clic en botón
+  //  Manejar clic en botón
   const handleVerUbicacion = useCallback(async () => {
     setMostrarMapa(true);
     await obtenerDireccion();
   }, [obtenerDireccion]);
 
-  // ✅ Cerrar mapa
+  // Cerrar mapa
   const handleCerrarMapa = useCallback(() => {
     setMostrarMapa(false);
     if (onMapClose) {
@@ -87,12 +87,12 @@ const BotonUbicacion = ({
     }
   }, [onMapClose]);
 
-  // ✅ Reintentar obtener dirección
+  //  Reintentar obtener dirección
   const handleReintentar = useCallback(() => {
     obtenerDireccion();
   }, [obtenerDireccion]);
 
-  // ✅ Limpiar al desmontar
+  //  Limpiar al desmontar
   useEffect(() => {
     return () => {
       if (abortControllerRef.current) {
@@ -101,7 +101,7 @@ const BotonUbicacion = ({
     };
   }, []);
 
-  // ✅ Si las coordenadas no son válidas
+  //  Si las coordenadas no son válidas
   if (!coordenadasValidas) {
     return (
       <div className="bg-gray-100 rounded-lg p-4 text-center text-gray-500 border border-gray-200">

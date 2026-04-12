@@ -100,20 +100,16 @@ const RegisterForm = ({ selectedPlan, onBack }) => {
                 const { tenant_id, admin_email, plan_asignado } = response.data;
                 localStorage.setItem('tenant_id', tenant_id);
 
-                toast.success(
-                    `✅ ¡Registro exitoso! Plan ${plan_asignado || 'asignado'}`,
-                    { duration: 8000 }
-                );
-
-                navigate('/login', {
-                    state: {
-                        message: 'Registro completado. Inicia sesión con tu cuenta de Google.',
-                        admin_email: admin_email,
-                        tenant_id: tenant_id
-                    }
-                });
+                navigate('/registro-exitoso', {
+                state: {
+                    admin_email: admin_email,
+                    tenant_id: tenant_id,
+                    municipio_nombre: formData.municipio_nombre,
+                    plan_nombre: selectedPlan.nombre
+                }
+            });
             } else {
-                // ✅ MENSAJE CLARO DESDE EL BACKEND
+                // mensaje backend
                 const errorMsg = response.error || 'Error al enviar solicitud';
                 if (errorMsg.includes('ya está registrado')) {
                     toast.error('Este municipio ya está registrado en el sistema.');
@@ -126,7 +122,7 @@ const RegisterForm = ({ selectedPlan, onBack }) => {
         } catch (error) {
             console.error('Error:', error);
 
-            // ✅ EXTRAER MENSAJE DEL ERROR
+            //  EXTRAER MENSAJE DEL ERROR
             const errorData = error?.response?.data || error;
             const errorMsg = errorData?.error || errorData?.message || 'Error al procesar el registro';
 

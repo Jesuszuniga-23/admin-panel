@@ -3,22 +3,22 @@ import { useEffect, useRef, useCallback } from 'react';
 import axiosInstance from '../../services/api/axiosConfig';
 
 const SecurityGuard = () => {
-  // ✅ REF para controlar reportes
+  // REF para controlar reportes
   const reportQueueRef = useRef([]);
   const reportTimeoutRef = useRef(null);
   const abortControllerRef = useRef(null);
   
-  // ✅ Límites de reportes (evitar spam)
+  // Límites de reportes (evitar spam)
   const REPORT_LIMIT = {
     MAX_REPORTS_PER_MINUTE: 10,
     BATCH_SIZE: 5,
     BATCH_DELAY: 5000 // 5 segundos entre lotes
   };
   
-  // ✅ Contador de reportes recientes
+  // Contador de reportes recientes
   const recentReportsRef = useRef([]);
   
-  // ✅ Función para limpiar reportes antiguos
+  // Función para limpiar reportes antiguos
   const limpiarReportesAntiguos = useCallback(() => {
     const ahora = Date.now();
     const unMinutoAtras = ahora - 60000;
@@ -27,24 +27,24 @@ const SecurityGuard = () => {
     );
   }, []);
   
-  // ✅ Verificar si se puede reportar
+  // Verificar si se puede reportar
   const puedeReportar = useCallback(() => {
     limpiarReportesAntiguos();
     return recentReportsRef.current.length < REPORT_LIMIT.MAX_REPORTS_PER_MINUTE;
   }, [limpiarReportesAntiguos]);
   
-  // ✅ Enviar lote de reportes - CORREGIDO (deshabilitado)
+  // Enviar lote de reportes - CORREGIDO (deshabilitado)
   const enviarLote = useCallback(async () => {
     if (reportQueueRef.current.length === 0) return;
     
-    // ✅ DESHABILITAR ENVÍO DE REPORTES (el endpoint no existe en backend)
-    console.log(`📊 [DEBUG] Reportes en cola (no enviados): ${reportQueueRef.current.length}`);
+    // DESHABILITAR ENVÍO DE REPORTES (el endpoint no existe en backend)
+    console.log(` [DEBUG] Reportes en cola (no enviados): ${reportQueueRef.current.length}`);
     
     // Limpiar la cola sin enviar
     reportQueueRef.current = [];
     return;
     
-    // ❌ CÓDIGO ORIGINAL COMENTADO (causaba el error 404)
+    //  CÓDIGO ORIGINAL COMENTADO (causaba el error 404)
     // if (abortControllerRef.current) {
     //   abortControllerRef.current.abort();
     // }
@@ -60,7 +60,7 @@ const SecurityGuard = () => {
     //   }, {
     //     signal: abortControllerRef.current.signal
     //   });
-    //   console.log(`📊 ${lote.length} reportes enviados al servidor`);
+    //   console.log(` ${lote.length} reportes enviados al servidor`);
     // } catch (error) {
     //   if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
     //     console.debug('Error enviando lote de reportes:', error);
@@ -72,7 +72,7 @@ const SecurityGuard = () => {
     // }
   }, []);
   
-  // ✅ Programar envío de lote
+  //  Programar envío de lote
   const scheduleEnvioLote = useCallback(() => {
     if (reportTimeoutRef.current) {
       clearTimeout(reportTimeoutRef.current);
@@ -85,10 +85,10 @@ const SecurityGuard = () => {
     }, REPORT_LIMIT.BATCH_DELAY);
   }, [enviarLote]);
   
-  // ✅ Reportar intento (con debounce y batching)
+  //  Reportar intento (con debounce y batching)
   const reportarIntento = useCallback(async (tipo, detalles = {}) => {
     if (!puedeReportar()) {
-      console.debug(`⏱️ Reporte limitado: ${tipo}`);
+      console.debug(` Reporte limitado: ${tipo}`);
       return;
     }
     
@@ -105,7 +105,7 @@ const SecurityGuard = () => {
     scheduleEnvioLote();
   }, [puedeReportar, scheduleEnvioLote]);
   
-  // ✅ Limpiar al desmontar
+  //  Limpiar al desmontar
   useEffect(() => {
     return () => {
       if (reportTimeoutRef.current) {
@@ -119,7 +119,7 @@ const SecurityGuard = () => {
   
   useEffect(() => {
     if (!window.isSecureContext) {
-      console.warn('⚠️ Contexto no seguro. Algunas protecciones pueden no funcionar.');
+      console.warn(' Contexto no seguro. Algunas protecciones pueden no funcionar.');
     }
     
     // 1. BLOQUEAR BOTÓN DERECHO
@@ -192,13 +192,13 @@ const SecurityGuard = () => {
         return false;
       }
       
-      // 🔓 F12 DESBLOQUEADO PARA DEPURACIÓN
+      //  F12 DESBLOQUEADO PARA DEPURACIÓN
       if (e.key === 'F12') {
         e.preventDefault();
         return false;
       }
       
-      // 🔓 Ctrl+Shift+I DESBLOQUEADO PARA DEPURACIÓN
+      //  Ctrl+Shift+I DESBLOQUEADO PARA DEPURACIÓN
       if ((e.ctrlKey && e.shiftKey && e.key === 'I') ||
           (e.metaKey && e.shiftKey && e.key === 'I')) {
         e.preventDefault();

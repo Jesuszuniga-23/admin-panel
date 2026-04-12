@@ -5,13 +5,13 @@ import autoTable from 'jspdf-autotable';
 import { saveAs } from 'file-saver';
 
 // =====================================================
-// FUNCIONES DE UTILIDAD (mantener igual)
+// FUNCIONES DE UTILIDAD
 // =====================================================
 
 const corregirTexto = (texto) => {
   if (!texto) return '';
   if (typeof texto !== 'string') return texto.toString();
-  
+
   const correcciones = [
     { de: 'Ã¡', para: 'á' }, { de: 'Ã©', para: 'é' }, { de: 'Ã­', para: 'í' },
     { de: 'Ã³', para: 'ó' }, { de: 'Ãº', para: 'ú' }, { de: 'Ã±', para: 'ñ' },
@@ -24,12 +24,12 @@ const corregirTexto = (texto) => {
     { de: 'L¢pez', para: 'López' }, { de: 'Jes£s', para: 'Jesús' },
     { de: 'Param‚dico', para: 'Paramédico' }
   ];
-  
+
   let textoCorregido = texto;
   correcciones.forEach(({ de, para }) => {
     textoCorregido = textoCorregido.split(de).join(para);
   });
-  
+
   return textoCorregido;
 };
 
@@ -54,14 +54,14 @@ const formatearFechaLarga = (fecha) => {
     if (isNaN(f.getTime())) return '—';
     const dias = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
     const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-    
+
     const diaSemana = dias[f.getDay()];
     const dia = f.getDate();
     const mes = meses[f.getMonth()];
     const año = f.getFullYear();
     const hora = f.getHours().toString().padStart(2, '0');
     const minuto = f.getMinutes().toString().padStart(2, '0');
-    
+
     return `${diaSemana}, ${dia} de ${mes} de ${año} a las ${hora}:${minuto}`;
   } catch (e) {
     return '—';
@@ -72,7 +72,7 @@ const formatearTelefono = (telefono) => {
   if (!telefono) return '—';
   const soloNumeros = telefono.replace(/\D/g, '');
   if (soloNumeros.length === 10) {
-    return `${soloNumeros.slice(0,3)} ${soloNumeros.slice(3,6)} ${soloNumeros.slice(6)}`;
+    return `${soloNumeros.slice(0, 3)} ${soloNumeros.slice(3, 6)} ${soloNumeros.slice(6)}`;
   }
   return telefono;
 };
@@ -98,13 +98,13 @@ const calcularZona = (lat, lng) => {
 
 const obtenerTextoFiltros = (filtros) => {
   const filtrosAplicados = [];
-  
+
   const formatearFechaLocal = (fechaStr) => {
     if (!fechaStr) return '';
     const [year, month, day] = fechaStr.split('-');
     return `${day}/${month}/${year}`;
   };
-  
+
   if (filtros.fechaInicio && filtros.fechaFin) {
     const desde = formatearFechaLocal(filtros.fechaInicio);
     const hasta = formatearFechaLocal(filtros.fechaFin);
@@ -114,23 +114,23 @@ const obtenerTextoFiltros = (filtros) => {
   } else if (filtros.fechaFin) {
     filtrosAplicados.push(`Hasta: ${formatearFechaLocal(filtros.fechaFin)}`);
   }
-  
+
   if (filtros.tipo && filtros.tipo !== 'todos') {
     filtrosAplicados.push(`Tipo: ${filtros.tipo}`);
   }
-  
+
   if (filtros.estado && filtros.estado !== 'todos') {
     filtrosAplicados.push(`Estado: ${filtros.estado}`);
   }
-  
+
   if (filtros.zona && filtros.zona !== 'todas') {
     filtrosAplicados.push(`Zona: ${filtros.zona}`);
   }
-  
+
   if (filtros.busqueda) {
     filtrosAplicados.push(`Búsqueda: ${filtros.busqueda}`);
   }
-  
+
   return filtrosAplicados;
 };
 
@@ -147,42 +147,41 @@ const dividirEnLotes = (datos, tamañoLote = 20) => {
 // =====================================================
 
 class ReportesService {
-  
+
   // =====================================================
-  // GENERAR EXCEL PROFESIONAL (CORREGIDO)
+  // GENERAR EXCEL PROFESIONAL
   // =====================================================
   async generarExcelPersonalizado(datos, tipo, filtros, usuario, options = {}) {
     try {
-      console.log(`📊 Generando Excel para ${tipo} con ${datos.length} registros`);
-      
+      console.log(` Generando Excel para ${tipo} con ${datos.length} registros`);
+
       if (options.signal?.aborted) {
         throw new Error('AbortError');
       }
-      
+
       if (!datos || datos.length === 0) {
-        console.warn('⚠️ No hay datos para exportar');
+        console.warn(' No hay datos para exportar');
         return false;
       }
-      
+
       const workbook = new ExcelJS.Workbook();
       const COLOR_PRIMARIO = '1E3A8A';
-      
+
       const MAX_REGISTROS_EXCEL = 10000;
       const datosProcesar = datos.slice(0, MAX_REGISTROS_EXCEL);
-      
+
       if (datos.length > MAX_REGISTROS_EXCEL) {
-        console.warn(`⚠️ Demasiados registros (${datos.length}). Solo se exportarán los primeros ${MAX_REGISTROS_EXCEL}`);
+        console.warn(` Demasiados registros (${datos.length}). Solo se exportarán los primeros ${MAX_REGISTROS_EXCEL}`);
       }
-      
+
       // =====================================================
-      // HOJA 1: DATOS PRINCIPALES (CORREGIDO)
+      // HOJA 1: DATOS PRINCIPALES
       // =====================================================
       const datosSheet = workbook.addWorksheet('DATOS');
-      
-      // Definir columnas según el tipo de reporte
+
       let columnas = [];
       let datosParaExcel = [];
-      
+
       if (tipo === 'personal') {
         columnas = [
           { header: 'ID', key: 'id', width: 10 },
@@ -195,22 +194,22 @@ class ReportesService {
           { header: 'DISPONIBLE', key: 'disponible', width: 12 },
           { header: 'FECHA REGISTRO', key: 'creado_en', width: 15 }
         ];
-        
+
         datosParaExcel = datosProcesar.map(item => ({
           id: item.id,
           nombre: corregirTexto(item.nombre || '—'),
           email: item.email || '—',
           rol: item.rol === 'policia' ? 'Policía' :
-                item.rol === 'paramedico' ? 'Paramédico' :
-                 item.rol === 'admin' ? 'Admin' :
-         item.rol === 'superadmin' ? 'Superadmin' : item.rol,
+            item.rol === 'paramedico' ? 'Paramédico' :
+              item.rol === 'admin' ? 'Admin' :
+                item.rol === 'superadmin' ? 'Superadmin' : item.rol,
           placa: item.placa || '—',
           telefono: formatearTelefono(item.telefono),
           activo: item.activo ? 'ACTIVO' : 'INACTIVO',
           disponible: item.disponible ? 'DISPONIBLE' : 'OCUPADO',
           creado_en: formatearFecha(item.creado_en)
         }));
-      } 
+      }
       else if (tipo === 'unidades') {
         columnas = [
           { header: 'ID', key: 'id', width: 10 },
@@ -222,13 +221,13 @@ class ReportesService {
           { header: 'ZONA', key: 'zona', width: 15 },
           { header: 'FECHA REGISTRO', key: 'creado_en', width: 15 }
         ];
-        
+
         datosParaExcel = datosProcesar.map(item => ({
           id: item.id,
           codigo: item.codigo || '—',
           tipo: item.tipo === 'patrulla' ? 'Patrulla' : 'Ambulancia',
           estado: item.estado === 'disponible' ? 'DISPONIBLE' :
-                   item.estado === 'ocupada' ? 'OCUPADA' : 'INACTIVA',
+            item.estado === 'ocupada' ? 'OCUPADA' : 'INACTIVA',
           activa: item.activa ? 'SÍ' : 'NO',
           personal: item.personal_asignado?.length || 0,
           zona: calcularZona(item.lat, item.lng),
@@ -245,7 +244,7 @@ class ReportesService {
           { header: 'ZONA', key: 'zona', width: 15 },
           { header: 'FECHA CREACIÓN', key: 'fecha_creacion', width: 15 }
         ];
-        
+
         datosParaExcel = datosProcesar.map(item => ({
           id: item.id,
           tipo: item.tipo === 'panico' ? 'PÁNICO' : 'MÉDICA',
@@ -256,15 +255,10 @@ class ReportesService {
           fecha_creacion: formatearFecha(item.fecha_creacion)
         }));
       }
-      
-      // Agregar columnas a la hoja
+
       datosSheet.columns = columnas;
-      
-      // Agregar datos
-      datosParaExcel.forEach(item => {
-        datosSheet.addRow(item);
-      });
-      
+      datosParaExcel.forEach(item => datosSheet.addRow(item));
+
       // Estilos para encabezados
       const headerRow = datosSheet.getRow(1);
       headerRow.height = 20;
@@ -274,7 +268,7 @@ class ReportesService {
         cell.alignment = { vertical: 'middle', horizontal: 'center' };
         cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
       });
-      
+
       // Estilos para datos
       datosSheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
         if (rowNumber === 1) return;
@@ -292,13 +286,13 @@ class ReportesService {
           }
         });
       });
-      
+
       // =====================================================
       // HOJA 2: INFORMACIÓN DEL REPORTE
       // =====================================================
       const infoSheet = workbook.addWorksheet('INFORMACIÓN');
       infoSheet.columns = [{ header: 'CAMPO', key: 'campo', width: 25 }, { header: 'VALOR', key: 'valor', width: 45 }];
-      
+
       infoSheet.addRow({ campo: 'FECHA DE GENERACIÓN', valor: formatearFechaLarga(new Date()) });
       infoSheet.addRow({ campo: 'TIPO DE REPORTE', valor: tipo.charAt(0).toUpperCase() + tipo.slice(1) });
       infoSheet.addRow({ campo: 'TOTAL REGISTROS', valor: datos.length });
@@ -309,14 +303,14 @@ class ReportesService {
       infoSheet.addRow({ campo: 'EMAIL', valor: usuario?.email || '—' });
       infoSheet.addRow({ campo: 'ROL', valor: usuario?.rol || '—' });
       infoSheet.addRow({ campo: '', valor: '' });
-      
+
       infoSheet.addRow({ campo: 'FILTROS APLICADOS', valor: '' });
       infoSheet.getRow(infoSheet.lastRow.number).eachCell((cell) => {
         cell.font = { bold: true, size: 12, color: { argb: COLOR_PRIMARIO } };
       });
-      
+
       const filtrosAplicados = obtenerTextoFiltros(filtros);
-      
+
       if (filtrosAplicados.length > 0) {
         filtrosAplicados.forEach(filtro => {
           const [campo, ...valorParts] = filtro.split(': ');
@@ -327,8 +321,7 @@ class ReportesService {
         infoSheet.addRow({ campo: 'Sin filtros aplicados:', valor: 'Todos los registros' });
         infoSheet.getRow(infoSheet.lastRow.number).getCell(2).font = { italic: true, color: { argb: '6B7280' } };
       }
-      
-      // Estilos para info sheet
+
       const infoHeaderRow = infoSheet.getRow(1);
       infoHeaderRow.height = 22;
       infoHeaderRow.eachCell((cell) => {
@@ -336,67 +329,146 @@ class ReportesService {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '2563EB' } };
         cell.alignment = { vertical: 'middle', horizontal: 'center' };
       });
-      
+
+      // =====================================================
+      // HOJA 3: ESTADÍSTICAS (TARJETAS)
+      // =====================================================
+      if (options.estadisticas) {
+        const statsSheet = workbook.addWorksheet('ESTADÍSTICAS');
+        const stats = options.estadisticas;
+
+        statsSheet.columns = [
+          { header: 'MÉTRICA', key: 'metrica', width: 25 },
+          { header: 'VALOR', key: 'valor', width: 15 }
+        ];
+
+        if (tipo === 'personal') {
+          statsSheet.addRow({ metrica: 'Total Personal', valor: stats.total || 0 });
+          statsSheet.addRow({ metrica: 'Activos', valor: stats.activos || 0 });
+          statsSheet.addRow({ metrica: 'Inactivos', valor: stats.inactivos || 0 });
+          statsSheet.addRow({ metrica: 'Disponibles', valor: stats.disponibles || 0 });
+          statsSheet.addRow({ metrica: 'Ocupados', valor: stats.ocupados || 0 });
+          statsSheet.addRow({ metrica: '', valor: '' });
+          statsSheet.addRow({ metrica: 'POR ROL', valor: '' });
+          if (stats.porRol) {
+            Object.entries(stats.porRol).forEach(([rol, cantidad]) => {
+              if (cantidad > 0) {
+                const nombreRol = {
+                  admin: 'Administradores',
+                  operador_policial: 'Operadores Policiales',
+                  operador_medico: 'Operadores Médicos',
+                  operador_tecnico: 'Operadores Técnicos',
+                  operador_general: 'Operadores Generales',
+                  policia: 'Policías',
+                  paramedico: 'Paramédicos',
+                  superadmin: 'Super Administradores'
+                }[rol] || rol;
+                statsSheet.addRow({ metrica: `  ${nombreRol}`, valor: cantidad });
+              }
+            });
+          }
+        } else if (tipo === 'unidades') {
+          statsSheet.addRow({ metrica: 'Total Unidades', valor: stats.total || 0 });
+          statsSheet.addRow({ metrica: 'Activas', valor: stats.activas || 0 });
+          statsSheet.addRow({ metrica: 'Inactivas', valor: stats.inactivas || 0 });
+          statsSheet.addRow({ metrica: 'Disponibles', valor: stats.disponibles || 0 });
+          statsSheet.addRow({ metrica: 'Ocupadas', valor: stats.ocupadas || 0 });
+          statsSheet.addRow({ metrica: '', valor: '' });
+          statsSheet.addRow({ metrica: 'POR TIPO', valor: '' });
+          if (stats.porTipo) {
+            statsSheet.addRow({ metrica: '  Patrullas', valor: stats.porTipo.patrulla || 0 });
+            statsSheet.addRow({ metrica: '  Ambulancias', valor: stats.porTipo.ambulancia || 0 });
+          }
+        } else if (tipo === 'alertas') {
+          statsSheet.addRow({ metrica: 'Total Alertas', valor: stats.total || 0 });
+          statsSheet.addRow({ metrica: 'Activas', valor: stats.activas || 0 });
+          statsSheet.addRow({ metrica: 'En Proceso', valor: stats.enProceso || 0 });
+          statsSheet.addRow({ metrica: 'Cerradas', valor: stats.cerradas || 0 });
+          statsSheet.addRow({ metrica: 'Expiradas', valor: stats.expiradas || 0 });
+          statsSheet.addRow({ metrica: 'Tiempo Promedio', valor: `${stats.tiempoPromedio || 0} min` });
+          statsSheet.addRow({ metrica: '', valor: '' });
+          statsSheet.addRow({ metrica: 'POR TIPO', valor: '' });
+          if (stats.porTipo) {
+            statsSheet.addRow({ metrica: '  Pánico', valor: stats.porTipo.panico || 0 });
+            statsSheet.addRow({ metrica: '  Médicas', valor: stats.porTipo.medica || 0 });
+          }
+          statsSheet.addRow({ metrica: '', valor: '' });
+          statsSheet.addRow({ metrica: 'POR ZONA', valor: '' });
+          if (stats.porZona) {
+            Object.entries(stats.porZona).forEach(([zona, cantidad]) => {
+              statsSheet.addRow({ metrica: `  ${zona}`, valor: cantidad });
+            });
+          }
+        }
+
+        const statsHeaderRow = statsSheet.getRow(1);
+        statsHeaderRow.height = 22;
+        statsHeaderRow.eachCell((cell) => {
+          cell.font = { bold: true, color: { argb: 'FFFFFF' }, size: 11 };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '2563EB' } };
+          cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        });
+      }
+
       // GUARDAR ARCHIVO
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const fecha = new Date().toISOString().split('T')[0];
       saveAs(blob, `Reporte_${tipo}_${fecha}.xlsx`);
-      
-      console.log(`✅ Excel generado correctamente con ${datosParaExcel.length} registros`);
+
+      console.log(`Excel generado correctamente con ${datosParaExcel.length} registros`);
       return true;
     } catch (error) {
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
-        console.log('🛑 Generación de Excel cancelada');
+        console.log(' Generación de Excel cancelada');
         throw error;
       }
-      console.error('❌ Error generando Excel:', error);
+      console.error('Error generando Excel:', error);
       throw error;
     }
   }
 
   // =====================================================
-  // GENERAR PDF PROFESIONAL (CORREGIDO)
+  // GENERAR PDF PROFESIONAL
   // =====================================================
   generarPDFPersonalizado(datos, tipo, filtros, usuario, options = {}) {
     try {
-      console.log(`📄 Generando PDF para ${tipo} con ${datos.length} registros`);
-      
+      console.log(` Generando PDF para ${tipo} con ${datos.length} registros`);
+
       if (options.signal?.aborted) {
         throw new Error('AbortError');
       }
-      
+
       if (!datos || datos.length === 0) {
-        console.warn('⚠️ No hay datos para exportar');
+        console.warn(' No hay datos para exportar');
         return false;
       }
-      
+
       const doc = new jsPDF({
         orientation: 'landscape',
         unit: 'mm',
         format: 'a4'
       });
-      
+
       const COLOR_PRIMARIO = [30, 58, 138];
       const COLOR_SECUNDARIO = [37, 99, 235];
-      
+
       const fecha = formatearFechaLarga(new Date());
-      
+
       const LOTES_POR_PAGINA = 20;
       const lotes = dividirEnLotes(datos, LOTES_POR_PAGINA);
-      
-      // Configuración de headers según tipo
+
       let getHeaders, getDataRow;
-      
+
       if (tipo === 'personal') {
         getHeaders = () => [['ID', 'NOMBRE', 'EMAIL', 'ROL', 'PLACA', 'ESTADO']];
         getDataRow = (item) => [
           item.id,
           corregirTexto(item.nombre || '—'),
           item.email || '—',
-          item.rol === 'policia' ? 'Policía' : 
-          item.rol === 'paramedico' ? 'Paramédico' : 
-          item.rol === 'admin' ? 'Admin' : 'Superadmin',
+          item.rol === 'policia' ? 'Policía' :
+            item.rol === 'paramedico' ? 'Paramédico' :
+              item.rol === 'admin' ? 'Admin' : 'Superadmin',
           item.placa || '—',
           item.activo ? 'ACTIVO' : 'INACTIVO'
         ];
@@ -425,108 +497,230 @@ class ReportesService {
           ];
         };
       }
-      
-      // ✅ CORRECCIÓN: Declarar yPos fuera del bloque condicional
+
       let yPos = 32;
-      
+
       for (let loteIdx = 0; loteIdx < lotes.length; loteIdx++) {
         if (loteIdx > 0) {
           doc.addPage();
         }
-        
+
         const lote = lotes[loteIdx];
         const dataRows = lote.map(getDataRow);
-        
-        // ENCABEZADO (solo en primera página)
+
+        // =====================================================
+        // ENCABEZADO Y ESTADÍSTICAS (SOLO PRIMERA PÁGINA)
+        // =====================================================
         if (loteIdx === 0) {
+          // Encabezado principal
           doc.setFillColor(COLOR_PRIMARIO[0], COLOR_PRIMARIO[1], COLOR_PRIMARIO[2]);
           doc.rect(0, 0, 297, 22, 'F');
-          
+
           doc.setTextColor(255, 255, 255);
           doc.setFontSize(22);
           doc.setFont('helvetica', 'bold');
           doc.text('SISTEMA DE EMERGENCIAS', 15, 14);
-          
+
           doc.setFontSize(12);
           doc.setFont('helvetica', 'normal');
           doc.text(`Reporte de ${tipo.charAt(0).toUpperCase() + tipo.slice(1)}`, 15, 20);
-          
-          // TARJETA DE INFORMACIÓN
+
+          // Tarjeta de información
           doc.setFillColor(245, 247, 250);
           doc.setDrawColor(200, 210, 230);
           doc.roundedRect(15, yPos, 267, 38, 3, 3, 'FD');
-          
+
           doc.setFillColor(COLOR_PRIMARIO[0], COLOR_PRIMARIO[1], COLOR_PRIMARIO[2]);
           doc.rect(15, yPos, 3, 38, 'F');
-          
+
           doc.setTextColor(0, 0, 0);
           doc.setFontSize(13);
           doc.setFont('helvetica', 'bold');
           doc.text('INFORMACIÓN DEL REPORTE', 25, yPos + 7);
-          
+
           doc.setFontSize(9);
           doc.setFont('helvetica', 'normal');
-          
+
           doc.text('Fecha de emisión:', 25, yPos + 16);
           doc.text(fecha, 60, yPos + 16);
-          
+
           doc.text('Total registros:', 25, yPos + 23);
           doc.text(datos.length.toString(), 60, yPos + 23);
-          
+
           doc.text('Generado por:', 140, yPos + 16);
           doc.text(corregirTexto(usuario?.nombre || 'Sistema'), 185, yPos + 16);
-          
+
           doc.text('Email:', 140, yPos + 23);
           doc.text(usuario?.email || '—', 185, yPos + 23);
-          
+
           yPos += 45;
-          
-          // SECCIÓN DE FILTROS APLICADOS
+
+          // Sección de filtros aplicados
           const filtrosAplicados = obtenerTextoFiltros(filtros);
-          
+
           if (filtrosAplicados.length > 0) {
             doc.setFillColor(240, 244, 250);
             doc.roundedRect(15, yPos, 267, 15 + (Math.ceil(filtrosAplicados.length / 3) * 5), 2, 2, 'FD');
-            
+
             doc.setTextColor(COLOR_SECUNDARIO[0], COLOR_SECUNDARIO[1], COLOR_SECUNDARIO[2]);
             doc.setFontSize(10);
             doc.setFont('helvetica', 'bold');
             doc.text('FILTROS APLICADOS:', 25, yPos + 6);
-            
+
             doc.setFontSize(8);
             doc.setFont('helvetica', 'normal');
             doc.setTextColor(60, 60, 60);
-            
-            let filtroX = 70;
+
             let filtroY = yPos + 6;
             let columna = 0;
-            
+
             filtrosAplicados.forEach((filtro) => {
               const colX = [70, 140, 210][columna];
               doc.text(filtro, colX, filtroY);
-              
               columna++;
               if (columna === 3) {
                 columna = 0;
                 filtroY += 5;
               }
             });
-            
+
             yPos += 20 + (Math.ceil(filtrosAplicados.length / 3) * 5);
           } else {
             doc.setFillColor(240, 244, 250);
             doc.roundedRect(15, yPos, 267, 12, 2, 2, 'FD');
-            
+
             doc.setTextColor(100, 100, 100);
             doc.setFontSize(9);
             doc.setFont('helvetica', 'italic');
             doc.text('Sin filtros aplicados - Mostrando todos los registros', 25, yPos + 7);
-            
+
             yPos += 17;
           }
+
+          // =====================================================
+          // SECCIÓN DE ESTADÍSTICAS (TARJETAS) - SOLO PRIMERA PÁGINA
+          // =====================================================
+          if (options.estadisticas) {
+            const stats = options.estadisticas;
+
+            yPos += 5;
+
+            // Título de estadísticas
+            doc.setFillColor(COLOR_SECUNDARIO[0], COLOR_SECUNDARIO[1], COLOR_SECUNDARIO[2]);
+            doc.roundedRect(15, yPos, 267, 8, 2, 2, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'bold');
+            doc.text('ESTADÍSTICAS DEL REPORTE', 25, yPos + 5.5);
+
+            yPos += 12;
+
+            if (tipo === 'personal') {
+              const tarjetas = [
+                { label: 'Total', value: stats.total || 0 },
+                { label: 'Activos', value: stats.activos || 0 },
+                { label: 'Inactivos', value: stats.inactivos || 0 },
+                { label: 'Disponibles', value: stats.disponibles || 0 },
+                { label: 'Ocupados', value: stats.ocupados || 0 }
+              ];
+
+              const anchoTarjeta = 50;
+              const alturaTarjeta = 18;
+              let tarjetaX = 15;
+
+              tarjetas.forEach((tarjeta) => {
+                doc.setFillColor(245, 247, 250);
+                doc.setDrawColor(200, 210, 230);
+                doc.roundedRect(tarjetaX, yPos, anchoTarjeta, alturaTarjeta, 2, 2, 'FD');
+
+                doc.setTextColor(100, 100, 100);
+                doc.setFontSize(7);
+                doc.setFont('helvetica', 'normal');
+                doc.text(tarjeta.label, tarjetaX + 3, yPos + 6);
+
+                doc.setTextColor(COLOR_PRIMARIO[0], COLOR_PRIMARIO[1], COLOR_PRIMARIO[2]);
+                doc.setFontSize(12);
+                doc.setFont('helvetica', 'bold');
+                doc.text(String(tarjeta.value), tarjetaX + 3, yPos + 14);
+
+                tarjetaX += anchoTarjeta + 3;
+              });
+
+              yPos += alturaTarjeta + 8;
+            }
+
+            if (tipo === 'unidades') {
+              const tarjetas = [
+                { label: 'Total', value: stats.total || 0 },
+                { label: 'Activas', value: stats.activas || 0 },
+                { label: 'Disponibles', value: stats.disponibles || 0 },
+                { label: 'Ocupadas', value: stats.ocupadas || 0 },
+                { label: 'Inactivas', value: stats.inactivas || 0 }
+              ];
+
+              const anchoTarjeta = 50;
+              const alturaTarjeta = 18;
+              let tarjetaX = 15;
+
+              tarjetas.forEach((tarjeta) => {
+                doc.setFillColor(245, 247, 250);
+                doc.setDrawColor(200, 210, 230);
+                doc.roundedRect(tarjetaX, yPos, anchoTarjeta, alturaTarjeta, 2, 2, 'FD');
+
+                doc.setTextColor(100, 100, 100);
+                doc.setFontSize(7);
+                doc.text(tarjeta.label, tarjetaX + 3, yPos + 6);
+
+                doc.setTextColor(COLOR_PRIMARIO[0], COLOR_PRIMARIO[1], COLOR_PRIMARIO[2]);
+                doc.setFontSize(12);
+                doc.setFont('helvetica', 'bold');
+                doc.text(String(tarjeta.value), tarjetaX + 3, yPos + 14);
+
+                tarjetaX += anchoTarjeta + 3;
+              });
+
+              yPos += alturaTarjeta + 8;
+            }
+
+            if (tipo === 'alertas') {
+              const tarjetas = [
+                { label: 'Total', value: stats.total || 0 },
+                { label: 'Activas', value: stats.activas || 0 },
+                { label: 'En Proceso', value: stats.enProceso || 0 },
+                { label: 'Cerradas', value: stats.cerradas || 0 },
+                { label: 'Expiradas', value: stats.expiradas || 0 },
+                { label: 'Tiempo Prom.', value: `${stats.tiempoPromedio || 0} min` }
+              ];
+
+              const anchoTarjeta = 42;
+              const alturaTarjeta = 18;
+              let tarjetaX = 15;
+
+              tarjetas.forEach((tarjeta) => {
+                doc.setFillColor(245, 247, 250);
+                doc.setDrawColor(200, 210, 230);
+                doc.roundedRect(tarjetaX, yPos, anchoTarjeta, alturaTarjeta, 2, 2, 'FD');
+
+                doc.setTextColor(100, 100, 100);
+                doc.setFontSize(6);
+                doc.text(tarjeta.label, tarjetaX + 2, yPos + 6);
+
+                doc.setTextColor(COLOR_PRIMARIO[0], COLOR_PRIMARIO[1], COLOR_PRIMARIO[2]);
+                doc.setFontSize(10);
+                doc.setFont('helvetica', 'bold');
+                doc.text(String(tarjeta.value), tarjetaX + 2, yPos + 14);
+
+                tarjetaX += anchoTarjeta + 2;
+              });
+
+              yPos += alturaTarjeta + 8;
+            }
+          }
         }
-        
-        // TABLA DE DATOS PARA ESTA PÁGINA
+
+        // =====================================================
+        // TABLA DE DATOS
+        // =====================================================
         autoTable(doc, {
           startY: loteIdx === 0 ? yPos : 20,
           head: getHeaders(),
@@ -537,8 +731,10 @@ class ReportesService {
           alternateRowStyles: { fillColor: [248, 250, 252] },
           margin: { left: 15, right: 15 }
         });
-        
+
+        // =====================================================
         // PIE DE PÁGINA
+        // =====================================================
         const pageCount = doc.internal.getNumberOfPages();
         doc.setPage(doc.internal.getCurrentPageInfo().pageNumber);
         doc.setFontSize(6);
@@ -549,18 +745,18 @@ class ReportesService {
           doc.internal.pageSize.height - 8
         );
       }
-      
+
       const fechaArchivo = new Date().toISOString().split('T')[0];
       doc.save(`Reporte_${tipo}_${fechaArchivo}.pdf`);
-      
-      console.log(`✅ PDF generado correctamente con ${datos.length} registros`);
+
+      console.log(` PDF generado correctamente con ${datos.length} registros`);
       return true;
     } catch (error) {
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
-        console.log('🛑 Generación de PDF cancelada');
+        console.log(' Generación de PDF cancelada');
         throw error;
       }
-      console.error('❌ Error generando PDF:', error);
+      console.error(' Error generando PDF:', error);
       throw error;
     }
   }

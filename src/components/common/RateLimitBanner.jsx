@@ -8,14 +8,14 @@ const RateLimitBanner = ({ onDismiss, autoHide = true, autoHideDelay = 5000 }) =
   const [dismissed, setDismissed] = useState(false);
   const [autoHideTimer, setAutoHideTimer] = useState(null);
 
-  // ✅ Resetear dismissed cuando se activa un nuevo rate limit
+  //  Resetear dismissed cuando se activa un nuevo rate limit
   useEffect(() => {
     if (isLimited) {
       setDismissed(false);
     }
   }, [isLimited]);
 
-  // ✅ Auto-hide después de cierto tiempo (opcional)
+  // Auto-hide después de cierto tiempo 
   useEffect(() => {
     if (autoHide && isLimited && !dismissed) {
       if (autoHideTimer) clearTimeout(autoHideTimer);
@@ -30,7 +30,7 @@ const RateLimitBanner = ({ onDismiss, autoHide = true, autoHideDelay = 5000 }) =
     }
   }, [autoHide, isLimited, dismissed, autoHideDelay]);
 
-  // ✅ Limpiar timer al desmontar
+  // Limpiar timer al desmontar
   useEffect(() => {
     return () => {
       if (autoHideTimer) {
@@ -51,7 +51,7 @@ const RateLimitBanner = ({ onDismiss, autoHide = true, autoHideDelay = 5000 }) =
 
   if (!isLimited || dismissed) return null;
 
-  // ✅ Formatear tiempo de forma segura
+  // Formatear tiempo de forma segura
   const displayTime = timeFormatted || 
     (timeRemaining ? `${Math.ceil(timeRemaining)} segundos` : 'un momento');
 
@@ -98,7 +98,7 @@ const RateLimitBanner = ({ onDismiss, autoHide = true, autoHideDelay = 5000 }) =
               </p>
             )}
 
-            {/* ✅ Mostrar consejo para usuarios normales */}
+            {/* Mostrar consejo para usuarios normales */}
             {!esAdmin && (
               <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
                 <AlertCircle size={12} />

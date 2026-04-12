@@ -10,13 +10,13 @@ export const useApi = (apiFunction, options = {}) => {
   const [rateLimit, setRateLimit] = useState(null);
   const abortControllerRef = useRef(null);
   
-  // ✅ Validar que apiFunction sea una función
+  // Validar que apiFunction sea una función
   if (typeof apiFunction !== 'function') {
     console.warn('useApi: apiFunction debe ser una función');
   }
 
   const execute = useCallback(async (...params) => {
-    // ✅ Validar apiFunction nuevamente por si cambió
+    //  Validar apiFunction nuevamente por si cambió
     if (typeof apiFunction !== 'function') {
       const err = new Error('apiFunction no es una función válida');
       setError(err);
@@ -54,13 +54,13 @@ export const useApi = (apiFunction, options = {}) => {
       setData(result);
       return result;
     } catch (err) {
-      // ✅ Manejar tanto AbortError como ERR_CANCELED
+      //  Manejar tanto AbortError como ERR_CANCELED
       if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') {
-        console.log('🛑 Petición cancelada en useApi');
+        console.log(' Petición cancelada en useApi');
         return null;
       }
       
-      console.error("❌ Error en API:", err);
+      console.error(" Error en API:", err);
 
       // Manejar rate limit
       if (err.rateLimit || err.response?.status === 429) {
@@ -72,11 +72,11 @@ export const useApi = (apiFunction, options = {}) => {
         setRateLimit(rateLimitInfo);
         toast.error(rateLimitInfo.mensaje, { duration: 5000 });
         
-        // ✅ Auto-retry solo si es admin y está habilitado
+        //  Auto-retry solo si es admin y está habilitado
         if (options.autoRetry && rateLimitInfo.esAdmin) {
           console.log(`⏱️ Reintentando en ${rateLimitInfo.retryAfter} segundos...`);
           setTimeout(() => {
-            // ✅ Limpiar estado de rate limit antes de reintentar
+            //  Limpiar estado de rate limit antes de reintentar
             setRateLimit(null);
             execute(...params);
           }, rateLimitInfo.retryAfter * 1000);
@@ -88,19 +88,19 @@ export const useApi = (apiFunction, options = {}) => {
     } finally {
       setLoading(false);
     }
-  }, [apiFunction, options.autoRetry]); // ✅ Agregada dependencia correcta
+  }, [apiFunction, options.autoRetry]); 
 
   const abort = useCallback(() => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
-      console.log('🛑 Petición cancelada manualmente');
+      console.log(' Petición cancelada manualmente');
     }
   }, []);
 
   const reset = useCallback(() => {
     // Cancelar petición si existe
     abort();
-    // ✅ Limpiar referencias
+    //  Limpiar referencias
     abortControllerRef.current = null;
     setData(null);
     setError(null);
@@ -115,12 +115,12 @@ export const useApi = (apiFunction, options = {}) => {
     rateLimit,
     execute,
     reset,
-    abort, // ✅ Exponer función para cancelar manualmente
-    isRateLimited: !!rateLimit // ✅ Indicador de rate limit activo
+    abort, //  Exponer función para cancelar manualmente
+    isRateLimited: !!rateLimit //  Indicador de rate limit activo
   };
 };
 
-// ✅ Versión para peticiones GET con caché simple
+// Versión para peticiones GET con caché simple
 export const useApiWithCache = (apiFunction, cacheKey, options = {}) => {
   const [cachedData, setCachedData] = useState(null);
   const [isCached, setIsCached] = useState(false);
@@ -179,7 +179,7 @@ export const useApiWithCache = (apiFunction, cacheKey, options = {}) => {
   };
 };
 
-// ✅ Versión para peticiones en lote (batch)
+//  Versión para peticiones en lote (batch)
 export const useBatchApi = (apiFunctions, options = {}) => {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);

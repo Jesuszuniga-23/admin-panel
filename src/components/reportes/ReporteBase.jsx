@@ -22,7 +22,7 @@ const ReporteBase = ({
   const [filtros, setFiltros] = useState({});
   const [exportando, setExportando] = useState(false);
 
-  // ✅ Memoizar datos procesados
+  //  Memoizar datos procesados
   const datosProcesados = useMemo(() => {
     if (!datos || datos.length === 0) return [];
     
@@ -39,10 +39,10 @@ const ReporteBase = ({
     });
   }, [datos, columnas]);
 
-  // ✅ Verificar si hay datos
+  //  Verificar si hay datos
   const hayDatos = datos && datos.length > 0;
 
-  // ✅ Generar Excel con límite de registros
+  //  Generar Excel con límite de registros
   const generarExcel = useCallback(async () => {
     if (!hayDatos) {
       toast.error('No hay datos para exportar');
@@ -86,7 +86,7 @@ const ReporteBase = ({
     }
   }, [datosProcesados, columnas, tipo, hayDatos]);
 
-  // ✅ Generar PDF con límite de registros
+  //  Generar PDF con límite de registros
   const generarPDF = useCallback(async () => {
     if (!hayDatos) {
       toast.error('No hay datos para exportar');
@@ -212,14 +212,14 @@ const ReporteBase = ({
     }
   }, [datos, columnas, titulo, tipo, user, hayDatos]);
 
-  // ✅ Limpiar al desmontar
+  //  Limpiar al desmontar
   useEffect(() => {
     return () => {
       setExportando(false);
     };
   }, []);
 
-  // ✅ Vista previa de datos
+  //  Vista previa de datos
   const vistaPrevia = useMemo(() => {
     if (!datos || datos.length === 0) return [];
     return datos.slice(0, 5);

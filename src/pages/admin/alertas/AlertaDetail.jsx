@@ -44,7 +44,7 @@ const formatearNombre = (nombre) => {
     .join(' ');
 };
 
-// ✅ CORRECCIÓN #3: Función para formatear fecha con manejo de errores
+// Función para formatear fecha con manejo de errores
 const formatearFecha = (fecha) => {
   if (!fecha) return 'N/A';
   try {
@@ -125,7 +125,7 @@ const AlertaDetail = () => {
   const [motivoCierre, setMotivoCierre] = useState('');
   const [cerrando, setCerrando] = useState(false);
 
-  // ✅ Obtener tipo de alerta permitido según rol
+  //  Obtener tipo de alerta permitido según rol
   const tipoAlertaPermitido = authService.getTipoAlertaPermitido();
 
   // REF para AbortController
@@ -142,13 +142,13 @@ const AlertaDetail = () => {
     tipo: null
   });
 
-  // ✅ CORRECCIÓN #1: Función cargarAlerta con validación de permisos
+  //  CORRECCIÓN #1: Función cargarAlerta con validación de permisos
   const cargarAlerta = useCallback(async () => {
     if (!id) return;
 
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
-      console.log('🛑 Petición anterior cancelada en AlertaDetail');
+      console.log(' Petición anterior cancelada en AlertaDetail');
     }
 
     abortControllerRef.current = new AbortController();
@@ -165,7 +165,7 @@ const AlertaDetail = () => {
       console.log("Respuesta del backend:", response);
 
       if (response.success && response.data) {
-        // ✅ VERIFICAR PERMISO DEL USUARIO
+        //  VERIFICAR PERMISO DEL USUARIO
         if (tipoAlertaPermitido && response.data.tipo !== tipoAlertaPermitido) {
           setError(`No tienes permiso para ver alertas de tipo ${response.data.tipo === 'panico' ? 'Pánico' : 'Médica'}`);
           setLoading(false);
@@ -203,7 +203,7 @@ const AlertaDetail = () => {
     return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
-        console.log('🛑 Componente AlertaDetail desmontado - petición cancelada');
+        console.log(' Componente AlertaDetail desmontado - petición cancelada');
       }
     };
   }, [cargarAlerta]);
@@ -337,7 +337,7 @@ const AlertaDetail = () => {
             </button>
             <div>
               <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Detalle de Alerta</h1>
-              <p className="text-sm text-gray-500 mt-1">Información completa de la alerta #{alerta.id}</p>
+              <p className="text-sm text-gray-500 mt-1">Información completa de la alerta</p>
             </div>
           </div>
 
@@ -392,7 +392,7 @@ const AlertaDetail = () => {
 
               <div className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                  {/* ✅ CORRECCIÓN #3: Usar formatearFecha */}
+                  {/*   Usar formatearFecha */}
                   <InfoCard
                     icon={Calendar}
                     label="Fecha de creación"
@@ -427,7 +427,7 @@ const AlertaDetail = () => {
                     />
                   )}
 
-                  {/* ✅ CORRECCIÓN #2: Tipo de unidad correcto */}
+                  {/*  CORRECCIÓN #2: Tipo de unidad correcto */}
                   {alerta.unidad && (
                     <InfoCard
                       icon={Shield}

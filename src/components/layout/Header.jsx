@@ -1,4 +1,4 @@
-// src/components/layout/Header.jsx (MODIFICADO - AGREGAR TENANT SELECTOR)
+// src/components/layout/Header.jsx 
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
 import toast from 'react-hot-toast';
-import TenantSelector from '../common/TenantSelector';  // ✅ NUEVO
+import TenantSelector from '../common/TenantSelector';  
 
 // Función para formatear nombres
 const formatearNombre = (nombre) => {
@@ -159,7 +159,7 @@ const Header = ({ titulo = 'Panel de Administración', subtitulo = 'Gestión del
       navigate('/login', { replace: true });
     } catch (error) {
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
-        console.log('🛑 Logout cancelado');
+        console.log(' Logout cancelado');
         return;
       }
       console.error('Error al cerrar sesión:', error);

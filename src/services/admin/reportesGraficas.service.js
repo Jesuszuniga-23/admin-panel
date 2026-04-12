@@ -1,9 +1,11 @@
 // src/services/admin/reportesGraficas.service.js
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { saveAs } from 'file-saver';
 
-// Funciones auxiliares
+// =====================================================
+// FUNCIONES AUXILIARES
+// =====================================================
+
 const corregirTexto = (texto) => {
   if (!texto) return '';
   if (typeof texto !== 'string') return texto.toString();
@@ -47,6 +49,17 @@ const formatearFechaLarga = (fecha) => {
   }
 };
 
+const formatearFecha = (fecha) => {
+  if (!fecha) return '—';
+  try {
+    const f = new Date(fecha);
+    if (isNaN(f.getTime())) return '—';
+    return f.toLocaleDateString('es-MX');
+  } catch (e) {
+    return '—';
+  }
+};
+
 const obtenerTextoFiltros = (filtros) => {
   const filtrosAplicados = [];
   
@@ -67,80 +80,55 @@ const obtenerTextoFiltros = (filtros) => {
   }
   
   if (filtros.tipo && filtros.tipo !== 'todos') {
-    filtrosAplicados.push(`Tipo: ${filtros.tipo}`);
+    filtrosAplicados.push(`Tipo: ${filtros.tipo === 'panico' ? 'Pánico' : 'Médica'}`);
   }
   
   if (filtros.estado && filtros.estado !== 'todos') {
-    filtrosAplicados.push(`Estado: ${filtros.estado}`);
+    const estados = {
+      activa: 'Activas', proceso: 'En Proceso', cerrada: 'Cerradas', expirada: 'Expiradas'
+    };
+    filtrosAplicados.push(`Estado: ${estados[filtros.estado] || filtros.estado}`);
+  }
+  
+  if (filtros.zona && filtros.zona !== 'todas') {
+    filtrosAplicados.push(`Zona: ${filtros.zona}`);
   }
   
   return filtrosAplicados;
 };
 
-// ✅ Función para validar imagen
 const esImagenValida = (imgData) => {
   return imgData && typeof imgData === 'string' && imgData.startsWith('data:image');
 };
 
-// =====================================================
-// FUNCIÓN PARA CALCULAR DIMENSIONES ÓPTIMAS
-// =====================================================
 const calcularDimensionesOptimas = (img, anchoMaximo = 180, altoMaximo = 120) => {
-  return new Promise((resolve, reject) => {
-    // ✅ Validar que la imagen sea válida
+  return new Promise((resolve) => {
     if (!esImagenValida(img)) {
-      console.warn('Imagen no válida, usando dimensiones por defecto');
       resolve({ ancho: anchoMaximo, alto: altoMaximo });
       return;
     }
     
     const image = new Image();
     const timeoutId = setTimeout(() => {
-      console.warn('Timeout cargando imagen');
       resolve({ ancho: anchoMaximo, alto: altoMaximo });
     }, 5000);
     
     image.onload = () => {
       clearTimeout(timeoutId);
-      const anchoOriginal = image.width;
-      const altoOriginal = image.height;
-      const proporcion = anchoOriginal / altoOriginal;
+      const proporcion = image.width / image.height;
+      let anchoFinal = anchoMaximo;
+      let altoFinal = anchoMaximo / proporcion;
       
-      let anchoFinal, altoFinal;
-      
-      // Mapa (ocupa más espacio)
-      if (anchoMaximo === 180 && altoMaximo === 120) {
-        anchoFinal = anchoMaximo;
-        altoFinal = anchoMaximo / proporcion;
-        if (altoFinal > altoMaximo) {
-          altoFinal = altoMaximo;
-          anchoFinal = altoMaximo * proporcion;
-        }
-      }
-      // Gráfica de pastel
-      else if (anchoMaximo === 80) {
-        anchoFinal = 80;
-        altoFinal = 80;
-      }
-      // Otras gráficas
-      else {
-        anchoFinal = anchoMaximo;
-        altoFinal = anchoMaximo / proporcion;
-        if (altoFinal > altoMaximo) {
-          altoFinal = altoMaximo;
-          anchoFinal = altoMaximo * proporcion;
-        }
+      if (altoFinal > altoMaximo) {
+        altoFinal = altoMaximo;
+        anchoFinal = altoMaximo * proporcion;
       }
       
-      resolve({ 
-        ancho: Math.round(anchoFinal), 
-        alto: Math.round(altoFinal) 
-      });
+      resolve({ ancho: Math.round(anchoFinal), alto: Math.round(altoFinal) });
     };
     
     image.onerror = () => {
       clearTimeout(timeoutId);
-      console.warn('Error cargando imagen');
       resolve({ ancho: anchoMaximo, alto: altoMaximo });
     };
     
@@ -148,20 +136,16 @@ const calcularDimensionesOptimas = (img, anchoMaximo = 180, altoMaximo = 120) =>
   });
 };
 
+// =====================================================
+// CLASE PRINCIPAL
+// =====================================================
+
 class ReportesGraficasService {
   
   async generarPDFConGraficas(datos, tipo, filtros, usuario, graficas, options = {}) {
     try {
-      console.log('Servicio PDF - Datos recibidos:', {
-        tieneMapa: !!graficas.mapa && esImagenValida(graficas.mapa),
-        tieneBarras: !!graficas.barras && esImagenValida(graficas.barras),
-        tienePastel: !!graficas.pastel && esImagenValida(graficas.pastel),
-        tieneTendencias: !!graficas.tendencias && esImagenValida(graficas.tendencias),
-        tieneEstados: !!graficas.estados && esImagenValida(graficas.estados),
-        totalDatos: datos.length
-      });
+      console.log('📄 Generando PDF con gráficas...');
       
-      // ✅ Verificar cancelación
       if (options.signal?.aborted) {
         throw new Error('AbortError');
       }
@@ -174,6 +158,7 @@ class ReportesGraficasService {
       
       const COLOR_PRIMARIO = [30, 58, 138];
       const COLOR_SECUNDARIO = [37, 99, 235];
+      const COLOR_TERCIARIO = [99, 102, 241];
       
       const fecha = formatearFechaLarga(new Date());
       
@@ -183,7 +168,7 @@ class ReportesGraficasService {
       
       // Encabezado
       doc.setFillColor(COLOR_PRIMARIO[0], COLOR_PRIMARIO[1], COLOR_PRIMARIO[2]);
-      doc.rect(0, 0, 210, 20, 'F');
+      doc.rect(0, 0, 210, 22, 'F');
       
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(18);
@@ -192,17 +177,17 @@ class ReportesGraficasService {
       
       doc.setFontSize(11);
       doc.setFont('helvetica', 'normal');
-      doc.text('Análisis Geográfico de Incidentes', 15, 18);
+      doc.text('Análisis Geográfico de Incidentes', 15, 19);
+      
+      let yPos = 28;
       
       // Tarjeta de información
-      let yPos = 25;
-      
       doc.setFillColor(245, 247, 250);
       doc.setDrawColor(200, 210, 230);
-      doc.roundedRect(15, yPos, 180, 38, 3, 3, 'FD');
+      doc.roundedRect(15, yPos, 180, 42, 3, 3, 'FD');
       
       doc.setFillColor(COLOR_PRIMARIO[0], COLOR_PRIMARIO[1], COLOR_PRIMARIO[2]);
-      doc.rect(15, yPos, 3, 38, 'F');
+      doc.rect(15, yPos, 3, 42, 'F');
       
       doc.setTextColor(0, 0, 0);
       doc.setFontSize(12);
@@ -212,26 +197,32 @@ class ReportesGraficasService {
       doc.setFontSize(8);
       doc.setFont('helvetica', 'normal');
       
-      doc.text('Fecha de emisión:', 25, yPos + 15);
-      doc.text(fecha, 50, yPos + 15);
+      doc.text('Fecha de emisión:', 25, yPos + 16);
+      doc.text(fecha, 55, yPos + 16);
       
-      doc.text('Total registros:', 25, yPos + 22);
-      doc.text(datos.length.toString(), 50, yPos + 22);
+      doc.text('Total registros:', 25, yPos + 24);
+      doc.text(datos.length.toString(), 55, yPos + 24);
       
-      doc.text('Generado por:', 110, yPos + 15);
-      doc.text(corregirTexto(usuario?.nombre || 'Sistema'), 135, yPos + 15);
+      doc.text('Con ubicación:', 25, yPos + 32);
+      doc.text(graficas.estadisticas?.conUbicacion?.toString() || '0', 55, yPos + 32);
       
-      doc.text('Email:', 110, yPos + 22);
-      doc.text(usuario?.email || '—', 135, yPos + 22);
+      doc.text('Generado por:', 110, yPos + 16);
+      doc.text(corregirTexto(usuario?.nombre || 'Sistema'), 135, yPos + 16);
       
-      yPos += 45;
+      doc.text('Email:', 110, yPos + 24);
+      doc.text(usuario?.email || '—', 135, yPos + 24);
+      
+      doc.text('Rol:', 110, yPos + 32);
+      doc.text(usuario?.rol || '—', 135, yPos + 32);
+      
+      yPos += 50;
       
       // Filtros aplicados
       const filtrosAplicados = obtenerTextoFiltros(filtros);
       
       if (filtrosAplicados.length > 0) {
         doc.setFillColor(240, 244, 250);
-        doc.roundedRect(15, yPos, 180, 15, 2, 2, 'FD');
+        doc.roundedRect(15, yPos, 180, 15 + (Math.ceil(filtrosAplicados.length / 2) * 6), 2, 2, 'FD');
         
         doc.setTextColor(COLOR_SECUNDARIO[0], COLOR_SECUNDARIO[1], COLOR_SECUNDARIO[2]);
         doc.setFontSize(9);
@@ -242,16 +233,86 @@ class ReportesGraficasService {
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(60, 60, 60);
         
-        let filtroX = 70;
+        let filtroY = yPos + 6;
+        let columna = 0;
+        
         filtrosAplicados.forEach((filtro) => {
-          doc.text(filtro, filtroX, yPos + 6);
-          filtroX += 45;
+          const colX = [70, 130][columna];
+          doc.text(filtro, colX, filtroY);
+          columna++;
+          if (columna === 2) {
+            columna = 0;
+            filtroY += 6;
+          }
         });
         
-        yPos += 20;
+        yPos += 20 + (Math.ceil(filtrosAplicados.length / 2) * 6);
+      } else {
+        doc.setFillColor(240, 244, 250);
+        doc.roundedRect(15, yPos, 180, 12, 2, 2, 'FD');
+        doc.setTextColor(100, 100, 100);
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'italic');
+        doc.text('Sin filtros aplicados - Mostrando todos los registros', 25, yPos + 8);
+        yPos += 18;
       }
       
-      // ✅ Verificar cancelación después de cada sección
+      // Resumen de estadísticas (tarjetas)
+      if (graficas.estadisticas) {
+        const stats = graficas.estadisticas;
+        
+        doc.setFillColor(COLOR_TERCIARIO[0], COLOR_TERCIARIO[1], COLOR_TERCIARIO[2]);
+        doc.roundedRect(15, yPos, 180, 8, 2, 2, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.text('📊 RESUMEN DE ESTADÍSTICAS', 25, yPos + 5.5);
+        
+        yPos += 14;
+        
+        // Tarjetas en formato 2x4
+        const tarjetas = [
+          { label: 'Total', value: stats.total || 0, color: [99, 102, 241] },
+          { label: 'Pánico', value: stats.panico || 0, color: [239, 68, 68] },
+          { label: 'Médica', value: stats.medica || 0, color: [16, 185, 129] },
+          { label: 'Activas', value: stats.activas || 0, color: [239, 68, 68] },
+          { label: 'En Proceso', value: stats.proceso || 0, color: [59, 130, 246] },
+          { label: 'Cerradas', value: stats.cerradas || 0, color: [16, 185, 129] },
+          { label: 'Expiradas', value: stats.expiradas || 0, color: [107, 114, 128] },
+          { label: 'Con ubicación', value: stats.conUbicacion || 0, color: [34, 197, 94] }
+        ];
+        
+        const anchoTarjeta = 42;
+        const alturaTarjeta = 16;
+        let tarjetaX = 15;
+        let tarjetaY = yPos;
+        
+        tarjetas.forEach((tarjeta, idx) => {
+          if (idx === 4) {
+            tarjetaX = 15;
+            tarjetaY += alturaTarjeta + 3;
+          }
+          
+          doc.setFillColor(245, 247, 250);
+          doc.setDrawColor(200, 210, 230);
+          doc.roundedRect(tarjetaX, tarjetaY, anchoTarjeta, alturaTarjeta, 2, 2, 'FD');
+          
+          doc.setTextColor(100, 100, 100);
+          doc.setFontSize(6);
+          doc.setFont('helvetica', 'normal');
+          doc.text(tarjeta.label, tarjetaX + 2, tarjetaY + 5);
+          
+          doc.setTextColor(tarjeta.color[0], tarjeta.color[1], tarjeta.color[2]);
+          doc.setFontSize(10);
+          doc.setFont('helvetica', 'bold');
+          doc.text(String(tarjeta.value), tarjetaX + 2, tarjetaY + 12);
+          
+          tarjetaX += anchoTarjeta + 3;
+        });
+        
+        yPos = tarjetaY + alturaTarjeta + 10;
+      }
+      
       if (options.signal?.aborted) throw new Error('AbortError');
       
       // =====================================================
@@ -267,32 +328,35 @@ class ReportesGraficasService {
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(14);
         doc.setFont('helvetica', 'bold');
-        doc.text('MAPA DE INCIDENTES', 15, 10);
+        doc.text('🗺️ MAPA DE INCIDENTES', 15, 10);
         
         doc.setTextColor(0, 0, 0);
-        doc.setFontSize(10);
+        doc.setFontSize(9);
         doc.setFont('helvetica', 'normal');
-        doc.text(`Ubicaciones visibles: ${graficas.estadisticas?.conUbicacion || 0} puntos`, 15, yPos + 5);
+        doc.text(`Ubicaciones visibles: ${graficas.estadisticas?.conUbicacion || 0} puntos`, 15, yPos);
         
-        // Calcular dimensiones para el mapa (más grande)
-        const dimensiones = await calcularDimensionesOptimas(graficas.mapa, 180, 120);
-        doc.addImage(graficas.mapa, 'PNG', 15, yPos + 10, dimensiones.ancho, dimensiones.alto);
+        const dimensiones = await calcularDimensionesOptimas(graficas.mapa, 180, 130);
+        doc.addImage(graficas.mapa, 'PNG', 15, yPos + 5, dimensiones.ancho, dimensiones.alto);
         
-        // Leyenda del mapa
-        yPos += dimensiones.alto + 15;
+        // Leyenda
+        yPos += dimensiones.alto + 12;
+        doc.setFillColor(239, 68, 68);
+        doc.circle(20, yPos - 2, 2, 'F');
         doc.setFontSize(8);
         doc.setTextColor(100, 100, 100);
-        doc.text('Pánico', 15, yPos);
-        doc.text('Médica', 60, yPos);
+        doc.text('Pánico', 25, yPos);
         
-        // ✅ Verificar cancelación
+        doc.setFillColor(16, 185, 129);
+        doc.circle(60, yPos - 2, 2, 'F');
+        doc.text('Médica', 65, yPos);
+        
         if (options.signal?.aborted) throw new Error('AbortError');
       }
       
       // =====================================================
-      // PÁGINA 3: GRÁFICA DE BARRAS Y PASTEL
+      // PÁGINA 3: GRÁFICA DE PASTEL Y BARRAS (ZONAS)
       // =====================================================
-      if (graficas.barras || graficas.pastel) {
+      if (graficas.pastel || graficas.barras) {
         doc.addPage();
         yPos = 20;
         
@@ -302,46 +366,42 @@ class ReportesGraficasService {
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(12);
         doc.setFont('helvetica', 'bold');
-        doc.text('ANÁLISIS VISUAL DE INCIDENTES', 15, 10);
-        
-        // Gráfica de barras
-        if (graficas.barras && esImagenValida(graficas.barras)) {
-          doc.setTextColor(0, 0, 0);
-          doc.setFontSize(10);
-          doc.setFont('helvetica', 'bold');
-          doc.text('Incidentes por Zona', 15, yPos + 5);
-          
-          const dimensiones = await calcularDimensionesOptimas(graficas.barras, 180, 80);
-          doc.addImage(graficas.barras, 'PNG', 15, yPos + 8, dimensiones.ancho, dimensiones.alto);
-          
-          yPos += dimensiones.alto + 15;
-        } else {
-          yPos += 15;
-        }
-        
-        // ✅ Verificar cancelación
-        if (options.signal?.aborted) throw new Error('AbortError');
+        doc.text('📊 ANÁLISIS POR TIPO Y ZONA', 15, 10);
         
         // Gráfica de pastel
         if (graficas.pastel && esImagenValida(graficas.pastel)) {
           doc.setTextColor(0, 0, 0);
           doc.setFontSize(10);
           doc.setFont('helvetica', 'bold');
-          doc.text('Distribución por Tipo', 15, yPos + 5);
+          doc.text('Distribución por Tipo de Alerta', 15, yPos);
           
           const dimensiones = await calcularDimensionesOptimas(graficas.pastel, 80, 80);
           const xPos = (210 - dimensiones.ancho) / 2;
-          doc.addImage(graficas.pastel, 'PNG', xPos, yPos + 8, dimensiones.ancho, dimensiones.alto);
+          doc.addImage(graficas.pastel, 'PNG', xPos, yPos + 3, dimensiones.ancho, dimensiones.alto);
+          
+          yPos += dimensiones.alto + 10;
         }
+        
+        // Gráfica de barras (zonas)
+        if (graficas.barras && esImagenValida(graficas.barras)) {
+          doc.setTextColor(0, 0, 0);
+          doc.setFontSize(10);
+          doc.setFont('helvetica', 'bold');
+          doc.text('Incidentes por Zona', 15, yPos);
+          
+          const dimensiones = await calcularDimensionesOptimas(graficas.barras, 180, 80);
+          doc.addImage(graficas.barras, 'PNG', 15, yPos + 3, dimensiones.ancho, dimensiones.alto);
+          
+          yPos += dimensiones.alto + 10;
+        }
+        
+        if (options.signal?.aborted) throw new Error('AbortError');
       }
       
-      // ✅ Verificar cancelación
-      if (options.signal?.aborted) throw new Error('AbortError');
-      
       // =====================================================
-      // PÁGINA 4: TENDENCIAS Y ESTADOS
+      // PÁGINA 4: ESTADOS, TENDENCIAS Y HORAS (NUEVAS GRÁFICAS)
       // =====================================================
-      if (graficas.tendencias || graficas.estados) {
+      if (graficas.estados || graficas.tendencias || graficas.horas) {
         doc.addPage();
         yPos = 20;
         
@@ -351,47 +411,66 @@ class ReportesGraficasService {
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(12);
         doc.setFont('helvetica', 'bold');
-        doc.text('ANÁLISIS TEMPORAL Y DE ESTADOS', 15, 10);
+        doc.text('📈 ANÁLISIS TEMPORAL Y DE ESTADOS', 15, 10);
         
-        // Tendencias
-        if (graficas.tendencias && esImagenValida(graficas.tendencias)) {
-          doc.setTextColor(0, 0, 0);
-          doc.setFontSize(10);
-          doc.setFont('helvetica', 'bold');
-          doc.text('Tendencias Mensuales', 15, yPos + 5);
-          
-          const dimensiones = await calcularDimensionesOptimas(graficas.tendencias, 180, 70);
-          doc.addImage(graficas.tendencias, 'PNG', 15, yPos + 8, dimensiones.ancho, dimensiones.alto);
-          
-          yPos += dimensiones.alto + 15;
-        } else {
-          yPos += 15;
-        }
-        
-        // ✅ Verificar cancelación
-        if (options.signal?.aborted) throw new Error('AbortError');
-        
-        // Distribución por estado
+        // ✅ NUEVA: Gráfica de Estados
         if (graficas.estados && esImagenValida(graficas.estados)) {
           doc.setTextColor(0, 0, 0);
           doc.setFontSize(10);
           doc.setFont('helvetica', 'bold');
-          doc.text('Distribución por Estado', 15, yPos + 5);
+          doc.text('Distribución por Estado', 15, yPos);
           
-          const dimensiones = await calcularDimensionesOptimas(graficas.estados, 180, 70);
-          doc.addImage(graficas.estados, 'PNG', 15, yPos + 8, dimensiones.ancho, dimensiones.alto);
+          const dimensiones = await calcularDimensionesOptimas(graficas.estados, 180, 60);
+          doc.addImage(graficas.estados, 'PNG', 15, yPos + 3, dimensiones.ancho, dimensiones.alto);
+          
+          yPos += dimensiones.alto + 10;
         }
+        
+        // ✅ NUEVA: Gráfica de Tendencias Mensuales
+        if (graficas.tendencias && esImagenValida(graficas.tendencias)) {
+          doc.setTextColor(0, 0, 0);
+          doc.setFontSize(10);
+          doc.setFont('helvetica', 'bold');
+          doc.text('Tendencias Mensuales (últimos 12 meses)', 15, yPos);
+          
+          const dimensiones = await calcularDimensionesOptimas(graficas.tendencias, 180, 60);
+          doc.addImage(graficas.tendencias, 'PNG', 15, yPos + 3, dimensiones.ancho, dimensiones.alto);
+          
+          yPos += dimensiones.alto + 10;
+        }
+        
+        // ✅ NUEVA: Gráfica de Horas del Día
+        if (graficas.horas && esImagenValida(graficas.horas)) {
+          // Si no hay espacio suficiente, agregar nueva página
+          if (yPos > 200) {
+            doc.addPage();
+            yPos = 20;
+            
+            doc.setFillColor(COLOR_PRIMARIO[0], COLOR_PRIMARIO[1], COLOR_PRIMARIO[2]);
+            doc.rect(0, 0, 210, 15, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(12);
+            doc.setFont('helvetica', 'bold');
+            doc.text('📈 ANÁLISIS TEMPORAL Y DE ESTADOS (CONTINUACIÓN)', 15, 10);
+          }
+          
+          doc.setTextColor(0, 0, 0);
+          doc.setFontSize(10);
+          doc.setFont('helvetica', 'bold');
+          doc.text('Alertas por Hora del Día', 15, yPos);
+          
+          const dimensiones = await calcularDimensionesOptimas(graficas.horas, 180, 60);
+          doc.addImage(graficas.horas, 'PNG', 15, yPos + 3, dimensiones.ancho, dimensiones.alto);
+        }
+        
+        if (options.signal?.aborted) throw new Error('AbortError');
       }
       
-      // ✅ Verificar cancelación
-      if (options.signal?.aborted) throw new Error('AbortError');
-      
       // =====================================================
-      // PÁGINA 5: TABLA DE DATOS
+      // PÁGINA FINAL: TABLA DE DATOS POR ZONA
       // =====================================================
       if (graficas.datosPorZona && graficas.datosPorZona.length > 0) {
         doc.addPage();
-        yPos = 20;
         
         doc.setFillColor(COLOR_PRIMARIO[0], COLOR_PRIMARIO[1], COLOR_PRIMARIO[2]);
         doc.rect(0, 0, 210, 15, 'F');
@@ -399,9 +478,8 @@ class ReportesGraficasService {
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(12);
         doc.setFont('helvetica', 'bold');
-        doc.text('DETALLE DE INCIDENTES POR ZONA', 15, 10);
+        doc.text('📋 DETALLE DE INCIDENTES POR ZONA', 15, 10);
         
-        // ✅ Límite de 50 zonas para evitar tablas enormes
         const zonasParaMostrar = graficas.datosPorZona.slice(0, 50);
         
         const headers = [['Zona', 'Total', 'Pánico', 'Médica', '%', 'Activas', 'Proceso', 'Cerradas']];
@@ -411,9 +489,9 @@ class ReportesGraficasService {
           z.panico.toString(),
           z.medica.toString(),
           z.porcentaje ? `${z.porcentaje}%` : '0%',
-          z.activas.toString(),
-          z.enProceso.toString(),
-          z.cerradas.toString()
+          z.activas?.toString() || '0',
+          z.enProceso?.toString() || '0',
+          z.cerradas?.toString() || '0'
         ]);
         
         autoTable(doc, {
@@ -423,7 +501,7 @@ class ReportesGraficasService {
           theme: 'grid',
           headStyles: { fillColor: COLOR_PRIMARIO, textColor: [255, 255, 255], fontSize: 8 },
           bodyStyles: { fontSize: 7 },
-          margin: { left: 15, right: 15 }
+          margin: { left: 10, right: 10 }
         });
         
         if (graficas.datosPorZona.length > 50) {
@@ -433,7 +511,9 @@ class ReportesGraficasService {
         }
       }
       
-      // Pie de página en todas las páginas
+      // =====================================================
+      // PIE DE PÁGINA EN TODAS LAS PÁGINAS
+      // =====================================================
       const pageCount = doc.internal.getNumberOfPages();
       for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
@@ -442,22 +522,21 @@ class ReportesGraficasService {
         doc.text(
           `Página ${i} de ${pageCount} • ${new Date().toLocaleDateString('es-MX')} • ${usuario?.nombre || 'Sistema'}`,
           15,
-          doc.internal.pageSize.height - 10
+          doc.internal.pageSize.height - 8
         );
       }
       
       const fechaArchivo = new Date().toISOString().split('T')[0];
       doc.save(`Analisis_Geografico_${fechaArchivo}.pdf`);
       
-      console.log('PDF con gráficas y mapa generado correctamente');
+      console.log('✅ PDF con gráficas generado correctamente');
       return true;
     } catch (error) {
-      // ✅ Manejar cancelación
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
-        console.log('🛑 Generación de PDF con gráficas cancelada');
+        console.log('🛑 Generación de PDF cancelada');
         throw error;
       }
-      console.error('Error generando PDF con gráficas:', error);
+      console.error('❌ Error generando PDF con gráficas:', error);
       throw error;
     }
   }

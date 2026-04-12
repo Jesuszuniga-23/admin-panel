@@ -561,7 +561,7 @@ const UnidadesList = () => {
           {(filtros.tipo || filtros.estado || filtros.search) && (
             <button onClick={limpiarFiltros} className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1">
               <X size={12} />
-              <span className="hidden xs:inline">Limpiar</span>
+              <span className="hidden xs:inline">Limpiar Filtros</span>
             </button>
           )}
         </div>

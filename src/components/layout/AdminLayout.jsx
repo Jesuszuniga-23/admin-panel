@@ -9,19 +9,19 @@ import RateLimitBanner from "../common/RateLimitBanner";
 import SessionMonitor from '../common/SessionMonitor';
 import SecurityGuard from '../common/SecurityGuard';
 
-// ✅ Roles que tienen acceso al layout admin
+//  Roles que tienen acceso al layout admin
 const ROLES_ADMIN = ['admin', 'superadmin', 'operador_tecnico', 'operador_policial', 'operador_medico', 'operador_general'];
 
 const AdminLayout = () => {
   const { user, isLoading, setLoading } = useAuthStore();
   const [timeoutError, setTimeoutError] = useState(false);
 
-  // ✅ Timeout para loading infinito (máximo 5 segundos)
+  //  Timeout para loading infinito (máximo 5 segundos)
   useEffect(() => {
     let timeoutId;
     if (isLoading) {
       timeoutId = setTimeout(() => {
-        console.warn('⚠️ AdminLayout: Loading timeout después de 5 segundos');
+        console.warn(' AdminLayout: Loading timeout después de 5 segundos');
         setTimeoutError(true);
         setLoading(false);
       }, 5000);
@@ -34,13 +34,13 @@ const AdminLayout = () => {
     };
   }, [isLoading, setLoading]);
 
-  // ✅ Verificar si el usuario tiene rol válido para admin
+  //  Verificar si el usuario tiene rol válido para admin
   const tieneAccesoAdmin = () => {
     if (!user) return false;
     return ROLES_ADMIN.includes(user.rol);
   };
 
-  // ✅ Estado de loading con timeout
+  //  Estado de loading con timeout
   if (isLoading || timeoutError) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -62,28 +62,28 @@ const AdminLayout = () => {
     );
   }
 
-  // ✅ Redirigir si no hay usuario o no tiene rol válido
+  //  Redirigir si no hay usuario o no tiene rol válido
   if (!user) {
-    console.log('🔒 AdminLayout: No hay usuario, redirigiendo a login');
+    console.log('AdminLayout: No hay usuario, redirigiendo a login');
     return <Navigate to="/login" replace />;
   }
 
   if (!tieneAccesoAdmin()) {
-    console.log(`🔒 AdminLayout: Usuario con rol "${user.rol}" no tiene acceso al panel admin`);
+    console.log(` AdminLayout: Usuario con rol "${user.rol}" no tiene acceso al panel admin`);
 
-    // ✅ Si es ciudadano, redirigir a app móvil
+    //  Si es ciudadano, redirigir a app móvil
     if (user.rol === 'ciudadano') {
       return <Navigate to="/mobile" replace />;
     }
 
-    // ✅ Otros roles no autorizados
+    //  Otros roles no autorizados
     return <Navigate to="/unauthorized" replace />;
   }
 
   return (
     <div className="flex h-screen bg-gray-100">
       <SecurityGuard />
-      {/* ✅ SessionMonitor dentro del fragment principal */}
+      {/*  SessionMonitor dentro del fragment principal */}
       <SessionMonitor />
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">

@@ -28,7 +28,7 @@ const MapaConDireccion = ({
     );
   }
 
-  // ✅ Obtener dirección automáticamente al montar el componente con AbortController
+  // Obtener dirección automáticamente al montar el componente con AbortController
   useEffect(() => {
     const obtenerDireccion = async () => {
       // Cancelar petición anterior si existe
@@ -58,14 +58,14 @@ const MapaConDireccion = ({
 
         const data = await response.json();
         
-        // ✅ Limpiar dirección si no hay datos
+        //  Limpiar dirección si no hay datos
         if (data && data.display_name) {
           setDireccion(data.display_name);
         } else {
           setDireccion('Dirección no disponible');
         }
       } catch (err) {
-        // ✅ Ignorar errores de cancelación
+        //  Ignorar errores de cancelación
         if (err.name !== 'AbortError' && err.code !== 'ERR_CANCELED') {
           console.error('Error obteniendo dirección:', err);
           setError('No se pudo obtener la dirección');
@@ -78,7 +78,7 @@ const MapaConDireccion = ({
 
     obtenerDireccion();
     
-    // ✅ Limpiar al desmontar
+    //  Limpiar al desmontar
     return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -86,7 +86,7 @@ const MapaConDireccion = ({
     };
   }, [lat, lng]);
 
-  // ✅ Función para reintentar obtener dirección
+  // Función para reintentar obtener dirección
   const handleReintentar = () => {
     setError('');
     setDireccion('');

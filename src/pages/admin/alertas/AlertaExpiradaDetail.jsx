@@ -302,7 +302,7 @@ const AlertaExpiradaDetail = () => {
             </button>
             <div>
               <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Alerta Expirada</h1>
-              <p className="text-sm text-gray-500 mt-1">Información de alerta no atendida #{alerta.id}</p>
+              <p className="text-sm text-gray-500 mt-1">Información de alerta no atendida</p>
             </div>
           </div>
 
@@ -458,8 +458,6 @@ const AlertaExpiradaDetail = () => {
               <h4 className="text-sm font-semibold text-gray-700 mb-4">Información de expiración</h4>
               <div className="space-y-3">
                 <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                  <span className="text-xs text-gray-500">ID de alerta</span>
-                  <span className="text-sm font-mono font-medium text-gray-800">#{alerta.id}</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-gray-100">
                   <span className="text-xs text-gray-500">Tipo</span>

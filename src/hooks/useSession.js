@@ -16,13 +16,13 @@ export const useSession = (options = {}) => {
   });
   const [loading, setLoading] = useState(true);
   
-  // ✅ Refs para AbortControllers y timeouts
+  //  Refs para AbortControllers y timeouts
   const verificarAbortControllerRef = useRef(null);
   const actividadAbortControllerRef = useRef(null);
   const actividadTimeoutRef = useRef(null);
   const ultimaActividadRef = useRef(Date.now());
 
-  // ✅ Función para cancelar todas las peticiones
+  //  Función para cancelar todas las peticiones
   const cancelarPeticiones = useCallback(() => {
     if (verificarAbortControllerRef.current) {
       verificarAbortControllerRef.current.abort();
@@ -38,12 +38,12 @@ export const useSession = (options = {}) => {
     }
   }, []);
 
-  // ✅ Verificar sesión con AbortController
+  //  Verificar sesión con AbortController
   const verificarSesion = useCallback(async () => {
     // Cancelar petición anterior si existe
     if (verificarAbortControllerRef.current) {
       verificarAbortControllerRef.current.abort();
-      console.log('🛑 Verificación de sesión anterior cancelada');
+      console.log(' Verificación de sesión anterior cancelada');
     }
     
     verificarAbortControllerRef.current = new AbortController();
@@ -55,9 +55,9 @@ export const useSession = (options = {}) => {
       setSessionState(estado);
       return estado;
     } catch (error) {
-      // ✅ Ignorar errores de cancelación
+      //  Ignorar errores de cancelación
       if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
-        console.log('🛑 Verificación de sesión cancelada');
+        console.log(' Verificación de sesión cancelada');
         return null;
       }
       console.error('Error verificando sesión:', error);
@@ -67,20 +67,20 @@ export const useSession = (options = {}) => {
     }
   }, []);
 
-  // ✅ Registrar actividad con debounce y throttle
+  //  Registrar actividad con debounce y throttle
   const registrarActividad = useCallback(async () => {
     // Limpiar timeout anterior
     if (actividadTimeoutRef.current) {
       clearTimeout(actividadTimeoutRef.current);
     }
     
-    // ✅ Debounce: esperar activityDebounce ms después del último evento
+    //  Debounce: esperar activityDebounce ms después del último evento
     actividadTimeoutRef.current = setTimeout(async () => {
       // Verificar si pasó suficiente tiempo desde la última actividad registrada
       const ahora = Date.now();
       const tiempoDesdeUltima = ahora - ultimaActividadRef.current;
       
-      // ✅ Throttle: solo registrar si pasaron activityThrottle ms
+      //  Throttle: solo registrar si pasaron activityThrottle ms
       if (tiempoDesdeUltima >= activityThrottle) {
         ultimaActividadRef.current = ahora;
         
@@ -95,9 +95,9 @@ export const useSession = (options = {}) => {
           await authService.registrarActividad({
             signal: actividadAbortControllerRef.current.signal
           });
-          console.log('🔄 Actividad registrada');
+          console.log('Actividad registrada');
         } catch (error) {
-          // ✅ Ignorar errores de cancelación y rate limit
+          //  Ignorar errores de cancelación y rate limit
           if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
             if (error.response?.status !== 429) {
               console.error('Error registrando actividad:', error);
@@ -110,7 +110,7 @@ export const useSession = (options = {}) => {
     }, activityDebounce);
   }, [activityThrottle, activityDebounce]);
 
-  // ✅ Intervalo para verificar sesión
+  //  Intervalo para verificar sesión
   useEffect(() => {
     verificarSesion();
     
@@ -123,20 +123,20 @@ export const useSession = (options = {}) => {
     };
   }, [verificarSesion, checkInterval]);
 
-  // ✅ Limpiar al desmontar
+  //  Limpiar al desmontar
   useEffect(() => {
     return () => {
       cancelarPeticiones();
     };
   }, [cancelarPeticiones]);
 
-  // ✅ Función para forzar verificación inmediata
+  //  Función para forzar verificación inmediata
   const refresh = useCallback(() => {
     setLoading(true);
     return verificarSesion();
   }, [verificarSesion]);
 
-  // ✅ Función para obtener tiempo restante formateado
+  //  Función para obtener tiempo restante formateado
   const getTiempoRestanteFormateado = useCallback(() => {
     const { minutos_restantes } = sessionState;
     if (!minutos_restantes) return null;
@@ -150,7 +150,7 @@ export const useSession = (options = {}) => {
     return `${minutos}min`;
   }, [sessionState]);
 
-  // ✅ Indicador de sesión próxima a expirar (menos de 5 minutos)
+  //  Indicador de sesión próxima a expirar (menos de 5 minutos)
   const isExpiringSoon = useCallback(() => {
     const { minutos_restantes } = sessionState;
     return minutos_restantes !== null && minutos_restantes <= 5 && minutos_restantes > 0;
@@ -168,10 +168,10 @@ export const useSession = (options = {}) => {
   };
 };
 
-// ✅ Versión con monitoreo de inactividad automático
+//  Versión con monitoreo de inactividad automático
 export const useSessionWithInactivity = (options = {}) => {
   const { 
-    inactivityTimeout = 5 * 60 * 1000, // 5 minutos
+    inactivityTimeout = 15 * 60 * 1000, // 15 minutos
     onInactivityWarning,
     onInactivityLogout
   } = options;
@@ -182,7 +182,7 @@ export const useSessionWithInactivity = (options = {}) => {
   const inactivityTimerRef = useRef(null);
   const warningTimerRef = useRef(null);
 
-  // ✅ Resetear timers de inactividad
+  //  Resetear timers de inactividad
   const resetInactivityTimers = useCallback(() => {
     setInactivityCounter(0);
     setInactivityWarning(false);
@@ -210,7 +210,7 @@ export const useSessionWithInactivity = (options = {}) => {
     }, inactivityTimeout);
   }, [inactivityTimeout, onInactivityWarning, onInactivityLogout]);
 
-  // ✅ Escuchar actividad del usuario
+  //  Escuchar actividad del usuario
   useEffect(() => {
     const eventos = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
     
@@ -246,7 +246,7 @@ export const useSessionWithInactivity = (options = {}) => {
   };
 };
 
-// ✅ Versión con conteo regresivo visual
+//  Versión con conteo regresivo visual
 export const useSessionCountdown = () => {
   const session = useSession();
   const [countdown, setCountdown] = useState(null);

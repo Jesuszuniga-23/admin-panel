@@ -14,6 +14,18 @@ import authService from '../../../services/auth.service';
 import useAuthStore from '../../../store/authStore';
 import axiosInstance from '../../../services/api/axiosConfig';
 
+const getNombreRol = (rol) => {
+    const nombres = {
+        admin: 'Administradores',
+        operador_tecnico: 'Operadores Técnicos',
+        operador_medico: 'Operadores Médicos',
+        operador_policial: 'Operadores Policiales',
+        operador_general: 'Operadores Generales',
+        policia: 'Policías',
+        paramedico: 'Paramédicos'
+    };
+    return nombres[rol] || rol;
+};
 // ✅ Función para obtener icono según rol (para preview)
 const getIconoPorRolPreview = (rol, size = 20) => {
   const iconos = {
@@ -210,26 +222,7 @@ const PersonalForm = () => {
       setOriginalFormData(JSON.parse(JSON.stringify(formData)));
     }
   }, [formData, originalFormData, cargandoDatos]);
-  useEffect(() => {
-    const verificarLimites = async () => {
-      try {
-        const response = await axiosInstance.get('/admin/tenants/plan/limites');
-        if (response.data.success) {
-          const limites = response.data.data;
-          const rolSeleccionado = formData.rol;
-          const limiteRol = limites.roles[rolSeleccionado];
-
-          if (limiteRol && limiteRol.limite > 0 && limiteRol.actual >= limiteRol.limite) {
-            toast.error(`Has alcanzado el límite de ${rolSeleccionado} para tu plan. Considera actualizar a un plan superior.`);
-          }
-        }
-      } catch (error) {
-        console.error('Error verificando límites:', error);
-      }
-    };
-
-    if (!isEditing) verificarLimites();
-  }, [formData.rol, isEditing]);
+  
 
   // Función para verificar si hay cambios
   const hasUnsavedChanges = () => {
@@ -750,9 +743,9 @@ const PersonalForm = () => {
 
       // Si es error de límite de plan, mostrar por más tiempo
       if (mensajeError.includes('límite') || mensajeError.includes('plan')) {
-        toast.error(mensajeError, {
-          duration: 7000,
-          icon: <AlertTriangle size={18} className="text-amber-600" />  // ✅ Icono puro de Lucide React
+        toast.warning(mensajeError, {
+            duration: 7000,
+            icon: <AlertTriangle size={18} className="text-amber-600" />
         });
       } else {
         toast.error(mensajeError);
@@ -1065,9 +1058,6 @@ const PersonalForm = () => {
                           <option key={rol} value={rol}>{rolTexto[rol] || rol}</option>
                         ))}
                       </select>
-                    </div>
-                    <div className="mt-2">
-                      <BadgeIcono entidad={rolPreview.entidad} texto={rolPreview.texto} size={12} />
                     </div>
                     {isEditing && (
                       <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
