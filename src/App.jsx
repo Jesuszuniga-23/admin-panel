@@ -6,8 +6,11 @@ import AppRouter from './routes/AppRouter';
 import useAuthStore from './store/authStore';
 import SecurityGuard from './components/common/SecurityGuard';
 
-// ✅ Timeout para loading infinito (10 segundos)
+const isProduction = import.meta.env.PROD;
+
+// Timeout para loading infinito (10 segundos)
 const LOADING_TIMEOUT = 10000;
+
 
 function App() {
   const { initFromService, isLoading, setLoading } = useAuthStore();
@@ -20,24 +23,23 @@ function App() {
 
     const inicializar = async () => {
       try {
-        console.log('🚀 App iniciando, inicializando auth...');
+        if (!isProduction) console.log('inicializando ...');
         await initFromService();
-        if (isMounted) {
-          console.log('✅ Autenticación inicializada correctamente');
+        if (isMounted && !isProduction) {
+          console.log('Autenticación  correctamente');
         }
       } catch (error) {
-        console.error('❌ Error inicializando autenticación:', error);
+        console.error('Error inicializando autenticación:', error);
         if (isMounted) {
           setInitError(error.message || 'Error al inicializar la aplicación');
-          setLoading(false); // Asegurar que salga del loading
+          setLoading(false);
         }
       }
     };
 
-    // ✅ Timeout para loading infinito
     timeoutId = setTimeout(() => {
       if (isMounted && isLoading) {
-        console.warn('⚠️ Timeout en inicialización de autenticación');
+        if (!isProduction) console.warn('Timeout en inicialización de autenticación');
         setTimeoutExcedido(true);
         setLoading(false);
       }
@@ -45,13 +47,14 @@ function App() {
 
     inicializar();
 
+
     return () => {
       isMounted = false;
       if (timeoutId) {
         clearTimeout(timeoutId);
       }
     };
-  }, [initFromService, setLoading, isLoading]);
+  }, [initFromService, setLoading, isLoading, isProduction]);
 
   // ✅ Mostrar error si hubo problema en inicialización
   if (initError) {

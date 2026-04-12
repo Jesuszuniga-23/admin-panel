@@ -2,16 +2,40 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { GoogleOAuthProvider } from '@react-oauth/google';
-import App from './App'; // ✅ CORREGIDO: Importar App, no AppRouter
+import App from './App';
 import './index.css';
 
-// ✅ Validar configuración de Google Client ID
+// SILENCIAR LOGS EN PRODUCCIÓN
+// Detectar si estamos en producción (Vercel o cualquier dominio que no sea localhost)
+const isProduction = import.meta.env.PROD ||
+  (window.location.hostname !== 'localhost' &&
+    !window.location.hostname.includes('127.0.0.1'));
+
+if (isProduction) {
+  // Guardar referencia al console.error original
+  const originalError = console.error;
+
+  // Silenciar todos los logs EXCEPTO errores críticos
+  console.log = () => { };
+  console.info = () => { };
+  console.debug = () => { };
+  console.warn = () => { };
+
+  // Mantener console.error para errores reales
+  console.error = (...args) => {
+    // Solo mostrar errores que NO sean de desarrollo
+    if (args[0]?.includes?.('❌') || args[0]?.includes?.('Error')) {
+      originalError(...args);
+    }
+  };
+}
+
+//Validar configuración de Google Client ID
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 if (!GOOGLE_CLIENT_ID) {
-  console.error('❌ VITE_GOOGLE_CLIENT_ID no está configurado en las variables de entorno');
-  
-  // ✅ Mostrar error en la UI si no está configurado
+  console.error(' VITE_GOOGLE_CLIENT_ID no está configurado en las variables de entorno');
+
   const root = document.getElementById('root');
   if (root) {
     root.innerHTML = `
@@ -38,19 +62,22 @@ if (!GOOGLE_CLIENT_ID) {
   throw new Error('VITE_GOOGLE_CLIENT_ID no está configurado');
 }
 
-// ✅ Verificar que el elemento root existe
+// Verificar que el elemento root existe
 const rootElement = document.getElementById('root');
 if (!rootElement) {
   console.error('❌ No se encontró el elemento con id "root" en el DOM');
   throw new Error('No se encontró el elemento root');
 }
 
-// ✅ Función para renderizar con manejo de errores
+// Función para renderizar con manejo de errores
 const renderApp = () => {
   try {
-    console.log('🚀 Iniciando aplicación...');
-    console.log('📧 Google Client ID configurado:', GOOGLE_CLIENT_ID ? '✅ Sí' : '❌ No');
-    
+    // Solo mostrar estos logs en desarrollo
+    if (!isProduction) {
+      console.log('Iniciando aplicación...');
+      console.log('Google Client:', GOOGLE_CLIENT_ID ? 'Sí' : 'No');
+    }
+
     ReactDOM.createRoot(rootElement).render(
       <React.StrictMode>
         <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
@@ -58,12 +85,13 @@ const renderApp = () => {
         </GoogleOAuthProvider>
       </React.StrictMode>
     );
-    
-    console.log('✅ Aplicación montada correctamente');
+
+    if (!isProduction) {
+      console.log('Aplicación montada correctamente');
+    }
   } catch (error) {
-    console.error('❌ Error montando la aplicación:', error);
-    
-    // ✅ Mostrar error en la UI
+    console.error('Error montando la aplicación:', error);
+
     rootElement.innerHTML = `
       <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #f3f4f6; padding: 16px;">
         <div style="background: white; border-radius: 16px; padding: 32px; max-width: 400px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
@@ -86,5 +114,5 @@ const renderApp = () => {
   }
 };
 
-// ✅ Ejecutar renderizado
+// Ejecutar renderizado
 renderApp();
