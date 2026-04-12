@@ -49,21 +49,21 @@ const formatearNombre = (nombre) => {
 
 // Valores por defecto - ACTUALIZADO con todos los roles
 const defaultData = {
-  personal: { 
-    total: 0, 
-    activos: 0, 
-    inactivos: 0, 
-    disponibles: 0, 
-    noDisponibles: 0, 
-    porRol: { 
-      policia: 0, 
-      paramedico: 0, 
-      admin: 0, 
+  personal: {
+    total: 0,
+    activos: 0,
+    inactivos: 0,
+    disponibles: 0,
+    noDisponibles: 0,
+    porRol: {
+      policia: 0,
+      paramedico: 0,
+      admin: 0,
       operador_tecnico: 0,
       operador_medico: 0,
       operador_policial: 0,
       operador_general: 0
-    } 
+    }
   },
   unidades: { total: 0, activas: 0, inactivas: 0, disponibles: 0, ocupadas: 0, porTipo: { patrulla: 0, ambulancia: 0 } },
   alertas: { expiradas: 0, cerradasManual: 0, totalAlertas: 0, activas: 0, enProceso: 0, cerradasTotales: 0 },
@@ -76,13 +76,20 @@ const defaultData = {
   alertasPorHora: []
 };
 
-// Función para calcular variación
+// Función para calcular variación - CORREGIDA
 const calcularVariacion = (actual, anterior) => {
+  // Si no hay datos anteriores
   if (!anterior || anterior === 0) {
+    // Si hay datos actuales, mostrar +100%
+    if (actual > 0) {
+      return { variacion: '+100%', tendencia: 'up' };
+    }
     return { variacion: '0%', tendencia: 'stable' };
   }
+
+  // Si hay datos anteriores, calcular porcentaje
   const porcentaje = ((actual - anterior) / anterior) * 100;
-  const variacion = `${Math.abs(Math.round(porcentaje))}%`;
+  const variacion = `${porcentaje > 0 ? '+' : ''}${Math.round(Math.abs(porcentaje))}%`;
   const tendencia = porcentaje > 0 ? 'up' : porcentaje < 0 ? 'down' : 'stable';
   return { variacion, tendencia };
 };
@@ -205,14 +212,14 @@ const Dashboard = () => {
   // =====================================================
   const getPersonalDistributionData = useCallback(() => {
     const porRol = stats?.personal?.porRol || {};
-    
+
     if (rolPersonalPermitido === 'policia') {
       return [{ name: 'Policía', value: porRol.policia || 0 }];
     }
     if (rolPersonalPermitido === 'paramedico') {
       return [{ name: 'Paramédico', value: porRol.paramedico || 0 }];
     }
-    
+
     // ✅ TODOS LOS ROLES (sin superadmin)
     const todosLosRoles = [
       { key: 'policia', name: 'Policía' },
@@ -223,18 +230,18 @@ const Dashboard = () => {
       { key: 'operador_policial', name: 'Op. Policial' },
       { key: 'operador_general', name: 'Op. General' }
     ];
-    
+
     const rolesConValor = todosLosRoles
       .map(rol => ({
         name: rol.name,
         value: porRol[rol.key] || 0
       }))
       .filter(item => item.value > 0);
-    
+
     if (rolesConValor.length === 0) {
       return [{ name: 'Sin datos', value: 1 }];
     }
-    
+
     return rolesConValor;
   }, [rolPersonalPermitido, stats?.personal?.porRol]);
 
